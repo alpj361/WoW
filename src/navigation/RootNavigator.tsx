@@ -26,6 +26,7 @@ export type TabParamList = {
   Map: undefined;
   Events: undefined;
   Profile: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
