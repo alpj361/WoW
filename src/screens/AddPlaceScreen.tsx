@@ -210,11 +210,12 @@ export default function AddPlaceScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={!name.trim() || !description.trim() || !address.trim()}
-            className={`rounded-full py-4 flex-row items-center justify-center ${
-              name.trim() && description.trim() && address.trim()
-                ? "bg-indigo-600"
-                : "bg-gray-300"
-            }`}
+            className="rounded-full py-4 flex-row items-center justify-center"
+            style={{
+              backgroundColor: name.trim() && description.trim() && address.trim()
+                ? "#0A2472"
+                : "#D1D5DB"
+            }}
           >
             <Ionicons
               name="checkmark-circle"
