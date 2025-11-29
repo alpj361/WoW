@@ -5,7 +5,7 @@ services:
     buildCommand: |
       apt-get update
       apt-get install -y php-curl php-json php-mbstring
-    startCommand: php -S 0.0.0.0:$PORT -t .
+    startCommand: php -S 0.0.0.0:$PORT -t . router.php
     envVars:
       - key: OUTSCRAPER_API_KEY
         sync: false
