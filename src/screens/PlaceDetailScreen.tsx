@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   Share,
+  Linking,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,6 +25,8 @@ import { usePlacesStore } from "../state/placesStore";
 import { useUserStore } from "../state/userStore";
 import { useEventsStore } from "../state/eventsStore";
 import { RootStackParamList } from "../navigation/RootNavigator";
+import { fetchInstagramPosts, getTimeAgo } from "../utils/instagramService";
+import { InstagramPost } from "../types/place";
 
 type RouteParams = RouteProp<RootStackParamList, "PlaceDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
