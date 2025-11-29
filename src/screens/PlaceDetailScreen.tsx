@@ -46,8 +46,21 @@ export default function PlaceDetailScreen() {
 
   const place = places.find((p) => p.id === placeId);
   const placeEvents = events.filter((e) => e.placeId === placeId);
+  const [instagramPosts, setInstagramPosts] = useState<InstagramPost[]>([]);
+  const [loadingInstagram, setLoadingInstagram] = useState(false);
 
   const scrollY = useSharedValue(0);
+
+  // Load Instagram posts when component mounts
+  useEffect(() => {
+    if (place?.instagramHandle) {
+      setLoadingInstagram(true);
+      fetchInstagramPosts(place.instagramHandle)
+        .then(posts => setInstagramPosts(posts))
+        .catch(err => console.error('Error loading Instagram posts:', err))
+        .finally(() => setLoadingInstagram(false));
+    }
+  }, [place?.instagramHandle]);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
