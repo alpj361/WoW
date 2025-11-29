@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: collaborative-map-backend
+    env: php
+    buildCommand: |
+      apt-get update
+      apt-get install -y php-curl php-json php-mbstring
+    startCommand: php -S 0.0.0.0:$PORT -t .
+    envVars:
+      - key: OUTSCRAPER_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
+      - key: SUPADATA_API_KEY
+        sync: false
+      - key: CACHE_DURATION
+        value: 3600
+      - key: MAX_RESULTS_PER_QUERY
+        value: 20
+      - key: DEFAULT_COUNTRY
+        value: Guatemala
+      - key: DEFAULT_LANGUAGE
+        value: es
