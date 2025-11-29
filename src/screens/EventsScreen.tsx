@@ -39,7 +39,8 @@ export default function EventsScreen() {
           <Text className="text-2xl font-bold text-gray-900">Events</Text>
           <Pressable
             onPress={() => navigation.navigate("CreateEvent", {})}
-            className="bg-indigo-600 rounded-full px-4 py-2.5 flex-row items-center"
+            className="rounded-full px-4 py-2.5 flex-row items-center"
+            style={{ backgroundColor: "#0A2472" }}
           >
             <Ionicons name="add" size={18} color="white" />
             <Text className="text-white font-semibold ml-1 text-sm">
