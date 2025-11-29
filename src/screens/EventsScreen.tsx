@@ -98,11 +98,11 @@ export default function EventsScreen() {
                   <View className="p-4">
                     {/* Date Badge */}
                     <View className="flex-row items-center mb-2">
-                      <View className="bg-indigo-100 rounded-lg px-3 py-2 mr-3">
-                        <Text className="text-2xl font-bold text-indigo-600">
+                      <View className="rounded-lg px-3 py-2 mr-3" style={{ backgroundColor: "#E8EAF6" }}>
+                        <Text className="text-2xl font-bold" style={{ color: "#0A2472" }}>
                           {format(new Date(event.date), "dd")}
                         </Text>
-                        <Text className="text-xs font-semibold text-indigo-600 uppercase">
+                        <Text className="text-xs font-semibold uppercase" style={{ color: "#0A2472" }}>
                           {format(new Date(event.date), "MMM")}
                         </Text>
                       </View>
