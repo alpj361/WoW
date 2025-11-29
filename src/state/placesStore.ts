@@ -14,7 +14,7 @@ interface PlacesState {
   incrementCheckIn: (placeId: string) => void;
 }
 
-// Mock data with artistic style
+// Mock data with artistic style and new color palette
 const MOCK_PLACES: Place[] = [
   {
     id: "1",
@@ -30,9 +30,10 @@ const MOCK_PLACES: Place[] = [
     rating: 4.8,
     priceLevel: "$$",
     features: ["Coffee", "Milkshakes", "Desserts"],
-    primaryColor: "#4F46E5",
+    primaryColor: "#0A2472",
     checkInCount: 234,
     isFavorite: false,
+    instagramHandle: "coffeehaven",
   },
   {
     id: "2",
@@ -48,9 +49,10 @@ const MOCK_PLACES: Place[] = [
     rating: 4.6,
     priceLevel: "$$$",
     features: ["WiFi", "Meeting Rooms", "Coffee Bar", "Printing"],
-    primaryColor: "#10B981",
+    primaryColor: "#1E3A8A",
     checkInCount: 456,
     isFavorite: false,
+    instagramHandle: "thecoworkspace",
   },
   {
     id: "3",
@@ -66,9 +68,10 @@ const MOCK_PLACES: Place[] = [
     rating: 4.9,
     priceLevel: "$$$",
     features: ["Italian", "Wine Bar", "Outdoor Seating"],
-    primaryColor: "#EF4444",
+    primaryColor: "#0A2472",
     checkInCount: 789,
     isFavorite: false,
+    instagramHandle: "latrattorianyc",
   },
   {
     id: "4",
@@ -84,9 +87,10 @@ const MOCK_PLACES: Place[] = [
     rating: 4.7,
     priceLevel: "$$$",
     features: ["Cocktails", "Live Music", "Rooftop"],
-    primaryColor: "#F59E0B",
+    primaryColor: "#1E3A8A",
     checkInCount: 567,
     isFavorite: false,
+    instagramHandle: "sunsetloungenyc",
   },
   {
     id: "5",
@@ -102,9 +106,10 @@ const MOCK_PLACES: Place[] = [
     rating: 4.5,
     priceLevel: "$",
     features: ["Books", "Coffee", "Pastries", "Quiet Space"],
-    primaryColor: "#8B5CF6",
+    primaryColor: "#0A2472",
     checkInCount: 345,
     isFavorite: false,
+    instagramHandle: "beanandbooks",
   },
 ];
 
