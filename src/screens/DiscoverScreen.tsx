@@ -27,6 +27,9 @@ import {
   HandDrawnFoodIcon,
   HandDrawnBarIcon,
   HandDrawnCoworkingIcon,
+  HandDrawnGymIcon,
+  HandDrawnHotelIcon,
+  HandDrawnShoppingIcon,
 } from "../components/HandDrawnIcons";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
