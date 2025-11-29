@@ -87,6 +87,12 @@ export default function DiscoverScreen() {
         return <HandDrawnBarIcon size={size} color={color} />;
       case "coworking":
         return <HandDrawnCoworkingIcon size={size} color={color} />;
+      case "gym":
+        return <HandDrawnGymIcon size={size} color={color} />;
+      case "hotel":
+        return <HandDrawnHotelIcon size={size} color={color} />;
+      case "shopping":
+        return <HandDrawnShoppingIcon size={size} color={color} />;
       default:
         return null;
     }
