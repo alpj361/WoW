@@ -39,3 +39,7 @@ android/
 
 # Expo log
 expo.log
+-e 
+# Environment files
+*.env
+*.env.*
