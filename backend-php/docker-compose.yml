@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+    environment:
+      - OUTSCRAPER_API_KEY=${OUTSCRAPER_API_KEY:-your_key_here}
+      - EXA_API_KEY=${EXA_API_KEY:-your_key_here}
+      - SUPADATA_API_KEY=${SUPADATA_API_KEY:-your_key_here}
+      - CACHE_DURATION=3600
+      - MAX_RESULTS_PER_QUERY=20
+      - DEFAULT_COUNTRY=Guatemala
+      - DEFAULT_LANGUAGE=es
+    volumes:
+      - ./cache:/var/www/html/cache
+      - ./.env:/var/www/html/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
