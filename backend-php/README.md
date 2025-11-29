@@ -18,7 +18,7 @@ Edita `.env` y agrega tus API keys:
 ### 2. Servidor Local (Testing)
 
 ```bash
-php -S localhost:8000
+php -S localhost:8000 router.php
 ```
 
 ### 3. Deploy a VPS
