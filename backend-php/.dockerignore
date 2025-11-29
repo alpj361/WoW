@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+*.log
+cache/*.json
+.env
+README.md
+render.yaml
+.render-buildpacks.yml
+Procfile
+composer.json
