@@ -24,8 +24,8 @@ export default function ProfileScreen() {
     <View className="flex-1 bg-white">
       {/* Header */}
       <View
-        style={{ paddingTop: insets.top }}
-        className="bg-indigo-600 pb-6"
+        style={{ paddingTop: insets.top, backgroundColor: "#0A2472" }}
+        className="pb-6"
       >
         <View className="px-5 py-4">
           <Text className="text-2xl font-bold text-white">Profile</Text>
