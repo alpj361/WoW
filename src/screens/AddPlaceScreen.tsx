@@ -109,9 +109,10 @@ export default function AddPlaceScreen() {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setCategory(cat.id);
                   }}
-                  className={`flex-1 min-w-[45%] rounded-xl py-4 px-3 flex-row items-center justify-center ${
-                    category === cat.id ? "bg-indigo-600" : "bg-gray-50"
-                  }`}
+                  className="flex-1 min-w-[45%] rounded-xl py-4 px-3 flex-row items-center justify-center"
+                  style={{
+                    backgroundColor: category === cat.id ? "#0A2472" : "#F9FAFB"
+                  }}
                 >
                   <Ionicons
                     name={cat.icon as keyof typeof Ionicons.glyphMap}
