@@ -105,9 +105,12 @@ export default function MapScreen() {
   const CATEGORIES = [
     { id: "all", label: "All", icon: "apps" },
     { id: "coffee", label: "Coffee", icon: "cafe" },
-    { id: "coworking", label: "Cowork", icon: "briefcase" },
     { id: "restaurant", label: "Food", icon: "restaurant" },
     { id: "bar", label: "Bars", icon: "wine" },
+    { id: "coworking", label: "Cowork", icon: "briefcase" },
+    { id: "gym", label: "Gym", icon: "fitness" },
+    { id: "hotel", label: "Hotels", icon: "bed" },
+    { id: "shopping", label: "Shop", icon: "cart" },
   ] as const;
 
   return (
