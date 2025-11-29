@@ -61,9 +61,10 @@ function TabNavigator() {
 
           return (
             <View
-              className={`items-center justify-center ${
-                focused ? "bg-indigo-50" : ""
-              } rounded-full px-6 py-2`}
+              className="items-center justify-center rounded-full px-6 py-2"
+              style={{
+                backgroundColor: focused ? "#E8EAF6" : "transparent"
+              }}
             >
               <Ionicons name={iconName} size={size} color={color} />
             </View>
