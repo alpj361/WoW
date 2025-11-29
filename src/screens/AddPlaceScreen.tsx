@@ -37,6 +37,7 @@ export default function AddPlaceScreen() {
   const [address, setAddress] = useState("");
   const [hours, setHours] = useState("");
   const [contact, setContact] = useState("");
+  const [instagram, setInstagram] = useState("");
 
   const handleSubmit = () => {
     if (!name.trim() || !description.trim() || !address.trim()) {
