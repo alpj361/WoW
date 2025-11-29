@@ -3,6 +3,9 @@ export type PlaceCategory =
   | "restaurant"
   | "bar"
   | "coffee"
+  | "gym"
+  | "hotel"
+  | "shopping"
   | "event";
 
 export interface Place {
