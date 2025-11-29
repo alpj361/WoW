@@ -22,11 +22,17 @@ import { usePlacesStore } from "../state/placesStore";
 import { useUserStore } from "../state/userStore";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { PlaceCategory } from "../types/place";
+import {
+  HandDrawnCoffeeIcon,
+  HandDrawnFoodIcon,
+  HandDrawnBarIcon,
+  HandDrawnCoworkingIcon,
+} from "../components/HandDrawnIcons";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width, height } = Dimensions.get("window");
-const CARD_HEIGHT = height * 0.72;
+const CARD_HEIGHT = height * 0.65;
 
 const CATEGORIES = [
   { id: "all", label: "All", icon: "apps" },
@@ -63,15 +69,34 @@ export default function DiscoverScreen() {
       ? places
       : places.filter((p) => p.category === selectedCategory);
 
+  // Render category icon based on place type
+  const renderCategoryIcon = (category: PlaceCategory, size: number = 80) => {
+    const color = "white";
+    switch (category) {
+      case "coffee":
+        return <HandDrawnCoffeeIcon size={size} color={color} />;
+      case "restaurant":
+        return <HandDrawnFoodIcon size={size} color={color} />;
+      case "bar":
+        return <HandDrawnBarIcon size={size} color={color} />;
+      case "coworking":
+        return <HandDrawnCoworkingIcon size={size} color={color} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-gray-50">
       {/* Header with blur effect */}
       <Animated.View
         style={[headerStyle]}
         className="absolute top-0 left-0 right-0 z-10 bg-white/95 border-b border-gray-100"
       >
         <View style={{ paddingTop: insets.top }} className="px-5 py-4">
-          <Text className="text-2xl font-bold text-gray-900">Discover</Text>
+          <Text className="text-2xl font-bold" style={{ color: "#0A2472" }}>
+            Discover
+          </Text>
         </View>
       </Animated.View>
 
@@ -85,19 +110,23 @@ export default function DiscoverScreen() {
         <View className="px-5 pt-6 pb-4">
           <View className="flex-row items-center justify-between mb-1">
             <View className="flex-row items-center">
-              <View className="w-10 h-10 bg-indigo-100 rounded-full items-center justify-center mr-3">
-                <Ionicons name="person" size={20} color="#4F46E5" />
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: "#E8EAF6" }}
+              >
+                <Ionicons name="person" size={20} color="#0A2472" />
               </View>
               <View>
                 <Text className="text-sm text-gray-500">Welcome back</Text>
-                <Text className="text-xl font-bold text-gray-900">
+                <Text className="text-xl font-bold" style={{ color: "#0A2472" }}>
                   {profile.name}
                 </Text>
               </View>
             </View>
             <Pressable
               onPress={() => navigation.navigate("AddPlace")}
-              className="bg-indigo-600 rounded-full px-4 py-2.5 flex-row items-center"
+              className="rounded-full px-4 py-2.5 flex-row items-center"
+              style={{ backgroundColor: "#0A2472" }}
             >
               <Ionicons name="add" size={18} color="white" />
               <Text className="text-white font-semibold ml-1 text-sm">
@@ -120,11 +149,11 @@ export default function DiscoverScreen() {
               onPress={() =>
                 setSelectedCategory(category.id as PlaceCategory | "all")
               }
-              className={`px-4 py-2.5 rounded-full flex-row items-center ${
-                selectedCategory === category.id
-                  ? "bg-indigo-600"
-                  : "bg-gray-100"
-              }`}
+              className="px-4 py-2.5 rounded-full flex-row items-center"
+              style={{
+                backgroundColor:
+                  selectedCategory === category.id ? "#0A2472" : "white",
+              }}
             >
               <Ionicons
                 name={category.icon as keyof typeof Ionicons.glyphMap}
@@ -144,7 +173,7 @@ export default function DiscoverScreen() {
           ))}
         </ScrollView>
 
-        {/* Places Grid/Cards */}
+        {/* Places Cards - Hand-drawn style */}
         <View className="px-5 pb-8">
           {filteredPlaces.map((place, index) => (
             <Pressable
@@ -155,38 +184,28 @@ export default function DiscoverScreen() {
               className="mb-6"
             >
               <View
-                className="rounded-3xl overflow-hidden shadow-lg"
+                className="rounded-3xl overflow-hidden"
                 style={{
                   height: CARD_HEIGHT,
                   shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 12,
-                  elevation: 8,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 16,
+                  elevation: 10,
                 }}
               >
-                {/* Background Image */}
-                <Image
-                  source={{ uri: place.images[0] }}
-                  className="absolute inset-0 w-full h-full"
-                  resizeMode="cover"
-                />
-
-                {/* Gradient Overlay */}
+                {/* Background with gradient */}
                 <LinearGradient
-                  colors={[
-                    "transparent",
-                    "rgba(0,0,0,0.3)",
-                    place.primaryColor || "#4F46E5",
-                  ]}
+                  colors={[place.primaryColor || "#0A2472", "#1E3A8A"]}
                   style={{ flex: 1 }}
-                  locations={[0, 0.5, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
                 >
                   <View className="flex-1 justify-between p-6">
-                    {/* Top Section - Category Badge */}
+                    {/* Top Section - Category Badge & Favorite */}
                     <View className="flex-row justify-between items-start">
                       <View className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5">
-                        <Text className="text-xs font-semibold text-gray-800 capitalize">
+                        <Text className="text-xs font-semibold capitalize" style={{ color: place.primaryColor || "#0A2472" }}>
                           {place.category}
                         </Text>
                       </View>
@@ -205,9 +224,14 @@ export default function DiscoverScreen() {
                       </Pressable>
                     </View>
 
+                    {/* Center Section - Hand-drawn Illustration */}
+                    <View className="items-center justify-center flex-1">
+                      {renderCategoryIcon(place.category, 120)}
+                    </View>
+
                     {/* Bottom Section - Place Info */}
                     <View>
-                      <Text className="text-5xl font-bold text-white mb-3">
+                      <Text className="text-4xl font-bold text-white mb-2">
                         {place.name}
                       </Text>
                       <Text className="text-white/90 text-base mb-4 leading-6">
@@ -270,7 +294,7 @@ export default function DiscoverScreen() {
                           </View>
                         </View>
                         <View className="bg-white rounded-full px-4 py-2">
-                          <Text className="font-bold text-gray-900">
+                          <Text className="font-bold" style={{ color: place.primaryColor || "#0A2472" }}>
                             {place.priceLevel}
                           </Text>
                         </View>
