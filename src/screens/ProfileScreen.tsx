@@ -88,7 +88,7 @@ export default function ProfileScreen() {
               Favorite Places
             </Text>
             {favoritePlaces.length > 0 && (
-              <Text className="text-sm text-indigo-600 font-semibold">
+              <Text className="text-sm font-semibold" style={{ color: "#0A2472" }}>
                 {favoritePlaces.length} places
               </Text>
             )}
