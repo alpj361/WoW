@@ -96,6 +96,11 @@ function TabNavigator() {
         component={ProfileScreen}
         options={{ tabBarLabel: "Profile" }}
       />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ tabBarLabel: "Settings" }}
+      />
     </Tab.Navigator>
   );
 }
