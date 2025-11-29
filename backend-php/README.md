@@ -17,6 +17,29 @@ Edita `.env` y agrega tus API keys:
 
 ### 2. Servidor Local (Testing)
 
+#### Opción A: Con Docker (Recomendado)
+
+```bash
+# Construir imagen
+docker-compose build
+
+# Iniciar servidor
+docker-compose up
+
+# En segundo plano
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f
+
+# Detener
+docker-compose down
+```
+
+Backend disponible en: http://localhost:8000
+
+#### Opción B: Sin Docker (PHP directo)
+
 ```bash
 php -S localhost:8000 router.php
 ```
