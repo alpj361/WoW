@@ -35,8 +35,8 @@ export default function ProfileScreen() {
         <View className="px-5">
           <View className="bg-white rounded-2xl p-5 shadow-sm">
             <View className="flex-row items-center mb-4">
-              <View className="w-16 h-16 bg-indigo-100 rounded-full items-center justify-center mr-4">
-                <Text className="text-2xl font-bold text-indigo-600">
+              <View className="w-16 h-16 rounded-full items-center justify-center mr-4" style={{ backgroundColor: "#E8EAF6" }}>
+                <Text className="text-2xl font-bold" style={{ color: "#0A2472" }}>
                   {profile.name.charAt(0)}
                 </Text>
               </View>
