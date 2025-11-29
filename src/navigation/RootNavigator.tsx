@@ -59,6 +59,8 @@ function TabNavigator() {
             iconName = focused ? "calendar" : "calendar-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
+          } else if (route.name === "Settings") {
+            iconName = focused ? "settings" : "settings-outline";
           }
 
           return (
