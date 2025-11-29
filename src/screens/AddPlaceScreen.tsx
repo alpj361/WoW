@@ -60,10 +60,11 @@ export default function AddPlaceScreen() {
       rating: undefined,
       priceLevel: "$$" as const,
       features: [],
-      primaryColor: "#4F46E5",
+      primaryColor: "#0A2472",
       createdBy: profile.id,
       checkInCount: 0,
       isFavorite: false,
+      instagramHandle: instagram.trim().replace('@', ''),
     };
 
     addPlace(newPlace);
