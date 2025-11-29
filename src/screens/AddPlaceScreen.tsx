@@ -190,6 +190,21 @@ export default function AddPlaceScreen() {
             />
           </View>
 
+          {/* Instagram Handle */}
+          <View className="mb-6">
+            <Text className="text-base font-semibold text-gray-900 mb-2">
+              Instagram (Optional)
+            </Text>
+            <TextInput
+              value={instagram}
+              onChangeText={setInstagram}
+              placeholder="@username"
+              autoCapitalize="none"
+              className="bg-gray-50 rounded-xl px-4 py-3.5 text-base text-gray-900"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
           {/* Submit Button */}
           <Pressable
             onPress={handleSubmit}
