@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
 
-// Import screens (to be created)
+// Import screens
 import DiscoverScreen from "../screens/DiscoverScreen";
 import MapScreen from "../screens/MapScreen";
 import EventsScreen from "../screens/EventsScreen";
@@ -12,6 +12,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 import PlaceDetailScreen from "../screens/PlaceDetailScreen";
 import AddPlaceScreen from "../screens/AddPlaceScreen";
 import CreateEventScreen from "../screens/CreateEventScreen";
+import SettingsScreen from "../screens/SettingsScreen";
 
 export type RootStackParamList = {
   MainTabs: undefined;
