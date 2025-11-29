@@ -152,11 +152,10 @@ export default function EventsScreen() {
                       </View>
                       <Pressable
                         onPress={() => toggleAttendance(event.id)}
-                        className={`px-5 py-2.5 rounded-full ${
-                          event.isUserAttending
-                            ? "bg-gray-100"
-                            : "bg-indigo-600"
-                        }`}
+                        className="px-5 py-2.5 rounded-full"
+                        style={{
+                          backgroundColor: event.isUserAttending ? "#F3F4F6" : "#0A2472"
+                        }}
                       >
                         <Text
                           className={`font-semibold ${
