@@ -6,9 +6,7 @@
 // IMPORTANT: Update this URL based on your environment
 // For local testing: http://localhost:8000 or http://YOUR_IP:8000
 // For production: https://your-domain.com
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000'  // Change to your computer's IP for mobile testing
-  : 'https://TU-SERVICE.onrender.com'; // REEMPLAZA con tu URL de Render
+const API_BASE_URL = 'https://mapshub.onrender.com';
 
 interface ApiResponse<T> {
   success: boolean;
