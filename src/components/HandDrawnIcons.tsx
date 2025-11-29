@@ -209,6 +209,102 @@ export const HandDrawnCoworkingIcon = ({ size = 60, color = 'white' }: IconProps
   </Svg>
 );
 
+// Gym Icon - Hand-drawn style
+export const HandDrawnGymIcon = ({ size = 60, color = 'white' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    {/* Dumbbell */}
+    <Path
+      d="M30 50 L70 50"
+      stroke={color}
+      strokeWidth="3"
+      strokeLinecap="round"
+    />
+    {/* Left weight */}
+    <Rect
+      x="15"
+      y="40"
+      width="15"
+      height="20"
+      rx="2"
+      stroke={color}
+      strokeWidth="3"
+      fill="none"
+    />
+    {/* Right weight */}
+    <Rect
+      x="70"
+      y="40"
+      width="15"
+      height="20"
+      rx="2"
+      stroke={color}
+      strokeWidth="3"
+      fill="none"
+    />
+    {/* Details */}
+    <Circle cx="22" cy="50" r="2" fill={color} />
+    <Circle cx="78" cy="50" r="2" fill={color} />
+  </Svg>
+);
+
+// Hotel Icon - Hand-drawn style
+export const HandDrawnHotelIcon = ({ size = 60, color = 'white' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    {/* Building */}
+    <Path
+      d="M25 75 L25 25 L75 25 L75 75"
+      stroke={color}
+      strokeWidth="3"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Door */}
+    <Rect
+      x="42"
+      y="55"
+      width="16"
+      height="20"
+      stroke={color}
+      strokeWidth="2"
+      fill="none"
+    />
+    {/* Windows */}
+    <Rect x="32" y="32" width="10" height="10" stroke={color} strokeWidth="2" fill="none" />
+    <Rect x="58" y="32" width="10" height="10" stroke={color} strokeWidth="2" fill="none" />
+    <Rect x="32" y="45" width="10" height="10" stroke={color} strokeWidth="2" fill="none" />
+    <Rect x="58" y="45" width="10" height="10" stroke={color} strokeWidth="2" fill="none" />
+    {/* Base line */}
+    <Path d="M20 75 L80 75" stroke={color} strokeWidth="3" strokeLinecap="round" />
+  </Svg>
+);
+
+// Shopping Icon - Hand-drawn style
+export const HandDrawnShoppingIcon = ({ size = 60, color = 'white' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    {/* Shopping bag */}
+    <Path
+      d="M30 35 L25 75 C25 80 28 85 33 85 L67 85 C72 85 75 80 75 75 L70 35 Z"
+      stroke={color}
+      strokeWidth="3"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Handle */}
+    <Path
+      d="M35 35 C35 25 40 20 50 20 C60 20 65 25 65 35"
+      stroke={color}
+      strokeWidth="3"
+      fill="none"
+      strokeLinecap="round"
+    />
+    {/* Tag */}
+    <Circle cx="50" cy="55" r="8" stroke={color} strokeWidth="2" fill="none" />
+    <Path d="M46 55 L54 55" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
 // Map Pin Icon - Hand-drawn style
 export const HandDrawnPinIcon = ({ size = 60, color = 'white' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 100 120" fill="none">
