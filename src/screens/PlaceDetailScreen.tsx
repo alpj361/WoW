@@ -415,9 +415,10 @@ export default function PlaceDetailScreen() {
       <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 py-4 pb-8">
         <Pressable
           onPress={handleCheckIn}
-          className="bg-indigo-600 rounded-full py-4 flex-row items-center justify-center shadow-lg"
+          className="rounded-full py-4 flex-row items-center justify-center shadow-lg"
           style={{
-            shadowColor: "#4F46E5",
+            backgroundColor: "#0A2472",
+            shadowColor: "#0A2472",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.3,
             shadowRadius: 8,
