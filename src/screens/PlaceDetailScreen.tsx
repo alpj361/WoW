@@ -306,6 +306,79 @@ export default function PlaceDetailScreen() {
             </View>
           )}
 
+          {/* Instagram Feed Section */}
+          {place.instagramHandle && (
+            <View className="mb-6">
+              <View className="flex-row items-center justify-between mb-3">
+                <View className="flex-row items-center">
+                  <Ionicons name="logo-instagram" size={24} style={{ color: "#0A2472" }} />
+                  <Text className="text-lg font-bold ml-2" style={{ color: "#0A2472" }}>
+                    @{place.instagramHandle}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => Linking.openURL(`https://instagram.com/${place.instagramHandle}`)}
+                  className="px-3 py-1.5 rounded-full"
+                  style={{ backgroundColor: "#E8EAF6" }}
+                >
+                  <Text className="text-xs font-semibold" style={{ color: "#0A2472" }}>
+                    Follow
+                  </Text>
+                </Pressable>
+              </View>
+
+              {loadingInstagram ? (
+                <View className="py-8 items-center">
+                  <Text className="text-gray-500">Loading posts...</Text>
+                </View>
+              ) : instagramPosts.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12 }}
+                >
+                  {instagramPosts.map((post) => (
+                    <Pressable
+                      key={post.id}
+                      onPress={() => post.permalink && Linking.openURL(post.permalink)}
+                      className="w-40"
+                    >
+                      <View className="rounded-xl overflow-hidden mb-2" style={{
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
+                        elevation: 3,
+                      }}>
+                        <Image
+                          source={{ uri: post.imageUrl }}
+                          className="w-40 h-40"
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <Text className="text-xs text-gray-700 mb-1" numberOfLines={2}>
+                        {post.caption}
+                      </Text>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <Ionicons name="heart" size={12} color="#EF4444" />
+                          <Text className="text-xs text-gray-500 ml-1">{post.likes}</Text>
+                        </View>
+                        <Text className="text-xs text-gray-400">
+                          {getTimeAgo(post.timestamp)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View className="py-6 items-center bg-gray-50 rounded-xl">
+                  <Text className="text-gray-500">No posts yet</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Events at this place */}
           {placeEvents.length > 0 && (
             <View className="mb-6">
@@ -313,7 +386,7 @@ export default function PlaceDetailScreen() {
                 <Text className="text-lg font-bold text-gray-900">
                   Upcoming Events
                 </Text>
-                <Text className="text-sm text-indigo-600 font-semibold">
+                <Text className="text-sm font-semibold" style={{ color: "#0A2472" }}>
                   {placeEvents.length}
                 </Text>
               </View>
