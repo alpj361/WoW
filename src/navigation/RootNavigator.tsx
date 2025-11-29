@@ -44,7 +44,7 @@ function TabNavigator() {
           paddingBottom: 28,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: "#4F46E5",
+        tabBarActiveTintColor: "#0A2472",
         tabBarInactiveTintColor: "#9CA3AF",
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home";
