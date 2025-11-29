@@ -24,6 +24,17 @@ export interface Place {
   createdBy?: string;
   checkInCount?: number;
   isFavorite?: boolean;
+  instagramHandle?: string; // Instagram username for the place
+  instagramPosts?: InstagramPost[]; // Recent Instagram posts
+}
+
+export interface InstagramPost {
+  id: string;
+  imageUrl: string;
+  caption?: string;
+  likes?: number;
+  timestamp: Date;
+  permalink?: string;
 }
 
 export interface Event {
