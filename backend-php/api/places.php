@@ -36,7 +36,9 @@ try {
     
     // Make API request to Outscraper
     if (!OUTSCRAPER_API_KEY || OUTSCRAPER_API_KEY === 'your_outscraper_api_key_here') {
-        Response::error('Outscraper API key not configured', 500);
+        // Return mock data if Outscraper not configured
+        $mockPlaces = getMockPlaces($category, $limit);
+        Response::success($mockPlaces);
     }
     
     $url = 'https://api.app.outscraper.com/maps/search-v3?' . http_build_query([
