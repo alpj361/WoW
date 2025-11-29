@@ -8,7 +8,7 @@
 // For production: https://your-domain.com
 const API_BASE_URL = __DEV__ 
   ? 'http://localhost:8000'  // Change to your computer's IP for mobile testing
-  : 'https://your-production-domain.com';
+  : 'https://TU-SERVICE.onrender.com'; // REEMPLAZA con tu URL de Render
 
 interface ApiResponse<T> {
   success: boolean;
