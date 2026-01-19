@@ -192,6 +192,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    marginBottom: 16,
+  },
+  demoText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   avatarContainer: {
     width: 100,
     height: 100,
