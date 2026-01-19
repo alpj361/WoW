@@ -86,10 +86,8 @@ export const EventCard: React.FC<EventCardProps> = ({
             </View>
           )}
 
-          <LinearGradient
-            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.9)']}
-            style={styles.overlay}
-          >
+          {/* Content overlay */}
+          <View style={styles.overlay}>
             <View style={styles.topRow}>
               <View style={styles.categoryBadge}>
                 <Ionicons name={icon as any} size={12} color="#fff" />
@@ -97,7 +95,7 @@ export const EventCard: React.FC<EventCardProps> = ({
               </View>
             </View>
 
-            <View style={styles.contentContainer}>
+            <View style={styles.bottomContent}>
               <Text style={styles.title} numberOfLines={2}>
                 {event.title}
               </Text>
@@ -132,7 +130,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 </View>
               )}
             </View>
-          </LinearGradient>
+          </View>
         </LinearGradient>
       </View>
 
@@ -172,6 +170,7 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+    position: 'relative',
   },
   eventImage: {
     ...StyleSheet.absoluteFillObject,
@@ -193,22 +192,25 @@ const styles = StyleSheet.create({
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 14,
     gap: 4,
   },
   categoryText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
-  contentContainer: {
+  bottomContent: {
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    padding: 12,
+    borderRadius: 12,
     gap: 4,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
