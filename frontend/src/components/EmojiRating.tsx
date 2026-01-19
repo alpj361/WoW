@@ -7,7 +7,9 @@ import {
   Modal,
 } from 'react-native';
 
-const emojis = ['🔥', '❤️', '😍', '🎉', '👏', '✨', '🤩', '💯'];
+// 4 positive emojis + 4 negative emojis
+const positiveEmojis = ['🔥', '❤️', '🎉', '🤩'];
+const negativeEmojis = ['😴', '👎', '😒', '💔'];
 
 interface EmojiRatingProps {
   visible: boolean;
@@ -41,11 +43,14 @@ export const EmojiRating: React.FC<EmojiRatingProps> = ({
               {eventTitle}
             </Text>
           )}
-          <View style={styles.emojiGrid}>
-            {emojis.map((emoji) => (
+          
+          {/* Positive emojis */}
+          <Text style={styles.sectionLabel}>Me gustó</Text>
+          <View style={styles.emojiRow}>
+            {positiveEmojis.map((emoji) => (
               <TouchableOpacity
                 key={emoji}
-                style={styles.emojiButton}
+                style={[styles.emojiButton, styles.positiveEmoji]}
                 onPress={() => onSelect(emoji)}
                 activeOpacity={0.7}
               >
@@ -53,6 +58,22 @@ export const EmojiRating: React.FC<EmojiRatingProps> = ({
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Negative emojis */}
+          <Text style={styles.sectionLabel}>No me gustó</Text>
+          <View style={styles.emojiRow}>
+            {negativeEmojis.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={[styles.emojiButton, styles.negativeEmoji]}
+                onPress={() => onSelect(emoji)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.emoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity
             style={styles.skipButton}
             onPress={() => onSelect('')}
@@ -68,7 +89,7 @@ export const EmojiRating: React.FC<EmojiRatingProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -89,28 +110,42 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 14,
     color: '#9CA3AF',
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  emojiGrid: {
+  sectionLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    marginTop: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  emojiRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 8,
   },
   emojiButton: {
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#2A2A2A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  positiveEmoji: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  negativeEmoji: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
   },
   emoji: {
     fontSize: 28,
   },
   skipButton: {
     paddingVertical: 12,
+    marginTop: 8,
   },
   skipText: {
     color: '#6B7280',
