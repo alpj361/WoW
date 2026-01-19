@@ -159,7 +159,7 @@ export default function ProfileScreen() {
           <SettingItem
             icon="information-circle-outline"
             title="Versión"
-            subtitle="1.0.0 MVP"
+            subtitle="0.0.1 MVP"
             showArrow={false}
           />
         </View>
