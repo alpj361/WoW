@@ -13,7 +13,7 @@ import { Event } from '../store/eventStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.2, SCREEN_HEIGHT * 0.50);
+const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.15, SCREEN_HEIGHT * 0.48);
 
 interface EventCardProps {
   event: Event;
@@ -82,17 +82,17 @@ export const EventCard: React.FC<EventCardProps> = ({
             />
           ) : (
             <View style={styles.placeholderImage}>
-              <Ionicons name={icon as any} size={60} color="rgba(255,255,255,0.3)" />
+              <Ionicons name={icon as any} size={50} color="rgba(255,255,255,0.25)" />
             </View>
           )}
 
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            colors={['transparent', 'rgba(0,0,0,0.85)']}
             style={styles.overlay}
           >
             <View style={styles.topRow}>
               <View style={styles.categoryBadge}>
-                <Ionicons name={icon as any} size={14} color="#fff" />
+                <Ionicons name={icon as any} size={12} color="#fff" />
                 <Text style={styles.categoryText}>{categoryLabel}</Text>
               </View>
             </View>
@@ -111,13 +111,13 @@ export const EventCard: React.FC<EventCardProps> = ({
               <View style={styles.metaContainer}>
                 {event.date && (
                   <View style={styles.infoItem}>
-                    <Ionicons name="calendar" size={14} color="#fff" />
+                    <Ionicons name="calendar" size={12} color="#fff" />
                     <Text style={styles.infoText}>{event.date}</Text>
                   </View>
                 )}
                 {event.time && (
                   <View style={styles.infoItem}>
-                    <Ionicons name="time" size={14} color="#fff" />
+                    <Ionicons name="time" size={12} color="#fff" />
                     <Text style={styles.infoText}>{event.time}</Text>
                   </View>
                 )}
@@ -125,7 +125,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 
               {event.location && (
                 <View style={styles.locationRow}>
-                  <Ionicons name="location" size={14} color="#fff" />
+                  <Ionicons name="location" size={12} color="rgba(255,255,255,0.8)" />
                   <Text style={styles.locationText} numberOfLines={1}>
                     {event.location}
                   </Text>
@@ -143,7 +143,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSkip}
             activeOpacity={0.8}
           >
-            <Ionicons name="close" size={30} color="#EF4444" />
+            <Ionicons name="close" size={28} color="#EF4444" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -151,7 +151,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSave}
             activeOpacity={0.8}
           >
-            <Ionicons name="heart" size={30} color="#10B981" />
+            <Ionicons name="heart" size={28} color="#10B981" />
           </TouchableOpacity>
         </View>
       )}
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 14,
   },
   topRow: {
     flexDirection: 'row',
@@ -193,29 +193,29 @@ const styles = StyleSheet.create({
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
+    paddingVertical: 4,
+    borderRadius: 14,
     gap: 4,
   },
   categoryText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   contentContainer: {
-    gap: 6,
+    gap: 4,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
   description: {
-    fontSize: 13,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.85)',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   metaContainer: {
     flexDirection: 'row',
@@ -225,33 +225,33 @@ const styles = StyleSheet.create({
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   infoText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   locationText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
     flex: 1,
   },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 40,
-    paddingVertical: 16,
+    gap: 50,
+    paddingVertical: 12,
   },
   actionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
