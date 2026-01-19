@@ -266,10 +266,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   currentCard: {
-    position: 'absolute',
+    zIndex: 2,
   },
   nextCard: {
     position: 'absolute',
+    zIndex: 1,
   },
   loadingContainer: {
     alignItems: 'center',
