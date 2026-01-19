@@ -2,6 +2,20 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.2] - 2026-01-19
+
+### Added
+- ✨ **Vercel Deployment Configuration**: Added `vercel.json` with proper build settings
+- 📝 **Deployment Guide**: Created comprehensive `DEPLOYMENT.md` with troubleshooting
+- 🔨 **Build Script**: Added `build:web` npm script for production builds
+
+### Changed
+- 📚 **README**: Added deployment section with Vercel instructions
+- 📦 **package.json**: Added production build script
+
+### Fixed
+- 🐛 **404 Error on Vercel**: Configured rewrites to properly serve SPA routes
+
 ## [0.0.1] - 2026-01-19
 
 ### Added

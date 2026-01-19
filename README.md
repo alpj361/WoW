@@ -115,6 +115,12 @@ npm run web
 ```
 La aplicación se abrirá en `http://localhost:8081` con un viewport móvil simulado (390x844px).
 
+#### Build para Producción (Web)
+```bash
+npm run build:web
+```
+Genera archivos estáticos en `frontend/dist/` listos para deployment.
+
 #### iOS (requiere macOS)
 ```bash
 npm run ios
@@ -219,9 +225,35 @@ La aplicación detecta la plataforma y adapta el comportamiento:
 ```bash
 npm start          # Iniciar servidor Expo
 npm run web        # Ejecutar en navegador
+npm run build:web  # Build para producción (Vercel)
 npm run ios        # Ejecutar en iOS
 npm run android    # Ejecutar en Android
 npm run lint       # Ejecutar ESLint
+```
+
+## 🌐 Deployment
+
+### Vercel (Web)
+
+La aplicación está configurada para deployment automático en Vercel:
+
+1. **Push a main branch** → Auto-deployment
+2. **Build Command**: `cd frontend && npm install --legacy-peer-deps && npm run build:web`
+3. **Output Directory**: `frontend/dist`
+
+Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para guía completa de deployment y troubleshooting.
+
+**Demo en vivo**: [Próximamente]
+
+### Mobile (iOS/Android)
+
+Deployment móvil requiere Expo Application Services (EAS):
+```bash
+# Configurar EAS
+eas build:configure
+
+# Build para iOS/Android
+eas build --platform all
 ```
 
 ## 🤝 Contribuir
