@@ -3,13 +3,15 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebViewport } from '../src/components/WebViewport';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
-      <Tabs
+    <WebViewport>
+      <View style={styles.container}>
+        <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
@@ -65,7 +67,8 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </View>
+      </View>
+    </WebViewport>
   );
 }
 

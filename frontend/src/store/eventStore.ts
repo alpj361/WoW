@@ -1,8 +1,4 @@
 import { create } from 'zustand';
-import axios from 'axios';
-import Constants from 'expo-constants';
-
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export interface Event {
   id: string;
@@ -15,6 +11,120 @@ export interface Event {
   location: string | null;
   created_at: string;
 }
+
+// Mock data - No backend required for demo
+const SAMPLE_EVENTS: Event[] = [
+  {
+    id: '1',
+    title: 'Noche de Jazz en Vivo',
+    description: 'Disfruta de una noche inolvidable con los mejores músicos de jazz de la ciudad. Incluye copa de bienvenida.',
+    category: 'music',
+    image: null,
+    date: '2025-07-20',
+    time: '21:00',
+    location: 'Jazz Bar La Cava',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    title: 'Festival de Rock Underground',
+    description: 'Las mejores bandas emergentes de rock alternativo. ¡No te lo pierdas!',
+    category: 'music',
+    image: null,
+    date: '2025-07-25',
+    time: '18:00',
+    location: 'Arena Norte',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '3',
+    title: 'Concierto Sinfónico',
+    description: 'La orquesta filarmónica presenta obras clásicas de Mozart y Beethoven.',
+    category: 'music',
+    image: null,
+    date: '2025-07-28',
+    time: '19:30',
+    location: 'Teatro Principal',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '4',
+    title: 'Limpieza de Playa',
+    description: 'Únete a nuestra jornada de limpieza ecológica. Incluye desayuno y camiseta.',
+    category: 'volunteer',
+    image: null,
+    date: '2025-07-22',
+    time: '07:00',
+    location: 'Playa del Sol',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '5',
+    title: 'Reforestación Comunitaria',
+    description: 'Planta un árbol y ayuda al medio ambiente. Todas las herramientas incluidas.',
+    category: 'volunteer',
+    image: null,
+    date: '2025-07-26',
+    time: '09:00',
+    location: 'Bosque Municipal',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '6',
+    title: 'Comedor Social',
+    description: 'Ayuda a servir comidas a personas necesitadas. Tu tiempo hace la diferencia.',
+    category: 'volunteer',
+    image: null,
+    date: '2025-07-21',
+    time: '12:00',
+    location: 'Centro Comunitario',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '7',
+    title: 'Food Truck Festival',
+    description: 'Los mejores food trucks de la ciudad en un solo lugar. Música en vivo incluida.',
+    category: 'general',
+    image: null,
+    date: '2025-07-24',
+    time: '12:00',
+    location: 'Parque Central',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '8',
+    title: 'Networking Tech',
+    description: 'Conecta con profesionales del mundo tecnológico. Charlas y networking.',
+    category: 'general',
+    image: null,
+    date: '2025-07-23',
+    time: '18:30',
+    location: 'Hub de Innovación',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '9',
+    title: 'Mercado Artesanal',
+    description: 'Descubre productos únicos hechos a mano por artesanos locales.',
+    category: 'general',
+    image: null,
+    date: '2025-07-27',
+    time: '10:00',
+    location: 'Plaza Mayor',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '10',
+    title: 'Clase de Yoga al Aire Libre',
+    description: 'Relájate y conecta con tu cuerpo en esta sesión de yoga gratuita.',
+    category: 'general',
+    image: null,
+    date: '2025-07-20',
+    time: '08:00',
+    location: 'Jardín Botánico',
+    created_at: new Date().toISOString(),
+  },
+];
 
 export interface SavedEventData {
   saved: {
@@ -57,7 +167,7 @@ interface EventStore {
 }
 
 export const useEventStore = create<EventStore>((set, get) => ({
-  events: [],
+  events: SAMPLE_EVENTS, // Cargar eventos al iniciar
   savedEvents: [],
   attendedEvents: [],
   currentCategory: 'all',
@@ -66,13 +176,19 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   fetchEvents: async (category?: string) => {
     set({ isLoading: true, error: null });
+
+    // Simulate API delay for realistic UX
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     try {
       const cat = category || get().currentCategory;
-      const url = cat && cat !== 'all' 
-        ? `${API_URL}/api/events?category=${cat}`
-        : `${API_URL}/api/events`;
-      const response = await axios.get(url);
-      set({ events: response.data, isLoading: false });
+      let filteredEvents = SAMPLE_EVENTS;
+
+      if (cat && cat !== 'all') {
+        filteredEvents = SAMPLE_EVENTS.filter(e => e.category === cat);
+      }
+
+      set({ events: filteredEvents, isLoading: false });
     } catch (error: any) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching events:', error);
@@ -81,31 +197,33 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   fetchSavedEvents: async () => {
     set({ isLoading: true, error: null });
-    try {
-      const response = await axios.get(`${API_URL}/api/saved`);
-      set({ savedEvents: response.data, isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      console.error('Error fetching saved events:', error);
-    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    set({ isLoading: false });
   },
 
   fetchAttendedEvents: async () => {
     set({ isLoading: true, error: null });
-    try {
-      const response = await axios.get(`${API_URL}/api/attended`);
-      set({ attendedEvents: response.data, isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      console.error('Error fetching attended events:', error);
-    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    set({ isLoading: false });
   },
 
   saveEvent: async (eventId: string) => {
     try {
-      await axios.post(`${API_URL}/api/events/${eventId}/save`);
-      // Refresh saved events
-      get().fetchSavedEvents();
+      const event = SAMPLE_EVENTS.find(e => e.id === eventId);
+      if (!event) return;
+
+      const savedEvent: SavedEventData = {
+        saved: {
+          id: `saved-${eventId}`,
+          event_id: eventId,
+          saved_at: new Date().toISOString(),
+        },
+        event,
+      };
+
+      set(state => ({
+        savedEvents: [...state.savedEvents, savedEvent],
+      }));
     } catch (error: any) {
       console.error('Error saving event:', error);
       throw error;
@@ -114,8 +232,6 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   unsaveEvent: async (eventId: string) => {
     try {
-      await axios.delete(`${API_URL}/api/saved/${eventId}`);
-      // Remove from local state
       set(state => ({
         savedEvents: state.savedEvents.filter(s => s.event.id !== eventId)
       }));
@@ -127,12 +243,23 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   markAttended: async (eventId: string, emoji?: string) => {
     try {
-      await axios.post(`${API_URL}/api/events/${eventId}/attend`, {
-        emoji_rating: emoji
-      });
-      // Refresh attended events and saved events
-      get().fetchAttendedEvents();
-      get().fetchSavedEvents();
+      const event = SAMPLE_EVENTS.find(e => e.id === eventId);
+      if (!event) return;
+
+      const attendedEvent: AttendedEventData = {
+        attended: {
+          id: `attended-${eventId}`,
+          event_id: eventId,
+          emoji_rating: emoji || null,
+          attended_at: new Date().toISOString(),
+        },
+        event,
+      };
+
+      set(state => ({
+        attendedEvents: [...state.attendedEvents, attendedEvent],
+        savedEvents: state.savedEvents.filter(s => s.event.id !== eventId),
+      }));
     } catch (error: any) {
       console.error('Error marking attended:', error);
       throw error;
@@ -141,8 +268,6 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   removeAttended: async (eventId: string) => {
     try {
-      await axios.delete(`${API_URL}/api/attended/${eventId}`);
-      // Remove from local state
       set(state => ({
         attendedEvents: state.attendedEvents.filter(a => a.event.id !== eventId)
       }));
@@ -154,10 +279,21 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   createEvent: async (eventData: Partial<Event>) => {
     try {
-      const response = await axios.post(`${API_URL}/api/events`, eventData);
-      // Refresh events list
+      const newEvent: Event = {
+        id: `event-${Date.now()}`,
+        title: eventData.title || '',
+        description: eventData.description || '',
+        category: eventData.category || 'general',
+        image: eventData.image || null,
+        date: eventData.date || null,
+        time: eventData.time || null,
+        location: eventData.location || null,
+        created_at: new Date().toISOString(),
+      };
+
+      SAMPLE_EVENTS.unshift(newEvent);
       get().fetchEvents();
-      return response.data;
+      return newEvent;
     } catch (error: any) {
       console.error('Error creating event:', error);
       throw error;
@@ -171,7 +307,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   seedData: async () => {
     try {
-      await axios.post(`${API_URL}/api/seed`);
+      await new Promise(resolve => setTimeout(resolve, 500));
       get().fetchEvents();
     } catch (error: any) {
       console.error('Error seeding data:', error);

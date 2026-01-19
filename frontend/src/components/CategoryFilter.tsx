@@ -57,7 +57,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             >
               <Ionicons
                 name={category.icon as any}
-                size={22}
+                size={20}
                 color={isSelected ? '#fff' : category.color}
               />
             </View>
@@ -79,25 +79,25 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 16,
+    paddingVertical: 6,
+    gap: 12,
   },
   categoryItem: {
     alignItems: 'center',
     marginRight: 12,
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   label: {
     color: '#9CA3AF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
 });

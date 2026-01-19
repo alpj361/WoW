@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ import { CategoryFilter } from '../src/components/CategoryFilter';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const IS_WEB = Platform.OS === 'web';
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -144,9 +146,103 @@ export default function ExploreScreen() {
     setSeeding(false);
   };
 
+  const renderCardContent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <Text style={styles.loadingText}>Cargando eventos...</Text>
+        </View>
+      );
+    }
+
+    if (events.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="calendar-outline" size={64} color="#4B5563" />
+          <Text style={styles.emptyTitle}>No hay eventos</Text>
+          <Text style={styles.emptyText}>
+            Parece que no hay eventos disponibles.
+          </Text>
+          <TouchableOpacity
+            style={styles.seedButton}
+            onPress={handleSeed}
+            disabled={seeding}
+          >
+            {seeding ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="sparkles" size={20} color="#fff" />
+                <Text style={styles.seedButtonText}>Cargar eventos de ejemplo</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (currentIndex >= events.length) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+          <Text style={styles.emptyTitle}>¡Has visto todos!</Text>
+          <Text style={styles.emptyText}>
+            Has revisado todos los eventos disponibles.
+          </Text>
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={() => {
+              setCurrentIndex(0);
+              fetchEvents();
+            }}
+          >
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.resetButtonText}>Ver de nuevo</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <>
+        {nextEvent && (
+          <Animated.View style={[styles.nextCard, nextCardStyle]}>
+            <EventCard event={nextEvent} showActions={false} />
+          </Animated.View>
+        )}
+        {currentEvent && (
+          IS_WEB ? (
+            // En web: solo animaciones, botones manejan las acciones
+            <Animated.View style={[styles.currentCard, cardStyle]}>
+              <EventCard
+                event={currentEvent}
+                onSave={() => animateSwipe('right')}
+                onSkip={() => animateSwipe('left')}
+                showActions={true}
+              />
+            </Animated.View>
+          ) : (
+            // En móvil: gestos táctiles completos
+            <GestureDetector gesture={gesture}>
+              <Animated.View style={[styles.currentCard, cardStyle]}>
+                <EventCard
+                  event={currentEvent}
+                  onSave={() => animateSwipe('right')}
+                  onSkip={() => animateSwipe('left')}
+                  showActions={true}
+                />
+              </Animated.View>
+            </GestureDetector>
+          )
+        )}
+      </>
+    );
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
         <Text style={styles.logo}>WOW</Text>
         <Text style={styles.tagline}>Descubre y Vive Eventos</Text>
       </View>
@@ -157,83 +253,7 @@ export default function ExploreScreen() {
       />
 
       <View style={styles.cardsContainer}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
-            <Text style={styles.loadingText}>Cargando eventos...</Text>
-          </View>
-        ) : events.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color="#4B5563" />
-            <Text style={styles.emptyTitle}>No hay eventos</Text>
-            <Text style={styles.emptyText}>
-              Parece que no hay eventos disponibles.
-            </Text>
-            <TouchableOpacity
-              style={styles.seedButton}
-              onPress={handleSeed}
-              disabled={seeding}
-            >
-              {seeding ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="sparkles" size={20} color="#fff" />
-                  <Text style={styles.seedButtonText}>Cargar eventos de ejemplo</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : currentIndex >= events.length ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle" size={64} color="#10B981" />
-            <Text style={styles.emptyTitle}>¡Has visto todos!</Text>
-            <Text style={styles.emptyText}>
-              Has revisado todos los eventos disponibles.
-            </Text>
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={() => {
-                setCurrentIndex(0);
-                fetchEvents();
-              }}
-            >
-              <Ionicons name="refresh" size={20} color="#fff" />
-              <Text style={styles.resetButtonText}>Ver de nuevo</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {nextEvent && (
-              <Animated.View style={[styles.nextCard, nextCardStyle]}>
-                <EventCard event={nextEvent} showActions={false} />
-              </Animated.View>
-            )}
-            {currentEvent && (
-              <GestureDetector gesture={gesture}>
-                <Animated.View style={[styles.currentCard, cardStyle]}>
-                  <EventCard
-                    event={currentEvent}
-                    onSave={() => animateSwipe('right')}
-                    onSkip={() => animateSwipe('left')}
-                    showActions={true}
-                  />
-                </Animated.View>
-              </GestureDetector>
-            )}
-          </>
-        )}
-      </View>
-
-      <View style={styles.swipeHints}>
-        <View style={styles.hintItem}>
-          <Ionicons name="arrow-back" size={16} color="#EF4444" />
-          <Text style={styles.hintText}>Pasar</Text>
-        </View>
-        <View style={styles.hintItem}>
-          <Text style={styles.hintText}>Guardar</Text>
-          <Ionicons name="arrow-forward" size={16} color="#10B981" />
-        </View>
+        {renderCardContent()}
       </View>
     </GestureHandlerRootView>
   );
@@ -246,31 +266,33 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 5,
+    paddingBottom: 2,
   },
   logo: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#8B5CF6',
     letterSpacing: 4,
   },
   tagline: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
+    marginTop: 0,
   },
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: 20,
+    width: '100%',
   },
   currentCard: {
     zIndex: 2,
+    width: '100%',
   },
   nextCard: {
     position: 'absolute',
     zIndex: 1,
+    width: '100%',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -330,7 +352,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 50,
-    paddingVertical: 4,
+    paddingVertical: 2,
+    paddingBottom: 4,
   },
   hintItem: {
     flexDirection: 'row',

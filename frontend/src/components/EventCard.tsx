@@ -12,8 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Event } from '../store/eventStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.15, SCREEN_HEIGHT * 0.6);
+const CARD_WIDTH = SCREEN_WIDTH * 0.9;
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.25;
 
 interface EventCardProps {
   event: Event;
@@ -82,53 +82,50 @@ export const EventCard: React.FC<EventCardProps> = ({
             />
           ) : (
             <View style={styles.placeholderImage}>
-              <Ionicons name={icon as any} size={50} color="rgba(255,255,255,0.25)" />
+              <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.3)" />
             </View>
           )}
 
-          {/* Content overlay */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.contentGradient}
+          />
+
           <View style={styles.overlay}>
-            <View style={styles.topRow}>
-              <View style={styles.categoryBadge}>
-                <Ionicons name={icon as any} size={12} color="#fff" />
-                <Text style={styles.categoryText}>{categoryLabel}</Text>
-              </View>
+            <View style={styles.categoryBadge}>
+              <Ionicons name={icon as any} size={10} color="#fff" />
+              <Text style={styles.categoryText}>{categoryLabel}</Text>
             </View>
 
             <View style={styles.bottomContent}>
-              <Text style={styles.title}>{event.title}</Text>
-              
+              <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
+
               {event.description && (
                 <Text style={styles.description} numberOfLines={2}>
                   {event.description}
                 </Text>
               )}
 
-              {(event.date || event.time) && (
-                <View style={styles.metaContainer}>
-                  {event.date && (
-                    <View style={styles.infoItem}>
-                      <Ionicons name="calendar" size={12} color="#fff" />
-                      <Text style={styles.infoText}>{event.date}</Text>
-                    </View>
-                  )}
-                  {event.time && (
-                    <View style={styles.infoItem}>
-                      <Ionicons name="time" size={12} color="#fff" />
-                      <Text style={styles.infoText}>{event.time}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {event.location && (
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.locationText} numberOfLines={1}>
-                    {event.location}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.metaRow}>
+                {event.date && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="calendar-outline" size={10} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.metaText}>{event.date}</Text>
+                  </View>
+                )}
+                {event.time && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.metaText}>{event.time}</Text>
+                  </View>
+                )}
+                {event.location && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </LinearGradient>
@@ -141,7 +138,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSkip}
             activeOpacity={0.8}
           >
-            <Ionicons name="close" size={28} color="#EF4444" />
+            <Ionicons name="close" size={24} color="#EF4444" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -149,7 +146,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSave}
             activeOpacity={0.8}
           >
-            <Ionicons name="heart" size={28} color="#10B981" />
+            <Ionicons name="heart" size={24} color="#10B981" />
           </TouchableOpacity>
         </View>
       )}
@@ -160,17 +157,17 @@ export const EventCard: React.FC<EventCardProps> = ({
 const styles = StyleSheet.create({
   cardWrapper: {
     alignItems: 'center',
+    width: '100%',
   },
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
   },
   gradient: {
     flex: 1,
-    position: 'relative',
   },
   eventImage: {
     ...StyleSheet.absoluteFillObject,
@@ -180,23 +177,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  overlay: {
+  contentGradient: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    padding: 14,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
+  overlay: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20, // Increased padding
+    paddingVertical: 12,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    gap: 4,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
   },
   categoryText: {
     color: '#fff',
@@ -204,68 +202,58 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomContent: {
-    backgroundColor: '#000000',
-    padding: 14,
-    borderRadius: 12,
-    gap: 6,
+    gap: 4,
+    // width: '100%', // Removed explicit width to rely on flexbox
   },
   title: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
+    fontWeight: '800',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   description: {
-    fontSize: 13,
-    color: '#cccccc',
-    lineHeight: 18,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 14,
   },
-  metaContainer: {
+  metaRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
   },
-  infoItem: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  infoText: {
-    color: '#fff',
-    fontSize: 11,
+  metaText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 10,
     fontWeight: '500',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  locationText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
-    flex: 1,
   },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 50,
-    paddingVertical: 12,
+    gap: 32,
+    marginTop: 12,
   },
   actionButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   skipButton: {
     borderColor: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   saveButton: {
     borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
 });
 
