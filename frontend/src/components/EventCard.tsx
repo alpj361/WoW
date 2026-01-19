@@ -96,30 +96,30 @@ export const EventCard: React.FC<EventCardProps> = ({
             </View>
 
             <View style={styles.bottomContent}>
-              <Text style={styles.title} numberOfLines={2}>
-                {event.title}
-              </Text>
+              <Text style={styles.title}>{event.title}</Text>
               
-              {event.description ? (
+              {event.description && (
                 <Text style={styles.description} numberOfLines={2}>
                   {event.description}
                 </Text>
-              ) : null}
+              )}
 
-              <View style={styles.metaContainer}>
-                {event.date && (
-                  <View style={styles.infoItem}>
-                    <Ionicons name="calendar" size={12} color="#fff" />
-                    <Text style={styles.infoText}>{event.date}</Text>
-                  </View>
-                )}
-                {event.time && (
-                  <View style={styles.infoItem}>
-                    <Ionicons name="time" size={12} color="#fff" />
-                    <Text style={styles.infoText}>{event.time}</Text>
-                  </View>
-                )}
-              </View>
+              {(event.date || event.time) && (
+                <View style={styles.metaContainer}>
+                  {event.date && (
+                    <View style={styles.infoItem}>
+                      <Ionicons name="calendar" size={12} color="#fff" />
+                      <Text style={styles.infoText}>{event.date}</Text>
+                    </View>
+                  )}
+                  {event.time && (
+                    <View style={styles.infoItem}>
+                      <Ionicons name="time" size={12} color="#fff" />
+                      <Text style={styles.infoText}>{event.time}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {event.location && (
                 <View style={styles.locationRow}>
