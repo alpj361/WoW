@@ -13,7 +13,7 @@ import { Event } from '../store/eventStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.3, SCREEN_HEIGHT * 0.55);
+const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.2, SCREEN_HEIGHT * 0.50);
 
 interface EventCardProps {
   event: Event;
@@ -66,68 +66,75 @@ export const EventCard: React.FC<EventCardProps> = ({
   const categoryLabel = getCategoryLabel(event.category);
 
   return (
-    <View style={styles.card}>
-      <LinearGradient
-        colors={gradient}
-        style={styles.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        {event.image ? (
-          <Image
-            source={{ uri: event.image }}
-            style={styles.eventImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Ionicons name={icon as any} size={80} color="rgba(255,255,255,0.5)" />
-          </View>
-        )}
+    <View style={styles.cardWrapper}>
+      <View style={styles.card}>
+        <LinearGradient
+          colors={gradient}
+          style={styles.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {event.image ? (
+            <Image
+              source={{ uri: event.image }}
+              style={styles.eventImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <Ionicons name={icon as any} size={60} color="rgba(255,255,255,0.3)" />
+            </View>
+          )}
 
-        <View style={styles.overlay}>
-          <View style={styles.categoryBadge}>
-            <Ionicons name={icon as any} size={16} color="#fff" />
-            <Text style={styles.categoryText}>{categoryLabel}</Text>
-          </View>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.overlay}
+          >
+            <View style={styles.topRow}>
+              <View style={styles.categoryBadge}>
+                <Ionicons name={icon as any} size={14} color="#fff" />
+                <Text style={styles.categoryText}>{categoryLabel}</Text>
+              </View>
+            </View>
 
-          <View style={styles.contentContainer}>
-            <Text style={styles.title} numberOfLines={2}>
-              {event.title}
-            </Text>
-            
-            {event.description ? (
-              <Text style={styles.description} numberOfLines={3}>
-                {event.description}
+            <View style={styles.contentContainer}>
+              <Text style={styles.title} numberOfLines={2}>
+                {event.title}
               </Text>
-            ) : null}
+              
+              {event.description ? (
+                <Text style={styles.description} numberOfLines={2}>
+                  {event.description}
+                </Text>
+              ) : null}
 
-            <View style={styles.infoRow}>
-              {event.date && (
-                <View style={styles.infoItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#fff" />
-                  <Text style={styles.infoText}>{event.date}</Text>
-                </View>
-              )}
-              {event.time && (
-                <View style={styles.infoItem}>
-                  <Ionicons name="time-outline" size={16} color="#fff" />
-                  <Text style={styles.infoText}>{event.time}</Text>
+              <View style={styles.metaContainer}>
+                {event.date && (
+                  <View style={styles.infoItem}>
+                    <Ionicons name="calendar" size={14} color="#fff" />
+                    <Text style={styles.infoText}>{event.date}</Text>
+                  </View>
+                )}
+                {event.time && (
+                  <View style={styles.infoItem}>
+                    <Ionicons name="time" size={14} color="#fff" />
+                    <Text style={styles.infoText}>{event.time}</Text>
+                  </View>
+                )}
+              </View>
+
+              {event.location && (
+                <View style={styles.locationRow}>
+                  <Ionicons name="location" size={14} color="#fff" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {event.location}
+                  </Text>
                 </View>
               )}
             </View>
-
-            {event.location && (
-              <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={16} color="#fff" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {event.location}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </LinearGradient>
+          </LinearGradient>
+        </LinearGradient>
+      </View>
 
       {showActions && (
         <View style={styles.actionsContainer}>
@@ -136,7 +143,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSkip}
             activeOpacity={0.8}
           >
-            <Ionicons name="close" size={32} color="#EF4444" />
+            <Ionicons name="close" size={30} color="#EF4444" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -144,7 +151,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             onPress={onSave}
             activeOpacity={0.8}
           >
-            <Ionicons name="heart" size={32} color="#10B981" />
+            <Ionicons name="heart" size={30} color="#10B981" />
           </TouchableOpacity>
         </View>
       )}
@@ -153,25 +160,21 @@ export const EventCard: React.FC<EventCardProps> = ({
 };
 
 const styles = StyleSheet.create({
+  cardWrapper: {
+    alignItems: 'center',
+  },
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
   gradient: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
   eventImage: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.8,
   },
   placeholderImage: {
     ...StyleSheet.absoluteFillObject,
@@ -179,46 +182,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 16,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    gap: 4,
   },
   categoryText: {
     color: '#fff',
-    marginLeft: 6,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   contentContainer: {
-    gap: 8,
+    gap: 6,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   description: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 20,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 18,
   },
-  infoRow: {
+  metaContainer: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 4,
   },
   infoItem: {
     flexDirection: 'row',
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   locationRow: {
@@ -236,21 +238,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   locationText: {
-    color: '#fff',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
     flex: 1,
   },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 40,
-    paddingVertical: 20,
-    backgroundColor: '#1F1F1F',
+    paddingVertical: 16,
   },
   actionButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
