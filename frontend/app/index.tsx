@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 5,
   },
   logo: {
     fontSize: 36,
@@ -262,7 +262,8 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 20,
   },
   currentCard: {
     zIndex: 2,
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 50,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   hintItem: {
     flexDirection: 'row',

@@ -13,7 +13,7 @@ import { Event } from '../store/eventStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.15, SCREEN_HEIGHT * 0.48);
+const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.15, SCREEN_HEIGHT * 0.6);
 
 interface EventCardProps {
   event: Event;
