@@ -87,7 +87,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           )}
 
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.85)']}
+            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.9)']}
             style={styles.overlay}
           >
             <View style={styles.topRow}>
