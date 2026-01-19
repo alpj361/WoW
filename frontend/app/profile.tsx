@@ -78,6 +78,10 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
+        <View style={styles.demoBanner}>
+          <Ionicons name="flask" size={16} color="#F59E0B" />
+          <Text style={styles.demoText}>Demo - Versión de prueba</Text>
+        </View>
         <View style={styles.avatarContainer}>
           <Ionicons name="person" size={48} color="#8B5CF6" />
         </View>
