@@ -328,8 +328,8 @@ const styles = StyleSheet.create({
   swipeHints: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 40,
-    paddingBottom: 16,
+    paddingHorizontal: 50,
+    paddingVertical: 8,
   },
   hintItem: {
     flexDirection: 'row',
