@@ -11,9 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Event } from '../store/eventStore';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = CARD_WIDTH * 1.4;
+const CARD_HEIGHT = Math.min(CARD_WIDTH * 1.3, SCREEN_HEIGHT * 0.55);
 
 interface EventCardProps {
   event: Event;
