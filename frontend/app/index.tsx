@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 20,
+    justifyContent: 'flex-start',
+    paddingTop: 10,
   },
   currentCard: {
     position: 'absolute',
