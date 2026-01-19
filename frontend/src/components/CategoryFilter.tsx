@@ -42,22 +42,29 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
         return (
           <TouchableOpacity
             key={category.id}
-            style={[
-              styles.chip,
-              isSelected && { backgroundColor: category.color },
-            ]}
+            style={styles.categoryItem}
             onPress={() => onSelectCategory(category.id)}
             activeOpacity={0.7}
           >
-            <Ionicons
-              name={category.icon as any}
-              size={18}
-              color={isSelected ? '#fff' : category.color}
-            />
+            <View
+              style={[
+                styles.iconCircle,
+                { 
+                  backgroundColor: isSelected ? category.color : '#2A2A2A',
+                  borderColor: isSelected ? category.color : '#3A3A3A',
+                },
+              ]}
+            >
+              <Ionicons
+                name={category.icon as any}
+                size={22}
+                color={isSelected ? '#fff' : category.color}
+              />
+            </View>
             <Text
               style={[
-                styles.chipText,
-                isSelected && styles.chipTextSelected,
+                styles.label,
+                isSelected && { color: category.color, fontWeight: '700' },
               ]}
             >
               {category.label}
@@ -73,25 +80,25 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 10,
+    gap: 16,
   },
-  chip: {
-    flexDirection: 'row',
+  categoryItem: {
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#2A2A2A',
-    gap: 6,
-    marginRight: 8,
+    marginRight: 12,
   },
-  chipText: {
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    marginBottom: 6,
+  },
+  label: {
     color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  chipTextSelected: {
-    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 
