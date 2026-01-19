@@ -204,19 +204,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomContent: {
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: '#000000',
     padding: 14,
     borderRadius: 12,
     gap: 6,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#ffffff',
+    marginBottom: 2,
   },
   description: {
     fontSize: 13,
-    color: '#e5e5e5',
+    color: '#cccccc',
     lineHeight: 18,
   },
   metaContainer: {
