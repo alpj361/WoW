@@ -10,21 +10,28 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  // En web, simular viewport móvil usando hook reactivo
-  const { height: windowHeight } = useWindowDimensions();
+  // En web, usar el viewport completo sin restricciones de altura
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
-  // Calcular altura máxima: 95% de la ventana o 844px (iPhone 14 Pro)
-  // Fallback a 844px si windowHeight no está disponible o es inválido
-  const maxHeight = windowHeight > 0 ? Math.min(windowHeight * 0.95, 844) : 844;
+  // Usar altura completa del viewport para que todo el contenido sea visible
+  const viewportHeight = windowHeight > 0 ? windowHeight : 844;
+
+  // En pantallas anchas, simular viewport móvil; en móviles, usar ancho completo
+  const viewportWidth = windowWidth > 600 ? 390 : windowWidth;
+  const shouldSimulateMobile = windowWidth > 600;
 
   return (
     <View style={styles.webContainer}>
       <View
         style={[
           styles.mobileViewport,
-          { height: maxHeight },
+          {
+            height: viewportHeight,
+            width: viewportWidth,
+            borderRadius: shouldSimulateMobile ? 20 : 0,
+          },
           // @ts-ignore - web only style
-          Platform.OS === 'web' && { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
+          shouldSimulateMobile && { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
         ]}
       >
         {children}
@@ -38,12 +45,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start', // Alinear arriba en vez de centrar
   },
   mobileViewport: {
-    width: 390, // iPhone 14 Pro width
     backgroundColor: '#0F0F0F',
-    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {

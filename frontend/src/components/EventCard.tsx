@@ -3,17 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   TouchableOpacity,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Event } from '../store/eventStore';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.9;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.25;
 
 interface EventCardProps {
   event: Event;
@@ -61,13 +57,18 @@ export const EventCard: React.FC<EventCardProps> = ({
   onSkip,
   showActions = true,
 }) => {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const gradient = getCategoryGradient(event.category);
   const icon = getCategoryIcon(event.category);
   const categoryLabel = getCategoryLabel(event.category);
 
+  // Dimensiones dinámicas de la tarjeta
+  const cardWidth = screenWidth * 0.9;
+  const cardHeight = screenHeight * 0.6; // 60% de la altura para ocupar más espacio
+
   return (
     <View style={styles.cardWrapper}>
-      <View style={styles.card}>
+      <View style={[styles.card, { width: cardWidth, height: cardHeight }]}>
         <LinearGradient
           colors={gradient}
           style={styles.gradient}
@@ -160,8 +161,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
