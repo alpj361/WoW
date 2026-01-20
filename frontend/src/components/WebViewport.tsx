@@ -17,8 +17,11 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
   const viewportWidth = windowWidth > 600 ? 390 : windowWidth;
   const shouldSimulateMobile = windowWidth > 600;
 
-  // Usar altura completa disponible, con fallback seguro
-  const viewportHeight = windowHeight > 0 ? windowHeight : 844;
+  // Usar 95% de la altura para dejar espacio a la barra del navegador
+  // Máximo 844px (iPhone 14 Pro height) en desktop
+  const viewportHeight = windowHeight > 0
+    ? Math.min(windowHeight * 0.95, shouldSimulateMobile ? 844 : windowHeight * 0.95)
+    : 844;
 
   return (
     <View style={styles.webContainer}>
