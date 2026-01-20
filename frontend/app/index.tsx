@@ -205,7 +205,7 @@ export default function ExploreScreen() {
     }
 
     return (
-      <>
+      <View style={styles.cardStackContainer}>
         {nextEvent && (
           <Animated.View style={[styles.nextCard, nextCardStyle]}>
             <EventCard event={nextEvent} showActions={false} />
@@ -236,7 +236,7 @@ export default function ExploreScreen() {
             </GestureDetector>
           )
         )}
-      </>
+      </View>
     );
   };
 
