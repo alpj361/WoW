@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm install --legacy-peer-deps && npm run build:web",
+  "buildCommand": "cd frontend && rm -rf .expo .metro-cache node_modules/.cache && npm install --legacy-peer-deps && npm run build:web",
   "outputDirectory": "frontend/dist",
   "framework": null,
   "rewrites": [
