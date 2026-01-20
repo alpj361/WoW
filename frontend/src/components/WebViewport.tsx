@@ -11,11 +11,14 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
   }
 
   // En web, detectar si es pantalla ancha (desktop) o móvil
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   // En pantallas anchas, simular viewport móvil; en móviles, usar ancho completo
   const viewportWidth = windowWidth > 600 ? 390 : windowWidth;
   const shouldSimulateMobile = windowWidth > 600;
+
+  // Usar altura completa disponible, con fallback seguro
+  const viewportHeight = windowHeight > 0 ? windowHeight : 844;
 
   return (
     <View style={styles.webContainer}>
@@ -24,9 +27,8 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
           styles.mobileViewport,
           {
             width: viewportWidth,
+            height: viewportHeight,
             borderRadius: shouldSimulateMobile ? 20 : 0,
-            // @ts-ignore - web only: maxHeight respeta la barra de URL del navegador
-            maxHeight: '100vh',
           },
           // @ts-ignore - web only style
           shouldSimulateMobile && { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
@@ -46,7 +48,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   mobileViewport: {
-    flex: 1, // Usar flex para adaptar al espacio disponible
     backgroundColor: '#0F0F0F',
     overflow: 'hidden',
     shadowColor: '#000',
