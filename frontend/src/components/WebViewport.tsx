@@ -6,12 +6,12 @@ interface WebViewportProps {
 }
 
 export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
+  // IMPORTANTE: Hooks deben llamarse ANTES de cualquier return condicional
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
-
-  // En web, detectar si es pantalla ancha (desktop) o móvil
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   // En pantallas anchas, simular viewport móvil; en móviles, usar ancho completo
   const viewportWidth = windowWidth > 600 ? 390 : windowWidth;
