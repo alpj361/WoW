@@ -25,6 +25,7 @@ import {
 import { useEventStore, Event } from '../src/store/eventStore';
 import { EventCard } from '../src/components/EventCard';
 import { CategoryFilter } from '../src/components/CategoryFilter';
+import { WowLogo } from '../src/components/WowLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
@@ -212,7 +213,7 @@ export default function ExploreScreen() {
             <EventCard event={nextEvent} showActions={false} />
           </Animated.View>
         )}
-        
+
         {/* Current card */}
         {currentEvent && (
           IS_WEB ? (
@@ -244,7 +245,7 @@ export default function ExploreScreen() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
-        <Text style={styles.logo}>WOW</Text>
+        <WowLogo width={100} height={32} />
         <Text style={styles.tagline}>Descubre y Vive Eventos</Text>
       </View>
 
@@ -263,25 +264,28 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: '#121212',
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 2,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   logo: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#8B5CF6',
-    letterSpacing: 4,
+    letterSpacing: 3,
+    fontStyle: 'italic',
   },
   tagline: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
-    marginTop: 0,
+    marginTop: 2,
   },
   cardsContainer: {
     flex: 1,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,

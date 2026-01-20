@@ -3,51 +3,62 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventStore } from '../src/store/eventStore';
+import { DigitalCard } from '../src/components/DigitalCard';
 
 interface SettingItemProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
   onPress?: () => void;
   showArrow?: boolean;
   color?: string;
+  isLast?: boolean;
 }
 
-const SettingItem: React.FC<SettingItemProps> = ({
+function SettingItem({
   icon,
   title,
   subtitle,
   onPress,
   showArrow = true,
   color = '#fff',
-}) => (
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={onPress}
-    activeOpacity={onPress ? 0.7 : 1}
-  >
-    <View style={[styles.settingIcon, { backgroundColor: `${color}20` }]}>
-      <Ionicons name={icon as any} size={22} color={color} />
-    </View>
-    <View style={styles.settingContent}>
-      <Text style={[styles.settingTitle, { color }]}>{title}</Text>
-      {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
-    </View>
-    {showArrow && onPress && (
-      <Ionicons name="chevron-forward" size={20} color="#4B5563" />
-    )}
-  </TouchableOpacity>
-);
+  isLast = false,
+}: SettingItemProps) {
+  return (
+    <TouchableOpacity
+      style={[styles.settingButton, isLast && styles.settingButtonLast]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      disabled={!onPress}
+    >
+      <View
+        style={[
+          styles.settingIconContainer,
+          { backgroundColor: `${color}20` },
+        ]}
+      >
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <View style={styles.settingTextContainer}>
+        <Text style={[styles.settingTitle, { color }]}>{title}</Text>
+        {subtitle && (
+          <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        )}
+      </View>
+      {showArrow && onPress && (
+        <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+      )}
+    </TouchableOpacity>
+  );
+}
 
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
   const { savedEvents, attendedEvents, seedData } = useEventStore();
 
   const handleSeedData = () => {
@@ -71,100 +82,111 @@ export default function ProfileScreen() {
     );
   };
 
+  const savedCount = savedEvents.length;
+  const attendedCount = attendedEvents.length;
+  const ratedCount = attendedEvents.filter((e) => e.attended?.emoji_rating).length;
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingTop: insets.top + 10 }}
-    >
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
+        {/* Demo Banner */}
         <View style={styles.demoBanner}>
-          <Ionicons name="flask" size={16} color="#F59E0B" />
-          <Text style={styles.demoText}>Demo - Versión de prueba</Text>
+          <Ionicons name="flask" size={14} color="#F59E0B" />
+          <Text style={styles.demoBannerText}>Demo - Version de prueba</Text>
         </View>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person" size={48} color="#8B5CF6" />
+
+        {/* Avatar */}
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={36} color="#8B5CF6" />
         </View>
-        <Text style={styles.userName}>Usuario WOW</Text>
-        <Text style={styles.userBio}>Explorando eventos increíbles</Text>
+
+        <Text style={styles.userName}>Juan Perez</Text>
+        <Text style={styles.userBio}>Explorando eventos increibles</Text>
+      </View>
+
+      {/* Digital Card */}
+      <View style={styles.cardSection}>
+        <Text style={styles.sectionTitle}>TU TARJETA DIGITAL</Text>
+        <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" />
       </View>
 
       {/* Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{savedEvents.length}</Text>
+          <Text style={styles.statValue}>{savedCount}</Text>
           <Text style={styles.statLabel}>Guardados</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{attendedEvents.length}</Text>
+          <Text style={styles.statValue}>{attendedCount}</Text>
           <Text style={styles.statLabel}>Asistidos</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {attendedEvents.filter((e) => e.attended.emoji_rating).length}
-          </Text>
+          <Text style={styles.statValue}>{ratedCount}</Text>
           <Text style={styles.statLabel}>Calificados</Text>
         </View>
       </View>
 
-      {/* Settings Sections */}
+      {/* Preferencias Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferencias</Text>
-        <View style={styles.sectionContent}>
+        <Text style={styles.sectionTitleMargin}>PREFERENCIAS</Text>
+        <View style={styles.settingsGroup}>
           <SettingItem
-            icon="notifications-outline"
+            icon="notifications"
             title="Notificaciones"
-            subtitle="Próximamente"
+            subtitle="Proximamente"
           />
           <SettingItem
-            icon="location-outline"
-            title="Ubicación"
-            subtitle="Próximamente"
+            icon="location"
+            title="Ubicacion"
+            subtitle="Proximamente"
           />
           <SettingItem
-            icon="color-palette-outline"
+            icon="color-palette"
             title="Apariencia"
             subtitle="Tema oscuro"
+            isLast
           />
         </View>
       </View>
 
+      {/* Desarrollo Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Desarrollo</Text>
-        <View style={styles.sectionContent}>
+        <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
+        <View style={styles.settingsGroup}>
           <SettingItem
-            icon="sparkles-outline"
+            icon="sparkles"
             title="Cargar eventos de ejemplo"
             subtitle="Reinicia con datos de prueba"
             onPress={handleSeedData}
             color="#8B5CF6"
+            isLast
           />
         </View>
       </View>
 
+      {/* Informacion Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Información</Text>
-        <View style={styles.sectionContent}>
+        <Text style={styles.sectionTitleMargin}>INFORMACION</Text>
+        <View style={styles.settingsGroup}>
           <SettingItem
-            icon="help-circle-outline"
+            icon="help-circle"
             title="Ayuda y Soporte"
             subtitle="Preguntas frecuentes"
           />
           <SettingItem
-            icon="document-text-outline"
-            title="Términos y Condiciones"
+            icon="document-text"
+            title="Terminos y Condiciones"
           />
+          <SettingItem icon="shield" title="Privacidad" />
           <SettingItem
-            icon="shield-checkmark-outline"
-            title="Privacidad"
-          />
-          <SettingItem
-            icon="information-circle-outline"
-            title="Versión"
+            icon="information-circle"
+            title="Version"
             subtitle="0.0.1 MVP"
             showArrow={false}
+            isLast
           />
         </View>
       </View>
@@ -173,12 +195,14 @@ export default function ProfileScreen() {
       <View style={styles.appInfo}>
         <Text style={styles.appLogo}>WOW</Text>
         <Text style={styles.appTagline}>Descubre y Vive Eventos</Text>
-        <Text style={styles.appCopyright}>
-          Desarrollado con amor para conectar{"\n"}personas con experiencias inolvidables
+        <Text style={styles.appDescription}>
+          Desarrollado con amor para conectar personas con experiencias
+          inolvidables
         </Text>
       </View>
 
-      <View style={{ height: insets.bottom + 40 }} />
+      {/* Bottom spacing */}
+      <View style={styles.bottomSpacing} />
     </ScrollView>
   );
 }
@@ -190,41 +214,54 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 16,
+    paddingTop: 32,
   },
   demoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    marginBottom: 12,
   },
-  demoText: {
+  demoBannerText: {
     color: '#F59E0B',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
-  avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFFFFF',
   },
   userBio: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 2,
+  },
+  cardSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -238,10 +275,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  statNumber: {
+  statValue: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFFFFF',
   },
   statLabel: {
     fontSize: 12,
@@ -256,43 +293,46 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  sectionTitle: {
+  sectionTitleMargin: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
     marginLeft: 20,
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
-  sectionContent: {
+  settingsGroup: {
     backgroundColor: '#1F1F1F',
     marginHorizontal: 20,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  settingItem: {
+  settingButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#2A2A2A',
   },
-  settingIcon: {
+  settingButtonLast: {
+    borderBottomWidth: 0,
+  },
+  settingIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 10,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
-  settingContent: {
+  settingTextContainer: {
     flex: 1,
   },
   settingTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#fff',
   },
   settingSubtitle: {
     fontSize: 13,
@@ -304,7 +344,7 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   appLogo: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: 'bold',
     color: '#8B5CF6',
     letterSpacing: 6,
@@ -314,11 +354,15 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
   },
-  appCopyright: {
+  appDescription: {
     fontSize: 12,
     color: '#4B5563',
     textAlign: 'center',
     marginTop: 16,
-    lineHeight: 18,
+    lineHeight: 20,
+    paddingHorizontal: 32,
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

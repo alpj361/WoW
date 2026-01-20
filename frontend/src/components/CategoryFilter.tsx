@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -32,11 +31,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   onSelectCategory,
 }) => {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-    >
+    <View style={styles.container}>
       {categories.map((category) => {
         const isSelected = selectedCategory === category.id;
         return (
@@ -49,22 +44,22 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             <View
               style={[
                 styles.iconCircle,
-                { 
-                  backgroundColor: isSelected ? category.color : '#2A2A2A',
-                  borderColor: isSelected ? category.color : '#3A3A3A',
+                {
+                  backgroundColor: isSelected ? '#8B5CF6' : '#1E1E1E',
+                  borderColor: isSelected ? '#8B5CF6' : '#333',
                 },
               ]}
             >
               <Ionicons
                 name={category.icon as any}
                 size={20}
-                color={isSelected ? '#fff' : category.color}
+                color={isSelected ? '#fff' : '#9CA3AF'}
               />
             </View>
             <Text
               style={[
                 styles.label,
-                isSelected && { color: category.color, fontWeight: '700' },
+                isSelected && { color: '#8B5CF6', fontWeight: '600' },
               ]}
             >
               {category.label}
@@ -72,19 +67,21 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
           </TouchableOpacity>
         );
       })}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 12,
+    paddingVertical: 12,
+    gap: 16,
   },
   categoryItem: {
     alignItems: 'center',
-    marginRight: 12,
+    gap: 6,
   },
   iconCircle: {
     width: 48,
@@ -92,11 +89,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#333',
   },
   label: {
-    color: '#9CA3AF',
+    color: '#6B7280',
     fontSize: 11,
     fontWeight: '500',
   },

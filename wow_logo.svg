@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 450" width="1400" height="450">
+  <defs>
+    <!-- Gradiente horizontal para todo el texto -->
+    <linearGradient id="mainGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" style="stop-color:#5a2d82;stop-opacity:1" />
+      <stop offset="18%" style="stop-color:#6d2973;stop-opacity:1" />
+      <stop offset="36%" style="stop-color:#8f2564;stop-opacity:1" />
+      <stop offset="54%" style="stop-color:#b22d56;stop-opacity:1" />
+      <stop offset="72%" style="stop-color:#d63848;stop-opacity:1" />
+      <stop offset="90%" style="stop-color:#f24737;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff5733;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Sombra difusa debajo del texto -->
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feOffset dx="0" dy="18" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.35"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Sombra secundaria más cercana -->
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="10" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.25"/>
+      </feComponentTransfer>
+      <feFlood flood-color="#000000"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Texto WOW! con gradiente y sombras -->
+  <g filter="url(#softShadow)">
+    <g filter="url(#innerShadow)">
+      <text 
+        x="700" 
+        y="310" 
+        font-family="Arial Black, Arial, sans-serif" 
+        font-size="320" 
+        font-weight="900"
+        text-anchor="middle"
+        fill="url(#mainGradient)"
+        letter-spacing="-15"
+        style="paint-order: stroke fill;">WOW!</text>
+    </g>
+  </g>
+</svg>
