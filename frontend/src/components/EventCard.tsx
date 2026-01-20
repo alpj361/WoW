@@ -64,8 +64,8 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   // Dimensiones dinámicas de la tarjeta
   const cardWidth = screenWidth * 0.9;
-  // Usar más espacio: 65% del viewport para ocupar mejor el área disponible
-  const cardHeight = screenHeight * 0.65;
+  // Usar 75% del viewport para ocupar mejor el área disponible
+  const cardHeight = screenHeight * 0.58;
 
   return (
     <View style={styles.cardWrapper}>
