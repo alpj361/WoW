@@ -283,20 +283,36 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    overflow: 'hidden',
+  },
+  cardStackContainer: {
+    position: 'relative',
     width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   currentCard: {
+    position: 'relative',
     zIndex: 2,
     width: '100%',
+    height: '100%',
   },
   nextCard: {
     position: 'absolute',
     zIndex: 1,
     width: '100%',
+    height: '100%',
+    opacity: 0.5,
+    transform: [{ scale: 0.92 }, { translateY: 8 }],
   },
   loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   loadingText: {
@@ -304,8 +320,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: 'center',
-    padding: 40,
+    justifyContent: 'center',
+    padding: 32,
     gap: 12,
   },
   emptyTitle: {
@@ -348,21 +366,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  swipeHints: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 50,
-    paddingVertical: 2,
-    paddingBottom: 4,
-  },
-  hintItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hintText: {
-    color: '#4B5563',
-    fontSize: 12,
   },
 });
