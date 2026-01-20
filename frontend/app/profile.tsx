@@ -6,10 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventStore } from '../src/store/eventStore';
 import { DigitalCard, CardDesign } from '../src/components/DigitalCard';
+import { PinMovementTest } from '../src/components/pins/PinMovementTest';
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -61,6 +64,7 @@ function SettingItem({
 export default function ProfileScreen() {
   const { savedEvents, attendedEvents, seedData } = useEventStore();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
+  const [showPinTest, setShowPinTest] = useState(false);
 
   const handleSeedData = () => {
     Alert.alert(
@@ -88,138 +92,167 @@ export default function ProfileScreen() {
   const ratedCount = attendedEvents.filter((e) => e.attended?.emoji_rating).length;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        {/* Demo Banner */}
-        <View style={styles.demoBanner}>
-          <Ionicons name="flask" size={16} color="#F59E0B" />
-          <Text style={styles.demoBannerText}>Demo - Version de prueba</Text>
+    <>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          {/* Demo Banner */}
+          <View style={styles.demoBanner}>
+            <Ionicons name="flask" size={16} color="#F59E0B" />
+            <Text style={styles.demoBannerText}>Demo - Version de prueba</Text>
+          </View>
+
+          {/* Avatar */}
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={48} color="#8B5CF6" />
+          </View>
+
+          <Text style={styles.userName}>Juan Perez</Text>
+          <Text style={styles.userBio}>Explorando eventos increibles</Text>
         </View>
 
-        {/* Avatar */}
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={48} color="#8B5CF6" />
+        {/* Digital Card */}
+        <View style={styles.cardSection}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.sectionTitle}>TU TARJETA DIGITAL</Text>
+            <TouchableOpacity
+              style={styles.editCardButton}
+              onPress={() => {
+                const designs: CardDesign[] = ['classic', 'ticket', 'pyramid'];
+                const currentIndex = designs.indexOf(cardDesign);
+                const nextIndex = (currentIndex + 1) % designs.length;
+                setCardDesign(designs[nextIndex]);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="color-wand" size={14} color="#8B5CF6" />
+              <Text style={styles.editCardText}>Cambiar</Text>
+            </TouchableOpacity>
+          </View>
+          <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" design={cardDesign} />
         </View>
 
-        <Text style={styles.userName}>Juan Perez</Text>
-        <Text style={styles.userBio}>Explorando eventos increibles</Text>
-      </View>
-
-      {/* Digital Card */}
-      <View style={styles.cardSection}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.sectionTitle}>TU TARJETA DIGITAL</Text>
-          <TouchableOpacity
-            style={styles.editCardButton}
-            onPress={() => {
-              const designs: CardDesign[] = ['classic', 'ticket', 'pyramid'];
-              const currentIndex = designs.indexOf(cardDesign);
-              const nextIndex = (currentIndex + 1) % designs.length;
-              setCardDesign(designs[nextIndex]);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="color-wand" size={14} color="#8B5CF6" />
-            <Text style={styles.editCardText}>Cambiar</Text>
-          </TouchableOpacity>
+        {/* Stats */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{savedCount}</Text>
+            <Text style={styles.statLabel}>Guardados</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{attendedCount}</Text>
+            <Text style={styles.statLabel}>Asistidos</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{ratedCount}</Text>
+            <Text style={styles.statLabel}>Calificados</Text>
+          </View>
         </View>
-        <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" design={cardDesign} />
-      </View>
 
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{savedCount}</Text>
-          <Text style={styles.statLabel}>Guardados</Text>
+        {/* Preferencias Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitleMargin}>PREFERENCIAS</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="notifications"
+              title="Notificaciones"
+              subtitle="Proximamente"
+            />
+            <SettingItem
+              icon="location"
+              title="Ubicacion"
+              subtitle="Proximamente"
+            />
+            <SettingItem
+              icon="color-palette"
+              title="Apariencia"
+              subtitle="Tema oscuro"
+              isLast
+            />
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{attendedCount}</Text>
-          <Text style={styles.statLabel}>Asistidos</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{ratedCount}</Text>
-          <Text style={styles.statLabel}>Calificados</Text>
-        </View>
-      </View>
 
-      {/* Preferencias Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitleMargin}>PREFERENCIAS</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="notifications"
-            title="Notificaciones"
-            subtitle="Proximamente"
-          />
-          <SettingItem
-            icon="location"
-            title="Ubicacion"
-            subtitle="Proximamente"
-          />
-          <SettingItem
-            icon="color-palette"
-            title="Apariencia"
-            subtitle="Tema oscuro"
-            isLast
-          />
+        {/* Desarrollo Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="sparkles"
+              title="Cargar eventos de ejemplo"
+              subtitle="Reinicia con datos de prueba"
+              onPress={handleSeedData}
+              color="#8B5CF6"
+            />
+            <SettingItem
+              icon="move"
+              title="Test de Movimiento"
+              subtitle="Prueba el movimiento 3D del pin"
+              onPress={() => setShowPinTest(true)}
+              color="#F59E0B"
+              isLast
+            />
+          </View>
         </View>
-      </View>
 
-      {/* Desarrollo Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="sparkles"
-            title="Cargar eventos de ejemplo"
-            subtitle="Reinicia con datos de prueba"
-            onPress={handleSeedData}
-            color="#8B5CF6"
-            isLast
-          />
+        {/* Informacion Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitleMargin}>INFORMACION</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="help-circle"
+              title="Ayuda y Soporte"
+              subtitle="Preguntas frecuentes"
+            />
+            <SettingItem
+              icon="document-text"
+              title="Terminos y Condiciones"
+            />
+            <SettingItem icon="shield" title="Privacidad" />
+            <SettingItem
+              icon="information-circle"
+              title="Version"
+              subtitle="0.0.1 MVP"
+              showArrow={false}
+              isLast
+            />
+          </View>
         </View>
-      </View>
 
-      {/* Informacion Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitleMargin}>INFORMACION</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="help-circle"
-            title="Ayuda y Soporte"
-            subtitle="Preguntas frecuentes"
-          />
-          <SettingItem
-            icon="document-text"
-            title="Terminos y Condiciones"
-          />
-          <SettingItem icon="shield" title="Privacidad" />
-          <SettingItem
-            icon="information-circle"
-            title="Version"
-            subtitle="0.0.1 MVP"
-            showArrow={false}
-            isLast
-          />
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appLogo}>WOW</Text>
+          <Text style={styles.appTagline}>Descubre y Vive Eventos</Text>
+          <Text style={styles.appDescription}>
+            Desarrollado con amor para conectar personas con experiencias
+            inolvidables
+          </Text>
         </View>
-      </View>
 
-      {/* App Info */}
-      <View style={styles.appInfo}>
-        <Text style={styles.appLogo}>WOW</Text>
-        <Text style={styles.appTagline}>Descubre y Vive Eventos</Text>
-        <Text style={styles.appDescription}>
-          Desarrollado con amor para conectar personas con experiencias
-          inolvidables
-        </Text>
-      </View>
+        {/* Bottom spacing */}
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
 
-      {/* Bottom spacing */}
-      <View style={styles.bottomSpacing} />
-    </ScrollView>
+      {/* Pin Movement Test Modal */}
+      <Modal
+        visible={showPinTest}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPinTest(false)}
+      >
+        <GestureHandlerRootView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setShowPinTest(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <PinMovementTest />
+        </GestureHandlerRootView>
+      </Modal>
+    </>
   );
 }
 
@@ -399,5 +432,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 40,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0F0F0F',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
