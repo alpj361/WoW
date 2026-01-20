@@ -64,7 +64,8 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   // Dimensiones dinámicas de la tarjeta
   const cardWidth = screenWidth * 0.9;
-  const cardHeight = screenHeight * 0.5; // 50% de la altura del viewport
+  // Usar más espacio: 65% del viewport para ocupar mejor el área disponible
+  const cardHeight = screenHeight * 0.65;
 
   return (
     <View style={styles.cardWrapper}>
@@ -130,27 +131,28 @@ export const EventCard: React.FC<EventCardProps> = ({
             </View>
           </View>
         </LinearGradient>
+
+        {/* Botones superpuestos sobre la tarjeta */}
+        {showActions && (
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.skipButton]}
+              onPress={onSkip}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={32} color="#EF4444" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.saveButton]}
+              onPress={onSave}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="heart" size={32} color="#10B981" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      {showActions && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.skipButton]}
-            onPress={onSkip}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="close" size={24} color="#EF4444" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.saveButton]}
-            onPress={onSave}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="heart" size={24} color="#10B981" />
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 };
@@ -203,6 +205,7 @@ const styles = StyleSheet.create({
   bottomContent: {
     gap: 2,
     width: '100%',
+    paddingBottom: 80, // Espacio para los botones superpuestos
   },
   title: {
     fontSize: 16,
@@ -234,19 +237,31 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   actionsContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 32,
-    marginTop: 12,
+    gap: 40,
+    paddingHorizontal: 20,
   },
   actionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 3,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   skipButton: {
     borderColor: '#EF4444',

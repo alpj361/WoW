@@ -282,9 +282,8 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     width: '100%',
-    paddingVertical: 20,
   },
   currentCard: {
     zIndex: 2,
