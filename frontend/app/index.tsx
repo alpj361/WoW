@@ -282,18 +282,16 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingTop: 8,
     paddingBottom: 8,
     overflow: 'hidden',
   },
   cardStackContainer: {
     position: 'relative',
     width: '100%',
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
   },
   currentCard: {
     zIndex: 2,
