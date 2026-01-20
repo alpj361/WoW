@@ -157,13 +157,17 @@ export const EventCard: React.FC<EventCardProps> = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     width: '100%',
   },
   card: {
+    flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
+    maxHeight: 480,
   },
   gradient: {
     flex: 1,
