@@ -57,19 +57,17 @@ export const EventCard: React.FC<EventCardProps> = ({
   onSkip,
   showActions = true,
 }) => {
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const gradient = getCategoryGradient(event.category);
   const icon = getCategoryIcon(event.category);
   const categoryLabel = getCategoryLabel(event.category);
 
-  // Dimensiones dinámicas de la tarjeta
-  const cardWidth = screenWidth * 0.9;
-  // Usar 60% del viewport para que los botones queden visibles
-  const cardHeight = screenHeight * 0.60;
+  // Dimensiones dinámicas de la tarjeta - ancho relativo, altura flexible
+  const cardWidth = Math.min(screenWidth * 0.9, 340);
 
   return (
     <View style={styles.cardWrapper}>
-      <View style={[styles.card, { width: cardWidth, height: cardHeight }]}>
+      <View style={[styles.card, { width: cardWidth }]}>
         <LinearGradient
           colors={gradient}
           style={styles.gradient}
