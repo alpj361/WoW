@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Platform, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform, Dimensions } from 'react-native';
 
 interface WebViewportProps {
   children: React.ReactNode;
 }
-
-const { width, height } = Dimensions.get('window');
 
 export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
   if (Platform.OS !== 'web') {
@@ -13,9 +11,21 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
   }
 
   // En web, simular viewport móvil
+  const { height: windowHeight } = Dimensions.get('window');
+
+  // Calcular altura máxima: 95% de la ventana o 844px (iPhone 14 Pro)
+  const maxHeight = Math.min(windowHeight * 0.95, 844);
+
   return (
     <View style={styles.webContainer}>
-      <View style={styles.mobileViewport}>
+      <View
+        style={[
+          styles.mobileViewport,
+          { height: maxHeight },
+          // @ts-ignore - web only style
+          Platform.OS === 'web' && { boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
+        ]}
+      >
         {children}
       </View>
     </View>
@@ -31,10 +41,9 @@ const styles = StyleSheet.create({
   },
   mobileViewport: {
     width: 390, // iPhone 14 Pro width
-    height: height > 844 ? 844 : height, // iPhone 14 Pro height max
-    maxHeight: '95vh',
     backgroundColor: '#0F0F0F',
     borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -42,7 +51,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 10,
-    // @ts-ignore - web only
-    boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+    elevation: 20, // Android shadow
   },
 });
