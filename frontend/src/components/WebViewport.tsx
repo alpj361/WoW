@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Platform, Dimensions } from 'react-native';
+import { View, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 
 interface WebViewportProps {
   children: React.ReactNode;
@@ -10,11 +10,12 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  // En web, simular viewport móvil
-  const { height: windowHeight } = Dimensions.get('window');
+  // En web, simular viewport móvil usando hook reactivo
+  const { height: windowHeight } = useWindowDimensions();
 
   // Calcular altura máxima: 95% de la ventana o 844px (iPhone 14 Pro)
-  const maxHeight = Math.min(windowHeight * 0.95, 844);
+  // Fallback a 844px si windowHeight no está disponible o es inválido
+  const maxHeight = windowHeight > 0 ? Math.min(windowHeight * 0.95, 844) : 844;
 
   return (
     <View style={styles.webContainer}>
