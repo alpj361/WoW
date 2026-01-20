@@ -11,10 +11,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEventStore } from '../src/store/eventStore';
 import { router } from 'expo-router';
 
@@ -31,11 +34,67 @@ export default function CreateEventScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('general');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<Date | null>(null);
   const [location, setLocation] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Picker visibility state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Format date for display
+  const formatDate = (date: Date): string => {
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    };
+    return date.toLocaleDateString('es-MX', options);
+  };
+
+  // Format time for display
+  const formatTime = (date: Date): string => {
+    return date.toLocaleTimeString('es-MX', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Format date for storage (YYYY-MM-DD)
+  const formatDateForStorage = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Format time for storage (HH:MM)
+  const formatTimeForStorage = (date: Date): string => {
+    return date.toLocaleTimeString('es-MX', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
+  const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'set' && date) {
+      setSelectedDate(date);
+    }
+  };
+
+  const onTimeChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (event.type === 'set' && date) {
+      setSelectedTime(date);
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -88,27 +147,20 @@ export default function CreateEventScreen() {
         title: title.trim(),
         description: description.trim(),
         category,
-        date: date.trim() || null,
-        time: time.trim() || null,
+        date: selectedDate ? formatDateForStorage(selectedDate) : null,
+        time: selectedTime ? formatTimeForStorage(selectedTime) : null,
         location: location.trim() || null,
         image,
       });
-      Alert.alert('¡Éxito!', 'Tu evento ha sido creado.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Reset form
-            setTitle('');
-            setDescription('');
-            setCategory('general');
-            setDate('');
-            setTime('');
-            setLocation('');
-            setImage(null);
-            router.replace('/');
-          },
-        },
-      ]);
+      // Reset form and navigate to events
+      setTitle('');
+      setDescription('');
+      setCategory('general');
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setLocation('');
+      setImage(null);
+      router.replace('/myevents');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
     }
@@ -190,7 +242,7 @@ export default function CreateEventScreen() {
         {/* Form Fields */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Detalles del Evento</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Título *</Text>
             <TextInput
@@ -219,23 +271,79 @@ export default function CreateEventScreen() {
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Fecha</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="2025-07-20"
-                placeholderTextColor="#6B7280"
-                value={date}
-                onChangeText={setDate}
-              />
+              {Platform.OS === 'web' ? (
+                <View style={styles.pickerButton}>
+                  <Ionicons name="calendar" size={20} color="#8B5CF6" />
+                  <input
+                    type="date"
+                    value={selectedDate ? formatDateForStorage(selectedDate) : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(new Date(e.target.value + 'T12:00:00'));
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: selectedDate ? '#fff' : '#6B7280',
+                      fontSize: 14,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.pickerButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar" size={20} color="#8B5CF6" />
+                  <Text style={selectedDate ? styles.pickerText : styles.pickerPlaceholder}>
+                    {selectedDate ? formatDate(selectedDate) : 'Seleccionar fecha'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Hora</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="19:00"
-                placeholderTextColor="#6B7280"
-                value={time}
-                onChangeText={setTime}
-              />
+              {Platform.OS === 'web' ? (
+                <View style={styles.pickerButton}>
+                  <Ionicons name="time" size={20} color="#8B5CF6" />
+                  <input
+                    type="time"
+                    value={selectedTime ? formatTimeForStorage(selectedTime) : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [hours, minutes] = e.target.value.split(':');
+                        const date = new Date();
+                        date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                        setSelectedTime(date);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: selectedTime ? '#fff' : '#6B7280',
+                      fontSize: 14,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.pickerButton}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time" size={20} color="#8B5CF6" />
+                  <Text style={selectedTime ? styles.pickerText : styles.pickerPlaceholder}>
+                    {selectedTime ? formatTime(selectedTime) : 'Seleccionar hora'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -272,6 +380,95 @@ export default function CreateEventScreen() {
 
         <View style={{ height: insets.bottom + 20 }} />
       </ScrollView>
+
+      {/* Date Picker Modal (iOS) */}
+      {Platform.OS === 'ios' && showDatePicker && (
+        <Modal
+          transparent
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.pickerModalOverlay}>
+            <Pressable
+              style={styles.pickerModalDismiss}
+              onPress={() => setShowDatePicker(false)}
+            />
+            <View style={styles.pickerModalContent}>
+              <View style={styles.pickerModalHeader}>
+                <Text style={styles.pickerModalTitle}>Seleccionar Fecha</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.pickerModalDone}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={selectedDate || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={onDateChange}
+                minimumDate={new Date()}
+                locale="es-MX"
+                textColor="#fff"
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Time Picker Modal (iOS) */}
+      {Platform.OS === 'ios' && showTimePicker && (
+        <Modal
+          transparent
+          animationType="slide"
+          visible={showTimePicker}
+          onRequestClose={() => setShowTimePicker(false)}
+        >
+          <View style={styles.pickerModalOverlay}>
+            <Pressable
+              style={styles.pickerModalDismiss}
+              onPress={() => setShowTimePicker(false)}
+            />
+            <View style={styles.pickerModalContent}>
+              <View style={styles.pickerModalHeader}>
+                <Text style={styles.pickerModalTitle}>Seleccionar Hora</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={styles.pickerModalDone}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={selectedTime || new Date()}
+                mode="time"
+                display="spinner"
+                onChange={onTimeChange}
+                locale="es-MX"
+                textColor="#fff"
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android Date Picker */}
+      {Platform.OS === 'android' && showDatePicker && (
+        <DateTimePicker
+          value={selectedDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Android Time Picker */}
+      {Platform.OS === 'android' && showTimePicker && (
+        <DateTimePicker
+          value={selectedTime || new Date()}
+          mode="time"
+          display="default"
+          onChange={onTimeChange}
+          is24Hour={false}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -415,5 +612,57 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  pickerText: {
+    color: '#fff',
+    fontSize: 14,
+    flex: 1,
+  },
+  pickerPlaceholder: {
+    color: '#6B7280',
+    fontSize: 14,
+    flex: 1,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalContent: {
+    backgroundColor: '#1F1F1F',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2A2A',
+  },
+  pickerModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  pickerModalDone: {
+    color: '#8B5CF6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pickerModalDismiss: {
+    flex: 1,
   },
 });

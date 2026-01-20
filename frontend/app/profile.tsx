@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventStore } from '../src/store/eventStore';
-import { DigitalCard } from '../src/components/DigitalCard';
+import { DigitalCard, CardDesign } from '../src/components/DigitalCard';
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -60,6 +60,7 @@ function SettingItem({
 
 export default function ProfileScreen() {
   const { savedEvents, attendedEvents, seedData } = useEventStore();
+  const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
 
   const handleSeedData = () => {
     Alert.alert(
@@ -92,13 +93,13 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         {/* Demo Banner */}
         <View style={styles.demoBanner}>
-          <Ionicons name="flask" size={14} color="#F59E0B" />
+          <Ionicons name="flask" size={16} color="#F59E0B" />
           <Text style={styles.demoBannerText}>Demo - Version de prueba</Text>
         </View>
 
         {/* Avatar */}
         <View style={styles.avatar}>
-          <Ionicons name="person" size={36} color="#8B5CF6" />
+          <Ionicons name="person" size={48} color="#8B5CF6" />
         </View>
 
         <Text style={styles.userName}>Juan Perez</Text>
@@ -107,8 +108,23 @@ export default function ProfileScreen() {
 
       {/* Digital Card */}
       <View style={styles.cardSection}>
-        <Text style={styles.sectionTitle}>TU TARJETA DIGITAL</Text>
-        <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" />
+        <View style={styles.cardHeader}>
+          <Text style={styles.sectionTitle}>TU TARJETA DIGITAL</Text>
+          <TouchableOpacity
+            style={styles.editCardButton}
+            onPress={() => {
+              const designs: CardDesign[] = ['classic', 'ticket', 'pyramid'];
+              const currentIndex = designs.indexOf(cardDesign);
+              const nextIndex = (currentIndex + 1) % designs.length;
+              setCardDesign(designs[nextIndex]);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="color-wand" size={14} color="#8B5CF6" />
+            <Text style={styles.editCardText}>Cambiar</Text>
+          </TouchableOpacity>
+        </View>
+        <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" design={cardDesign} />
       </View>
 
       {/* Stats */}
@@ -214,54 +230,73 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingTop: 32,
+    paddingVertical: 24,
+    paddingTop: 40,
   },
   demoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 9999,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   demoBannerText: {
     color: '#F59E0B',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   userBio: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#6B7280',
-    marginTop: 2,
+    marginTop: 4,
   },
   cardSection: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
-    marginBottom: 10,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  editCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 12,
+  },
+  editCardText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
   statsContainer: {
     flexDirection: 'row',
