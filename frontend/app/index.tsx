@@ -205,15 +205,17 @@ export default function ExploreScreen() {
     }
 
     return (
-      <>
+      <View style={styles.cardStackContainer}>
+        {/* Next card (behind) */}
         {nextEvent && (
           <Animated.View style={[styles.nextCard, nextCardStyle]}>
             <EventCard event={nextEvent} showActions={false} />
           </Animated.View>
         )}
+        
+        {/* Current card */}
         {currentEvent && (
           IS_WEB ? (
-            // En web: solo animaciones, botones manejan las acciones
             <Animated.View style={[styles.currentCard, cardStyle]}>
               <EventCard
                 event={currentEvent}
@@ -223,7 +225,6 @@ export default function ExploreScreen() {
               />
             </Animated.View>
           ) : (
-            // En móvil: gestos táctiles completos
             <GestureDetector gesture={gesture}>
               <Animated.View style={[styles.currentCard, cardStyle]}>
                 <EventCard
@@ -236,7 +237,7 @@ export default function ExploreScreen() {
             </GestureDetector>
           )
         )}
-      </>
+      </View>
     );
   };
 
