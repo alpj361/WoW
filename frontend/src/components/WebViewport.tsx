@@ -1,18 +1,17 @@
 import React from 'react';
-import { View, StyleSheet, Platform, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 
 interface WebViewportProps {
   children: React.ReactNode;
 }
 
-const { width, height } = Dimensions.get('window');
-
 export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
+  // No usar hooks - simplemente renderizar children directamente en web
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
 
-  // En web, simular viewport móvil
+  // En web, simplemente envolver en un contenedor sin hooks
   return (
     <View style={styles.webContainer}>
       <View style={styles.mobileViewport}>
@@ -25,24 +24,15 @@ export const WebViewport: React.FC<WebViewportProps> = ({ children }) => {
 const styles = StyleSheet.create({
   webContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0F0F0F',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   mobileViewport: {
-    width: 390, // iPhone 14 Pro width
-    height: height > 844 ? 844 : height, // iPhone 14 Pro height max
-    maxHeight: '95vh',
+    flex: 1,
+    width: '100%',
+    maxWidth: 428, // iPhone 14 Pro Max width
     backgroundColor: '#0F0F0F',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    // @ts-ignore - web only
-    boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+    overflow: 'hidden',
   },
 });

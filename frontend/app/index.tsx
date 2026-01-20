@@ -205,7 +205,7 @@ export default function ExploreScreen() {
     }
 
     return (
-      <>
+      <View style={styles.cardStackContainer}>
         {nextEvent && (
           <Animated.View style={[styles.nextCard, nextCardStyle]}>
             <EventCard event={nextEvent} showActions={false} />
@@ -236,7 +236,7 @@ export default function ExploreScreen() {
             </GestureDetector>
           )
         )}
-      </>
+      </View>
     );
   };
 
@@ -281,18 +281,32 @@ const styles = StyleSheet.create({
   },
   cardsContainer: {
     flex: 1,
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  cardStackContainer: {
+    position: 'relative',
     width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   currentCard: {
+    position: 'relative',
     zIndex: 2,
     width: '100%',
+    height: '100%',
   },
   nextCard: {
     position: 'absolute',
     zIndex: 1,
     width: '100%',
+    height: '100%',
+    opacity: 0.5,
+    transform: [{ scale: 0.92 }, { translateY: 8 }],
   },
   loadingContainer: {
     alignItems: 'center',
