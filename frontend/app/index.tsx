@@ -286,7 +286,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingBottom: 8,
-    overflow: 'hidden',
   },
   cardStackContainer: {
     position: 'relative',
