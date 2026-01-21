@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import * as api from '../services/api';
 
 export interface Event {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   category: string;
   image: string | null;
   date: string | null;
@@ -11,120 +12,6 @@ export interface Event {
   location: string | null;
   created_at: string;
 }
-
-// Mock data - No backend required for demo
-const SAMPLE_EVENTS: Event[] = [
-  {
-    id: '1',
-    title: 'Noche de Jazz en Vivo',
-    description: 'Disfruta de una noche inolvidable con los mejores músicos de jazz de la ciudad. Incluye copa de bienvenida.',
-    category: 'music',
-    image: null,
-    date: '2025-07-20',
-    time: '21:00',
-    location: 'Jazz Bar La Cava',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Festival de Rock Underground',
-    description: 'Las mejores bandas emergentes de rock alternativo. ¡No te lo pierdas!',
-    category: 'music',
-    image: null,
-    date: '2025-07-25',
-    time: '18:00',
-    location: 'Arena Norte',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    title: 'Concierto Sinfónico',
-    description: 'La orquesta filarmónica presenta obras clásicas de Mozart y Beethoven.',
-    category: 'music',
-    image: null,
-    date: '2025-07-28',
-    time: '19:30',
-    location: 'Teatro Principal',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    title: 'Limpieza de Playa',
-    description: 'Únete a nuestra jornada de limpieza ecológica. Incluye desayuno y camiseta.',
-    category: 'volunteer',
-    image: null,
-    date: '2025-07-22',
-    time: '07:00',
-    location: 'Playa del Sol',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    title: 'Reforestación Comunitaria',
-    description: 'Planta un árbol y ayuda al medio ambiente. Todas las herramientas incluidas.',
-    category: 'volunteer',
-    image: null,
-    date: '2025-07-26',
-    time: '09:00',
-    location: 'Bosque Municipal',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '6',
-    title: 'Comedor Social',
-    description: 'Ayuda a servir comidas a personas necesitadas. Tu tiempo hace la diferencia.',
-    category: 'volunteer',
-    image: null,
-    date: '2025-07-21',
-    time: '12:00',
-    location: 'Centro Comunitario',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '7',
-    title: 'Food Truck Festival',
-    description: 'Los mejores food trucks de la ciudad en un solo lugar. Música en vivo incluida.',
-    category: 'general',
-    image: null,
-    date: '2025-07-24',
-    time: '12:00',
-    location: 'Parque Central',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '8',
-    title: 'Networking Tech',
-    description: 'Conecta con profesionales del mundo tecnológico. Charlas y networking.',
-    category: 'general',
-    image: null,
-    date: '2025-07-23',
-    time: '18:30',
-    location: 'Hub de Innovación',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '9',
-    title: 'Mercado Artesanal',
-    description: 'Descubre productos únicos hechos a mano por artesanos locales.',
-    category: 'general',
-    image: null,
-    date: '2025-07-27',
-    time: '10:00',
-    location: 'Plaza Mayor',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '10',
-    title: 'Clase de Yoga al Aire Libre',
-    description: 'Relájate y conecta con tu cuerpo en esta sesión de yoga gratuita.',
-    category: 'general',
-    image: null,
-    date: '2025-07-20',
-    time: '08:00',
-    location: 'Jardín Botánico',
-    created_at: new Date().toISOString(),
-  },
-];
 
 export interface SavedEventData {
   saved: {
@@ -152,7 +39,7 @@ interface EventStore {
   currentCategory: string;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   fetchEvents: (category?: string) => Promise<void>;
   fetchSavedEvents: () => Promise<void>;
@@ -163,11 +50,10 @@ interface EventStore {
   removeAttended: (eventId: string) => Promise<void>;
   createEvent: (eventData: Partial<Event>) => Promise<Event>;
   setCategory: (category: string) => void;
-  seedData: () => Promise<void>;
 }
 
 export const useEventStore = create<EventStore>((set, get) => ({
-  events: SAMPLE_EVENTS, // Cargar eventos al iniciar
+  events: [],
   savedEvents: [],
   attendedEvents: [],
   currentCategory: 'all',
@@ -177,39 +63,31 @@ export const useEventStore = create<EventStore>((set, get) => ({
   fetchEvents: async (category?: string) => {
     set({ isLoading: true, error: null });
 
-    // Simulate API delay for realistic UX
-    await new Promise(resolve => setTimeout(resolve, 300));
-
     try {
       const cat = category || get().currentCategory;
-      let filteredEvents = SAMPLE_EVENTS;
-
-      if (cat && cat !== 'all') {
-        filteredEvents = SAMPLE_EVENTS.filter(e => e.category === cat);
-      }
-
-      set({ events: filteredEvents, isLoading: false });
+      const events = await api.fetchEvents(cat);
+      set({ events, isLoading: false });
     } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      console.error('Error fetching events:', error);
+      console.error('Error fetching events:', error.message);
+      set({ error: error.message, isLoading: false, events: [] });
     }
   },
 
   fetchSavedEvents: async () => {
     set({ isLoading: true, error: null });
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // TODO: Implement with Supabase when user auth is added
     set({ isLoading: false });
   },
 
   fetchAttendedEvents: async () => {
     set({ isLoading: true, error: null });
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // TODO: Implement with Supabase when user auth is added
     set({ isLoading: false });
   },
 
   saveEvent: async (eventId: string) => {
     try {
-      const event = SAMPLE_EVENTS.find(e => e.id === eventId);
+      const event = get().events.find(e => e.id === eventId);
       if (!event) return;
 
       const savedEvent: SavedEventData = {
@@ -243,7 +121,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   markAttended: async (eventId: string, emoji?: string) => {
     try {
-      const event = SAMPLE_EVENTS.find(e => e.id === eventId);
+      const event = get().events.find(e => e.id === eventId);
       if (!event) return;
 
       const attendedEvent: AttendedEventData = {
@@ -279,20 +157,19 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   createEvent: async (eventData: Partial<Event>) => {
     try {
-      const newEvent: Event = {
-        id: `event-${Date.now()}`,
+      const newEvent = await api.createEvent({
         title: eventData.title || '',
-        description: eventData.description || '',
+        description: eventData.description || undefined,
         category: eventData.category || 'general',
-        image: eventData.image || null,
-        date: eventData.date || null,
-        time: eventData.time || null,
-        location: eventData.location || null,
-        created_at: new Date().toISOString(),
-      };
+        image: eventData.image,
+        date: eventData.date,
+        time: eventData.time,
+        location: eventData.location || undefined,
+      });
 
-      SAMPLE_EVENTS.unshift(newEvent);
+      // Refresh events list
       get().fetchEvents();
+
       return newEvent;
     } catch (error: any) {
       console.error('Error creating event:', error);
@@ -304,14 +181,4 @@ export const useEventStore = create<EventStore>((set, get) => ({
     set({ currentCategory: category });
     get().fetchEvents(category);
   },
-
-  seedData: async () => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      get().fetchEvents();
-    } catch (error: any) {
-      console.error('Error seeding data:', error);
-      throw error;
-    }
-  }
 }));
