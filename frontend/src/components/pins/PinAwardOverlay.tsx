@@ -15,11 +15,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PIN_SIZE = 100;
 
-// Pin image
 const PIN_IMAGE = require('../../../assets/images/pin-aesdi.png');
 
 interface PinAwardOverlayProps {
@@ -37,17 +37,15 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
     onDismiss,
     targetPosition,
 }) => {
-    // Animation values
     const showProgress = useSharedValue(0);
     const pinScale = useSharedValue(0);
     const pinTranslateX = useSharedValue(0);
     const pinTranslateY = useSharedValue(50);
     const textProgress = useSharedValue(0);
     const isAttaching = useSharedValue(false);
-
     const isVisible = useSharedValue(false);
 
-    // Metallic sheen - subtle tilt animation
+    // Metallic sheen tilt
     const tiltX = useSharedValue(0);
     const tiltY = useSharedValue(0);
 
@@ -57,13 +55,12 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
             isAttaching.value = false;
             pinTranslateX.value = 0;
 
-            // Entrance animation
             showProgress.value = withTiming(1, { duration: 300 });
             pinScale.value = withDelay(100, withSpring(1.2, { damping: 10, stiffness: 100 }));
             pinTranslateY.value = withDelay(100, withSpring(0, { damping: 12, stiffness: 80 }));
             textProgress.value = withDelay(300, withSpring(1, { damping: 10, stiffness: 80 }));
 
-            // Subtle continuous tilt for metallic sheen
+            // Subtle tilt for sheen
             tiltX.value = withRepeat(
                 withSequence(
                     withTiming(4, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
@@ -82,7 +79,6 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
                 true
             );
         } else {
-            // Reset values
             showProgress.value = 0;
             pinScale.value = 0;
             pinTranslateX.value = 0;
@@ -103,20 +99,15 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
         if (isAttaching.value) return;
         isAttaching.value = true;
 
-        // Hide text
         textProgress.value = withTiming(0, { duration: 150 });
 
-        // Fly to card position
-        const flyToX = targetPosition.x;
-        const flyToY = targetPosition.y;
-
-        pinTranslateX.value = withSpring(flyToX, {
+        pinTranslateX.value = withSpring(targetPosition.x, {
             damping: 12,
             stiffness: 150,
             mass: 0.5,
         });
 
-        pinTranslateY.value = withSpring(flyToY, {
+        pinTranslateY.value = withSpring(targetPosition.y, {
             damping: 12,
             stiffness: 150,
             mass: 0.5,
@@ -139,13 +130,11 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
             runOnJS(handleTap)();
         });
 
-    // Backdrop style
     const backdropStyle = useAnimatedStyle(() => ({
         opacity: interpolate(showProgress.value, [0, 1], [0, 0.9]),
         pointerEvents: isVisible.value ? 'auto' : 'none',
     }));
 
-    // Pin container with 3D tilt
     const pinContainerStyle = useAnimatedStyle(() => ({
         transform: [
             { perspective: 800 },
@@ -160,14 +149,13 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
 
     // Sheen moves opposite to tilt
     const sheenStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(Math.abs(tiltX.value + tiltY.value), [0, 7], [0.05, 0.15]),
+        opacity: interpolate(Math.abs(tiltX.value + tiltY.value), [0, 7], [0.08, 0.2]),
         transform: [
-            { translateX: -tiltY.value * 5 },
-            { translateY: -tiltX.value * 5 },
+            { translateX: -tiltY.value * 6 },
+            { translateY: -tiltX.value * 6 },
         ],
     }));
 
-    // Text style
     const textStyle = useAnimatedStyle(() => ({
         opacity: textProgress.value,
         transform: [
@@ -176,13 +164,11 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
         ],
     }));
 
-    // Glow style
     const glowStyle = useAnimatedStyle(() => ({
         opacity: interpolate(pinScale.value, [0, 1.2], [0, 1]),
         transform: [{ scale: pinScale.value }],
     }));
 
-    // Instruction text
     const instructionStyle = useAnimatedStyle(() => ({
         opacity: interpolate(textProgress.value, [0.5, 1], [0, 1], Extrapolation.CLAMP),
     }));
@@ -191,43 +177,52 @@ export const PinAwardOverlay: React.FC<PinAwardOverlayProps> = ({
 
     return (
         <View style={styles.overlay}>
-            {/* Backdrop */}
             <Animated.View style={[styles.backdrop, backdropStyle]} />
 
-            {/* Pin and content */}
             <GestureDetector gesture={tapGesture}>
                 <View style={styles.content}>
                     <Animated.View style={[styles.pinWrapper, pinContainerStyle]}>
                         {/* Glow effect */}
                         <Animated.View style={[styles.glow, glowStyle]} />
 
-                        {/* Pin image */}
+                        {/* Pin with masked sheen */}
                         <View style={styles.pinFrame}>
+                            {/* Base image */}
                             <Image
                                 source={PIN_IMAGE}
                                 style={styles.pinImage}
                                 resizeMode="contain"
                             />
-                            {/* Metallic sheen overlay */}
-                            <Animated.View style={[styles.sheenOverlay, sheenStyle]}>
-                                <LinearGradient
-                                    colors={['rgba(255,255,255,0.9)', 'transparent', 'rgba(255,255,255,0.5)']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={styles.sheenGradient}
-                                />
-                            </Animated.View>
+
+                            {/* Masked sheen - follows pin shape */}
+                            <MaskedView
+                                style={styles.maskedSheen}
+                                maskElement={
+                                    <Image
+                                        source={PIN_IMAGE}
+                                        style={styles.pinImage}
+                                        resizeMode="contain"
+                                    />
+                                }
+                            >
+                                <Animated.View style={[styles.sheenContainer, sheenStyle]}>
+                                    <LinearGradient
+                                        colors={['rgba(255,255,255,0.95)', 'transparent', 'rgba(255,255,255,0.7)']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.sheenGradient}
+                                    />
+                                </Animated.View>
+                            </MaskedView>
                         </View>
                     </Animated.View>
 
-                    {/* Pin name */}
                     <Animated.View style={[styles.textContainer, textStyle]}>
                         <Text style={styles.congratsText}>¡Nuevo Pin!</Text>
                         <Text style={styles.pinName}>{pinName}</Text>
                         <View style={styles.nameLine} />
                     </Animated.View>
 
-                    {/* Instruction */}
                     <Animated.Text style={[styles.instruction, instructionStyle]}>
                         Toca para agregar a tu tarjeta
                     </Animated.Text>
@@ -267,20 +262,20 @@ const styles = StyleSheet.create({
     pinFrame: {
         width: PIN_SIZE,
         height: PIN_SIZE * 1.2,
-        overflow: 'hidden',
-        borderRadius: 8,
     },
     pinImage: {
         width: '100%',
         height: '100%',
     },
-    sheenOverlay: {
+    maskedSheen: {
         position: 'absolute',
-        top: -20,
-        left: -20,
-        right: -20,
-        bottom: -20,
-        pointerEvents: 'none',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    sheenContainer: {
+        flex: 1,
     },
     sheenGradient: {
         flex: 1,
