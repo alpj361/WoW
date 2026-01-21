@@ -1,14 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../src/services/supabase';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function AuthVerifyScreen() {
     const [status, setStatus] = useState('Verificando cuenta...');
     const [error, setError] = useState<string | null>(null);
+    const videoRef = useRef<Video>(null);
 
     useEffect(() => {
         verifyUser();
+        return () => {
+            if (videoRef.current) {
+                videoRef.current.unloadAsync();
+            }
+        };
     }, []);
 
     // Check if user exists in profiles table
@@ -96,9 +106,38 @@ export default function AuthVerifyScreen() {
 
     return (
         <View style={styles.container}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
-            <Text style={styles.status}>{status}</Text>
-            {error && <Text style={styles.error}>{error}</Text>}
+            {/* Video Background - Adapted to phone size */}
+            <Video
+                ref={videoRef}
+                source={require('../assets/splash-video.mp4')}
+                style={styles.video}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                isLooping
+                isMuted
+            />
+            
+            {/* Gradient Overlay */}
+            <LinearGradient
+                colors={['rgba(10, 10, 10, 0.3)', 'rgba(10, 10, 10, 0.7)', 'rgba(10, 10, 10, 0.9)']}
+                locations={[0, 0.5, 1]}
+                style={styles.overlay}
+            />
+            
+            {/* Content */}
+            <View style={styles.content}>
+                {/* Animated loading indicator */}
+                <View style={styles.loaderContainer}>
+                    <View style={styles.pulseOuter}>
+                        <View style={styles.pulseInner}>
+                            <View style={styles.pulseCore} />
+                        </View>
+                    </View>
+                </View>
+                
+                <Text style={styles.status} data-testid="verify-status">{status}</Text>
+                {error && <Text style={styles.error} data-testid="verify-error">{error}</Text>}
+            </View>
         </View>
     );
 }
@@ -106,21 +145,62 @@ export default function AuthVerifyScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0F0F0F',
+        backgroundColor: '#0a0a0a',
+    },
+    video: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    content: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
     },
+    loaderContainer: {
+        marginBottom: 32,
+    },
+    pulseOuter: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    pulseInner: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(139, 92, 246, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    pulseCore: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#8B5CF6',
+    },
     status: {
         color: '#fff',
-        fontSize: 16,
-        marginTop: 20,
+        fontSize: 18,
+        fontWeight: '600',
         textAlign: 'center',
+        letterSpacing: 0.3,
     },
     error: {
-        color: '#EF4444',
-        fontSize: 14,
-        marginTop: 12,
+        color: '#F87171',
+        fontSize: 15,
+        marginTop: 16,
         textAlign: 'center',
     },
 });
