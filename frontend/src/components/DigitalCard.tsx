@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
     View,
     Text,
@@ -8,13 +8,27 @@ import {
     Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AttachedPin } from './pins/AttachedPin';
 
 export type CardDesign = 'classic' | 'ticket' | 'pyramid';
+
+export interface CollectedPin {
+    id: string;
+    name: string;
+    image: any;
+    isNew?: boolean;  // For triggering magnetic snap animation
+}
+
+export interface DigitalCardRef {
+    flipToBack: () => void;
+    flipToFront: () => void;
+}
 
 interface DigitalCardProps {
     userName?: string;
     memberId?: string;
     design?: CardDesign;
+    pins?: CollectedPin[];
 }
 
 // Card images
@@ -25,15 +39,46 @@ const CARD_IMAGES = {
 };
 
 const CARD_BACK = require('../../assets/images/wow-card-back.png');
+const PIN_IMAGE = require('../../assets/images/pin-fundador.png');
 
-export const DigitalCard: React.FC<DigitalCardProps> = ({
-    userName = 'Usuario',
-    memberId = 'WOW-2024-001',
-    design = 'classic',
-}) => {
+export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
+    {
+        userName = 'Usuario',
+        memberId = 'WOW-2024-001',
+        design = 'classic',
+        pins = [],
+    },
+    ref
+) => {
     const [isFlipped, setIsFlipped] = useState(false);
     const flipAnimation = useRef(new Animated.Value(0)).current;
     const [glowOpacity] = useState(new Animated.Value(0.15));
+
+    // Expose flip methods to parent via ref
+    useImperativeHandle(ref, () => ({
+        flipToBack: () => {
+            if (!isFlipped) {
+                Animated.spring(flipAnimation, {
+                    toValue: 1,
+                    friction: 8,
+                    tension: 10,
+                    useNativeDriver: true,
+                }).start();
+                setIsFlipped(true);
+            }
+        },
+        flipToFront: () => {
+            if (isFlipped) {
+                Animated.spring(flipAnimation, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 10,
+                    useNativeDriver: true,
+                }).start();
+                setIsFlipped(false);
+            }
+        },
+    }));
 
     const flipCard = () => {
         const toValue = isFlipped ? 0 : 1;
@@ -185,6 +230,19 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({
                             resizeMode="cover"
                         />
 
+                        {/* Collected Pins */}
+                        {pins.length > 0 && (
+                            <View style={styles.pinsContainer}>
+                                {pins.map((pin, index) => (
+                                    <AttachedPin
+                                        key={pin.id}
+                                        index={index}
+                                        isNew={pin.isNew}
+                                    />
+                                ))}
+                            </View>
+                        )}
+
                         {/* Subtle border */}
                         <View style={styles.cardBorder} />
                     </Animated.View>
@@ -202,7 +260,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({
             </Animated.View>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     container: {
@@ -374,6 +432,18 @@ const styles = StyleSheet.create({
     reflectionGradient: {
         flex: 1,
         borderRadius: 100,
+    },
+    pinsContainer: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+    },
+    attachedPin: {
+        position: 'absolute',
+        width: 45,
+        height: 55,
     },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventStore } from '../src/store/eventStore';
-import { DigitalCard, CardDesign } from '../src/components/DigitalCard';
+import { DigitalCard, CardDesign, DigitalCardRef, CollectedPin } from '../src/components/DigitalCard';
 import { PinMovementTest } from '../src/components/pins/PinMovementTest';
+import { PinAwardOverlay } from '../src/components/pins/PinAwardOverlay';
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -65,6 +66,33 @@ export default function ProfileScreen() {
   const { savedEvents, attendedEvents, seedData } = useEventStore();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
   const [showPinTest, setShowPinTest] = useState(false);
+  const [showPinAward, setShowPinAward] = useState(false);
+  const [collectedPins, setCollectedPins] = useState<CollectedPin[]>([]);
+  const cardRef = useRef<DigitalCardRef>(null);
+
+  const handleObtainPin = () => {
+    // Step 1: Flip the card to back first (if not already flipped)
+    cardRef.current?.flipToBack();
+
+    // Step 2: After card finishes flipping, show the pin award overlay
+    setTimeout(() => {
+      setShowPinAward(true);
+    }, 600);
+  };
+
+  const handlePinAttach = () => {
+    // Add pin to collection with isNew flag for magnetic snap animation
+    const newPin: CollectedPin = {
+      id: `pin-${Date.now()}`,
+      name: 'Miembro AESDI',
+      image: null,
+      isNew: true,
+    };
+    setCollectedPins(prev => [...prev, newPin]);
+
+    // Close the overlay immediately
+    setShowPinAward(false);
+  };
 
   const handleSeedData = () => {
     Alert.alert(
@@ -129,7 +157,23 @@ export default function ProfileScreen() {
               <Text style={styles.editCardText}>Cambiar</Text>
             </TouchableOpacity>
           </View>
-          <DigitalCard userName="Juan Perez" memberId="WOW-2024-001" design={cardDesign} />
+          <DigitalCard
+            ref={cardRef}
+            userName="Juan Perez"
+            memberId="WOW-2024-001"
+            design={cardDesign}
+            pins={collectedPins}
+          />
+
+          {/* Obtener PIN Button */}
+          <TouchableOpacity
+            style={styles.obtainPinButton}
+            onPress={handleObtainPin}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="star" size={18} color="#fff" />
+            <Text style={styles.obtainPinText}>Obtener PIN</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Stats */}
@@ -183,15 +227,17 @@ export default function ProfileScreen() {
               subtitle="Reinicia con datos de prueba"
               onPress={handleSeedData}
               color="#8B5CF6"
+              isLast
             />
+            {/* Test de Movimiento - hidden for now
             <SettingItem
               icon="move"
               title="Test de Movimiento"
               subtitle="Prueba el movimiento 3D del pin"
               onPress={() => setShowPinTest(true)}
               color="#F59E0B"
-              isLast
             />
+            */}
           </View>
         </View>
 
@@ -252,6 +298,19 @@ export default function ProfileScreen() {
           <PinMovementTest />
         </GestureHandlerRootView>
       </Modal>
+
+      {/* Pin Award Overlay */}
+      {showPinAward && (
+        <GestureHandlerRootView style={styles.pinAwardContainer}>
+          <PinAwardOverlay
+            visible={showPinAward}
+            pinName="Miembro AESDI"
+            onAttach={handlePinAttach}
+            onDismiss={() => setShowPinAward(false)}
+            targetPosition={{ x: 100, y: -200 }}
+          />
+        </GestureHandlerRootView>
+      )}
     </>
   );
 }
@@ -450,5 +509,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  obtainPinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  obtainPinText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pinAwardContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });
