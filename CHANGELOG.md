@@ -2,7 +2,17 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
-## [0.0.3] - 2026-01-21
+## [0.0.4] - 2026-01-21
+
+### Added
+- 🔐 **Google Authentication**: Login with Google + invitation codes
+- 🎬 **Splash Video**: Animated splash screen while loading
+
+### Changed
+- 🔀 **App Layout**: Now wraps in `AuthProvider` with auth gating
+- 🏠 **Navigation**: After event creation redirects to Home (not My Events)
+
+## [0.0.3] - 2026-01-20
 
 ### Added
 - ✨ **Supabase Integration**: Backend now uses Supabase for event storage

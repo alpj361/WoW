@@ -1,50 +1,80 @@
-# Welcome to your Expo app 👋
+# WoW Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobile app for discovering and experiencing local events. Built with React Native and Expo.
 
-## Get started
+## Features
 
-1. Install dependencies
+- 🎯 **Event Discovery**: Swipe through events like a dating app
+- 📸 **AI Image Analysis**: Upload event flyers, AI extracts details
+- 🔐 **Google Authentication**: Login with Google + invitation codes
+- 📱 **Cross-platform**: iOS, Android, and Web support
 
+## Tech Stack
+
+- **Framework**: React Native + Expo
+- **Routing**: Expo Router (file-based)
+- **State**: Zustand
+- **Backend**: Supabase + Custom API
+- **Auth**: Supabase Auth with Google OAuth
+
+## Project Structure
+
+```
+frontend/
+├── app/                    # Screens (file-based routing)
+│   ├── _layout.tsx        # Root layout with AuthProvider
+│   ├── index.tsx          # Home/Explore screen
+│   ├── auth.tsx           # Login screen (code + Google)
+│   ├── auth-callback.tsx  # OAuth callback handler
+│   ├── create.tsx         # Create event form
+│   ├── myevents.tsx       # Saved events
+│   └── profile.tsx        # User profile
+├── src/
+│   ├── components/        # Reusable components
+│   │   ├── SplashScreen.tsx  # Video splash
+│   │   └── ...
+│   ├── context/           # React contexts
+│   │   └── AuthContext.tsx   # Auth state
+│   ├── services/          # API services
+│   │   ├── api.ts         # Backend API
+│   │   └── supabase.ts    # Supabase client
+│   └── store/             # Zustand stores
+│       └── eventStore.ts
+└── assets/                # Images, videos
+    └── splash-video.mp4
+```
+
+## Getting Started
+
+1. **Install dependencies**
    ```bash
-   npm install
+   npm install --legacy-peer-deps
    ```
 
-2. Start the app
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
 
+3. **Start development**
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Environment Variables
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_API_URL` | Backend API URL |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Auth Flow
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. App opens → Shows splash video
+2. No session → Redirects to `/auth`
+3. User enters invitation code
+4. Code valid → Shows Google button
+5. Google OAuth → Creates profile
+6. Authenticated → Navigate to Home

@@ -222,7 +222,7 @@ export default function CreateEventScreen() {
       setSelectedTime(null);
       setLocation('');
       setImage(null);
-      router.replace('/myevents');
+      router.replace('/');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
     }
