@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEventStore } from '../src/store/eventStore';
 import { router } from 'expo-router';
+import { analyzeImage } from '../src/services/api';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -39,6 +40,7 @@ export default function CreateEventScreen() {
   const [location, setLocation] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -135,6 +137,66 @@ export default function CreateEventScreen() {
     }
   };
 
+  const handleAnalyzeImage = async () => {
+    if (!image) return;
+
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeImage(image, title);
+
+      if (result.success && result.analysis) {
+        const { analysis } = result;
+
+        // Auto-fill fields
+        setTitle(analysis.event_name || title);
+        setDescription(analysis.description || description);
+        setLocation(analysis.location || location);
+
+        // Parse Date
+        if (analysis.date) {
+          // Try to parse date strings like "20-10" (DD-MM) or "2023-10-20"
+          let parsedDate = new Date();
+          const dateParts = analysis.date.split(/[-/]/);
+
+          if (dateParts.length === 3) {
+            // YYYY-MM-DD
+            parsedDate = new Date(analysis.date);
+          } else if (dateParts.length === 2) {
+            // DD-MM, assume current year
+            const currentYear = new Date().getFullYear();
+            // Check if parsing as DD-MM
+            const day = parseInt(dateParts[0]);
+            const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed
+            parsedDate.setFullYear(currentYear);
+            parsedDate.setMonth(month);
+            parsedDate.setDate(day);
+          }
+          if (!isNaN(parsedDate.getTime())) {
+            setSelectedDate(parsedDate);
+          }
+        }
+
+        // Parse Time
+        if (analysis.time) {
+          // Format "HH:MM"
+          const timeParts = analysis.time.split(':');
+          if (timeParts.length >= 2) {
+            const parsedTime = new Date();
+            parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+            setSelectedTime(parsedTime);
+          }
+        }
+
+        Alert.alert('¡Análisis Completado!', 'Hemos llenado los campos con la información detectada.');
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      Alert.alert('Error', 'No pudimos analizar la imagen. Intenta llenar los datos manualmente.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Por favor ingresa un título para el evento.');
@@ -187,11 +249,27 @@ export default function CreateEventScreen() {
           {image ? (
             <View style={styles.imagePreview}>
               <Image source={{ uri: image }} style={styles.previewImage} />
+
               <TouchableOpacity
                 style={styles.removeImageButton}
                 onPress={() => setImage(null)}
               >
                 <Ionicons name="close-circle" size={28} color="#EF4444" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.analyzeButton}
+                onPress={handleAnalyzeImage}
+                disabled={isAnalyzing}
+              >
+                {isAnalyzing ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="sparkles" size={18} color="#fff" />
+                    <Text style={styles.analyzeButtonText}>Analizar Flyer con IA</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : (
@@ -537,6 +615,27 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 14,
+  },
+  analyzeButton: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.9)',
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(10px)',
+  },
+  analyzeButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

@@ -60,4 +60,28 @@ export async function fetchEventById(id: string): Promise<Event> {
     return response.data.event;
 }
 
+export interface AnalysisResult {
+    analysis: {
+        event_name: string;
+        date: string;
+        time: string;
+        description: string;
+        location: string;
+        confidence: string;
+        extracted_text: string;
+    };
+    success: boolean;
+}
+
+/**
+ * Analyze an event flyer image
+ */
+export async function analyzeImage(base64Image: string, title?: string): Promise<AnalysisResult> {
+    const response = await api.post('/events/analyze-image', {
+        image: base64Image,
+        title: title || 'New Event Upload'
+    });
+    return response.data;
+}
+
 export default api;

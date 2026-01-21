@@ -7,6 +7,7 @@ All notable changes to the WOW Events project will be documented in this file.
 ### Added
 - ✨ **Supabase Integration**: Backend now uses Supabase for event storage
 - 📡 **API Service**: New `api.ts` service for backend communication
+- 🤖 **AI Image Analysis**: Added "Analyze Flyer" button to auto-fill event details
 - 📋 **Agent Workflows**: Added `/changelog` and `/rules` workflows
 
 ### Changed
