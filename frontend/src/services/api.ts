@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-// Configure base URL - change for production
-const API_BASE_URL = __DEV__
-    ? 'http://localhost:3001/api'
-    : 'https://your-domain.com/api';
+// Configure base URL
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,

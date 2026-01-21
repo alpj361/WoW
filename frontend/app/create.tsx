@@ -267,7 +267,7 @@ export default function CreateEventScreen() {
                 ) : (
                   <>
                     <Ionicons name="sparkles" size={18} color="#fff" />
-                    <Text style={styles.analyzeButtonText}>Analizar Flyer con IA</Text>
+                    <Text style={styles.analyzeButtonText}>Analizar Flyer</Text>
                   </>
                 )}
               </TouchableOpacity>
