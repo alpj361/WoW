@@ -10,7 +10,7 @@ After making any significant changes to the codebase, always update the CHANGELO
 Location: `/Users/pj/Desktop/WoWBack/CHANGELOG.md`
 
 ## Frontend (Wow)
-Location: `/Users/pj/Desktop/Wow/frontend/CHANGELOG.md`
+Location: `/Users/pj/Desktop/Wow/CHANGELOG.md`
 
 ## Format
 Use [Keep a Changelog](https://keepachangelog.com/) format:

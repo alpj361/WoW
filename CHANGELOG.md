@@ -2,6 +2,20 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.3] - 2026-01-21
+
+### Added
+- ✨ **Supabase Integration**: Backend now uses Supabase for event storage
+- 📡 **API Service**: New `api.ts` service for backend communication
+- 📋 **Agent Workflows**: Added `/changelog` and `/rules` workflows
+
+### Changed
+- 🔄 **Event Store**: Replaced mock data with real API calls
+- 🗄️ **Backend Database**: Switched from MongoDB to Supabase
+
+### Removed
+- 🗑️ **Mock Data**: Removed `SAMPLE_EVENTS` from `eventStore.ts`
+
 ## [0.0.2] - 2026-01-19
 
 ### Added

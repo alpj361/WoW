@@ -63,7 +63,7 @@ function SettingItem({
 }
 
 export default function ProfileScreen() {
-  const { savedEvents, attendedEvents, seedData } = useEventStore();
+  const { savedEvents, attendedEvents, fetchEvents } = useEventStore();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
   const [showPinTest, setShowPinTest] = useState(false);
   const [showPinAward, setShowPinAward] = useState(false);
@@ -94,18 +94,18 @@ export default function ProfileScreen() {
     setShowPinAward(false);
   };
 
-  const handleSeedData = () => {
+  const handleRefreshEvents = () => {
     Alert.alert(
-      'Cargar datos de ejemplo',
-      '¿Quieres cargar eventos de ejemplo? Esto eliminará los datos actuales.',
+      'Actualizar eventos',
+      '¿Quieres cargar los eventos desde el servidor?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Cargar',
+          text: 'Actualizar',
           onPress: async () => {
             try {
-              await seedData();
-              Alert.alert('¡Listo!', 'Eventos de ejemplo cargados.');
+              await fetchEvents();
+              Alert.alert('¡Listo!', 'Eventos actualizados.');
             } catch (error) {
               Alert.alert('Error', 'No se pudieron cargar los eventos.');
             }
@@ -222,10 +222,10 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
           <View style={styles.settingsGroup}>
             <SettingItem
-              icon="sparkles"
-              title="Cargar eventos de ejemplo"
-              subtitle="Reinicia con datos de prueba"
-              onPress={handleSeedData}
+              icon="sync"
+              title="Actualizar eventos"
+              subtitle="Cargar desde el servidor"
+              onPress={handleRefreshEvents}
               color="#8B5CF6"
               isLast
             />
