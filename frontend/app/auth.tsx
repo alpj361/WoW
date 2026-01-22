@@ -629,13 +629,24 @@ const styles = StyleSheet.create({
     // Logo
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 30,
     },
     logoGlow: {
-        shadowColor: '#ff5733',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 25,
+        // Remove shadow on web as it creates a square background effect
+        ...Platform.select({
+            ios: {
+                shadowColor: '#ff5733',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 30,
+            },
+            android: {
+                elevation: 0,
+            },
+            web: {
+                // No shadow on web - it creates ugly square
+            },
+        }),
     },
     tagline: {
         fontSize: 15,
