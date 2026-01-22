@@ -1,32 +1,24 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-// Only create client if credentials are configured
-let supabase: SupabaseClient;
+const isConfigured = !!process.env.EXPO_PUBLIC_SUPABASE_URL && !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-        },
-    });
-} else {
-    console.warn('⚠️ Supabase credentials not configured - using mock client');
-    // Create a mock client that won't crash but won't work either
-    supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
+if (!isConfigured) {
+    console.warn('⚠️ Supabase credentials not configured - using placeholder values for UI preview');
 }
+
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        persistSession: isConfigured,
+        autoRefreshToken: isConfigured,
+        detectSessionInUrl: isConfigured,
+    },
+});
 
 export { supabase };
 
 export const isSupabaseConfigured = () => {
-    return !!supabaseUrl && !!supabaseAnonKey;
+    return isConfigured;
 };
