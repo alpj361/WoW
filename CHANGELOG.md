@@ -2,6 +2,17 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.5] - 2026-01-21
+
+### Fixed
+- 🐛 **Supabase Build Error**: Fixed `supabaseUrl is required` error on Vercel by using placeholder client when env vars not configured
+- 🔄 **Auth Flow Race Conditions**: Fixed black screens and redirect loops during login/register
+- 🔐 **Auth State Management**: Added `authState` utility to coordinate auth-callback with layout
+
+### Changed
+- 📦 **Auth Callback**: Improved handling of login vs registration flow
+- 🏗️ **Layout Navigation**: Better detection of auth processing state
+
 ## [0.0.4] - 2026-01-21
 
 ### Added
