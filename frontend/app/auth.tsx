@@ -30,6 +30,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Interactive Background Component with animated gradient orbs
+// Using deep blue/teal tones to contrast with the purple-to-orange logo
 function InteractiveBackground() {
     const orb1Anim = useRef(new RNAnimated.Value(0)).current;
     const orb2Anim = useRef(new RNAnimated.Value(0)).current;
@@ -59,21 +60,21 @@ function InteractiveBackground() {
         RNAnimated.loop(
             RNAnimated.sequence([
                 RNAnimated.timing(pulseAnim, {
-                    toValue: 1.15,
-                    duration: 2000,
+                    toValue: 1.1,
+                    duration: 3000,
                     useNativeDriver: true,
                 }),
                 RNAnimated.timing(pulseAnim, {
                     toValue: 1,
-                    duration: 2000,
+                    duration: 3000,
                     useNativeDriver: true,
                 }),
             ])
         ).start();
 
-        animateOrb(orb1Anim, 4000);
-        animateOrb(orb2Anim, 5000);
-        animateOrb(orb3Anim, 6000);
+        animateOrb(orb1Anim, 5000);
+        animateOrb(orb2Anim, 6000);
+        animateOrb(orb3Anim, 7000);
     }, []);
 
     const orb1Style = {
@@ -81,13 +82,13 @@ function InteractiveBackground() {
             {
                 translateY: orb1Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -30],
+                    outputRange: [0, -25],
                 }),
             },
             {
                 translateX: orb1Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 20],
+                    outputRange: [0, 15],
                 }),
             },
             { scale: pulseAnim },
@@ -99,13 +100,13 @@ function InteractiveBackground() {
             {
                 translateY: orb2Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 40],
+                    outputRange: [0, 30],
                 }),
             },
             {
                 translateX: orb2Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -25],
+                    outputRange: [0, -20],
                 }),
             },
         ],
@@ -116,13 +117,13 @@ function InteractiveBackground() {
             {
                 translateY: orb3Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -20],
+                    outputRange: [0, -15],
                 }),
             },
             {
                 translateX: orb3Anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 30],
+                    outputRange: [0, 25],
                 }),
             },
         ],
@@ -130,17 +131,17 @@ function InteractiveBackground() {
 
     return (
         <View style={StyleSheet.absoluteFill}>
-            {/* Base dark gradient */}
+            {/* Base dark gradient - deep blue/black for contrast with warm logo */}
             <LinearGradient
-                colors={['#0a0a0a', '#120818', '#0d0515', '#0a0a0a']}
+                colors={['#050508', '#08101a', '#0a1520', '#050508']}
                 locations={[0, 0.3, 0.7, 1]}
                 style={StyleSheet.absoluteFill}
             />
 
-            {/* Animated gradient orbs */}
+            {/* Animated gradient orbs - cool teal/cyan tones for contrast */}
             <RNAnimated.View style={[styles.orb, styles.orb1, orb1Style]}>
                 <LinearGradient
-                    colors={['rgba(90, 45, 130, 0.6)', 'rgba(139, 92, 246, 0.3)', 'transparent']}
+                    colors={['rgba(20, 80, 100, 0.4)', 'rgba(30, 120, 140, 0.2)', 'transparent']}
                     style={styles.orbGradient}
                     start={{ x: 0.5, y: 0 }}
                     end={{ x: 0.5, y: 1 }}
@@ -149,7 +150,7 @@ function InteractiveBackground() {
 
             <RNAnimated.View style={[styles.orb, styles.orb2, orb2Style]}>
                 <LinearGradient
-                    colors={['rgba(178, 45, 86, 0.5)', 'rgba(242, 71, 55, 0.25)', 'transparent']}
+                    colors={['rgba(15, 60, 90, 0.35)', 'rgba(25, 100, 130, 0.15)', 'transparent']}
                     style={styles.orbGradient}
                     start={{ x: 0.5, y: 0 }}
                     end={{ x: 0.5, y: 1 }}
@@ -158,20 +159,20 @@ function InteractiveBackground() {
 
             <RNAnimated.View style={[styles.orb, styles.orb3, orb3Style]}>
                 <LinearGradient
-                    colors={['rgba(109, 41, 115, 0.4)', 'rgba(255, 87, 51, 0.2)', 'transparent']}
+                    colors={['rgba(10, 50, 70, 0.3)', 'rgba(20, 80, 100, 0.15)', 'transparent']}
                     style={styles.orbGradient}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                 />
             </RNAnimated.View>
 
-            {/* Noise overlay for texture */}
+            {/* Subtle noise overlay for texture */}
             <View style={styles.noiseOverlay} />
 
-            {/* Vignette effect */}
+            {/* Soft vignette effect */}
             <LinearGradient
-                colors={['transparent', 'transparent', 'rgba(0,0,0,0.8)']}
-                locations={[0, 0.5, 1]}
+                colors={['transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+                locations={[0, 0.6, 1]}
                 style={StyleSheet.absoluteFill}
             />
         </View>
