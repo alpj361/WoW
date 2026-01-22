@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Platform } from 'react-native';
 import { supabase } from '../src/services/supabase';
 import { authState } from '../src/utils/authState';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+const INVITE_CODE_STORAGE_KEY = 'wow_pending_invite_code';
 
 export default function AuthCallbackScreen() {
     const params = useLocalSearchParams();
@@ -26,7 +28,19 @@ export default function AuthCallbackScreen() {
             authState.setProcessing(true);
 
             const urlParam = params.url as string;
-            const code = params.code as string;
+            const urlToParse =
+                urlParam
+                    ? decodeURIComponent(urlParam)
+                    : Platform.OS === 'web' && typeof window !== 'undefined'
+                        ? window.location.href
+                        : '';
+
+            const codeFromParams = params.code as string;
+            const codeFromStorage =
+                Platform.OS === 'web' && typeof window !== 'undefined'
+                    ? window.sessionStorage?.getItem(INVITE_CODE_STORAGE_KEY) || ''
+                    : '';
+            const code = codeFromParams || codeFromStorage;
             const isRegistration = !!code;
 
             console.log('🔍 AuthCallback - INICIO:', {
@@ -36,9 +50,9 @@ export default function AuthCallbackScreen() {
             });
 
             // Extract tokens from OAuth URL
-            if (urlParam) {
+            if (urlToParse) {
                 console.log('📝 Processing OAuth URL');
-                const url = new URL(decodeURIComponent(urlParam));
+                const url = new URL(urlToParse);
                 const hashParams = new URLSearchParams(url.hash.substring(1));
                 const accessToken = hashParams.get('access_token');
                 const refreshToken = hashParams.get('refresh_token');
@@ -56,6 +70,11 @@ export default function AuthCallbackScreen() {
                     }
                     console.log('✅ Session set');
                 }
+            }
+
+            // Clear pending invite code after we reach callback (web flow)
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.sessionStorage?.removeItem(INVITE_CODE_STORAGE_KEY);
             }
 
             // Get session with retries

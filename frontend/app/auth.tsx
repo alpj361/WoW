@@ -48,6 +48,8 @@ const getRedirectUrl = () => {
         path: 'auth-callback',
     });
 };
+
+const INVITE_CODE_STORAGE_KEY = 'wow_pending_invite_code';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Elegant Shape Component - Floating geometric pill shapes
@@ -334,10 +336,30 @@ export default function AuthScreen() {
         try {
             const redirectUrl = getRedirectUrl();
 
+            // On web, avoid popup windows; let Supabase redirect the same tab.
+            // Store the invitation code so the callback can finish registration.
+            if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined') {
+                    window.sessionStorage?.setItem(INVITE_CODE_STORAGE_KEY, validatedCode);
+                }
+
+                const { error: authError } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: redirectUrl,
+                    },
+                });
+                if (authError) throw authError;
+                return;
+            }
+
             const { data, error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${redirectUrl}?code=${validatedCode}`,
+                    // Supabase validates redirectTo against allowlisted URLs.
+                    // Keep it "clean" (no query params) to avoid "requested path is invalid".
+                    // The invitation code is passed internally after OAuth completes.
+                    redirectTo: redirectUrl,
                     skipBrowserRedirect: true,
                 },
             });
@@ -367,6 +389,18 @@ export default function AuthScreen() {
 
         try {
             const redirectUrl = getRedirectUrl();
+
+            // On web, avoid popup windows; let Supabase redirect the same tab.
+            if (Platform.OS === 'web') {
+                const { error: authError } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: redirectUrl,
+                    },
+                });
+                if (authError) throw authError;
+                return;
+            }
 
             const { data, error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
