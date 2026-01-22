@@ -426,7 +426,7 @@ export default function AuthScreen() {
                                             data-testid="validate-code-button"
                                         >
                                             <LinearGradient
-                                                colors={['#8B5CF6', '#A855F7', '#C026D3']}
+                                                colors={['#5a2d82', '#b22d56', '#ff5733']}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 0 }}
                                                 style={styles.buttonGradient}
