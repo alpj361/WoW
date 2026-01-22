@@ -632,14 +632,14 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     logoGlow: {
-        shadowColor: '#8B5CF6',
+        shadowColor: '#ff5733',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 30,
+        shadowOpacity: 0.4,
+        shadowRadius: 25,
     },
     tagline: {
         fontSize: 15,
-        color: 'rgba(167, 139, 250, 0.8)',
+        color: 'rgba(200, 210, 220, 0.85)',
         marginTop: 12,
         letterSpacing: 0.5,
     },
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
     formGradient: {
         borderRadius: 24,
         borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.2)',
+        borderColor: 'rgba(60, 80, 100, 0.3)',
     },
     formContainer: {
         padding: 28,
