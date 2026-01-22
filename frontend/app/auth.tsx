@@ -512,7 +512,7 @@ export default function AuthScreen() {
                 >
                     <BlurView intensity={20} tint="dark" style={styles.formBlur}>
                         <LinearGradient
-                            colors={['rgba(30, 20, 40, 0.8)', 'rgba(20, 15, 30, 0.9)']}
+                            colors={['rgba(20, 35, 50, 0.85)', 'rgba(15, 25, 40, 0.95)']}
                             style={styles.formGradient}
                         >
                             <View style={styles.formContainer}>
