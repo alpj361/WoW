@@ -397,7 +397,7 @@ export default function AuthScreen() {
 
                                         <View style={styles.inputWrapper}>
                                             <LinearGradient
-                                                colors={['rgba(139, 92, 246, 0.2)', 'rgba(178, 45, 86, 0.1)']}
+                                                colors={['rgba(90, 45, 130, 0.3)', 'rgba(242, 71, 55, 0.15)']}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
                                                 style={styles.inputGradientBorder}
