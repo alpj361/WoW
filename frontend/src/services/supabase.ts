@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('⚠️ Supabase credentials not configured');
+const isConfigured = !!process.env.EXPO_PUBLIC_SUPABASE_URL && !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!isConfigured) {
+    console.warn('⚠️ Supabase credentials not configured - using placeholder values for UI preview');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -16,5 +18,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export const isSupabaseConfigured = () => {
-    return !!supabaseUrl && !!supabaseAnonKey;
+    return isConfigured;
 };
