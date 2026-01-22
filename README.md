@@ -1,6 +1,6 @@
 # WOW - Descubre y Vive Eventos
 
-![Version](https://img.shields.io/badge/version-0.0.1-blue)
+![Version](https://img.shields.io/badge/version-0.0.5-blue)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20Web-lightgrey)
 ![React Native](https://img.shields.io/badge/React%20Native-0.81.5-61DAFB)
 ![Expo](https://img.shields.io/badge/Expo-54.0-000020)
@@ -40,7 +40,16 @@ WOW/
 │   │   │   ├── EventCard.tsx   # Tarjeta de evento con animaciones
 │   │   │   ├── CategoryFilter.tsx  # Filtro de categorías
 │   │   │   ├── WebViewport.tsx     # Wrapper para viewport móvil en web
+│   │   │   ├── SplashScreen.tsx    # Video splash de carga
+│   │   │   ├── DigitalCard.tsx     # Tarjeta digital de perfil
 │   │   │   └── EmojiRating.tsx     # Selector de emojis para calificación
+│   │   │
+│   │   ├── context/            # React contexts
+│   │   │   └── AuthContext.tsx # Estado de autenticación
+│   │   │
+│   │   ├── services/           # Servicios de API
+│   │   │   ├── api.ts          # Backend API
+│   │   │   └── supabase.ts     # Cliente Supabase
 │   │   │
 │   │   └── store/
 │   │       └── eventStore.ts   # Store de Zustand (state management)

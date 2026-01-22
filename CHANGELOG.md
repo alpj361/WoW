@@ -2,6 +2,22 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.5] - 2026-01-22
+
+### Added
+- 🗄️ **Database Tables for User Events**:
+  - `saved_events` - Stores events saved by users
+  - `attended_events` - Stores events attended by users with emoji ratings
+- 🔒 **Row Level Security (RLS)**: Each user can only view/modify their own events
+- 📊 **eventStore Functions**:
+  - `fetchSavedEvents()` → Obtains from Supabase with join to events
+  - `fetchAttendedEvents()` → Obtains from Supabase with join to events
+  - `saveEvent()` / `unsaveEvent()` → Manage saved_events
+  - `markAttended()` / `removeAttended()` → Manage attended_events
+
+### Changed
+- 🔄 **Event Persistence**: Saved and attended events now persist per-user in database
+
 ## [0.0.4] - 2026-01-21
 
 ### Added
