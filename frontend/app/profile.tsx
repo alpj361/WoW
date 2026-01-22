@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventStore } from '../src/store/eventStore';
+import { useAuth } from '../src/context/AuthContext';
 import { DigitalCard, CardDesign, DigitalCardRef, CollectedPin } from '../src/components/DigitalCard';
 import { PinMovementTest } from '../src/components/pins/PinMovementTest';
 import { PinAwardOverlay } from '../src/components/pins/PinAwardOverlay';
@@ -62,13 +64,31 @@ function SettingItem({
   );
 }
 
+// Generate member ID: 01-version-year-member_number
+// Example: 01-001-26-0001
+const generateMemberId = (memberNumber?: number): string => {
+  const prefix = '01';
+  const version = '001'; // App version 0.0.1
+  const year = '26'; // 2026
+  const number = memberNumber ? String(memberNumber).padStart(4, '0') : '0001';
+  return `${prefix}-${version}-${year}-${number}`;
+};
+
 export default function ProfileScreen() {
   const { savedEvents, attendedEvents, fetchEvents } = useEventStore();
+  const { profile, user, signOut } = useAuth();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
   const [showPinTest, setShowPinTest] = useState(false);
   const [showPinAward, setShowPinAward] = useState(false);
   const [collectedPins, setCollectedPins] = useState<CollectedPin[]>([]);
   const cardRef = useRef<DigitalCardRef>(null);
+
+  // Get user display name
+  const userName = profile?.full_name || user?.user_metadata?.full_name || 'Usuario';
+  const userEmail = profile?.email || user?.email || '';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const memberNumber = profile?.member_number;
+  const memberId = generateMemberId(memberNumber);
 
   const handleObtainPin = () => {
     // Step 1: Flip the card to back first (if not already flipped)
@@ -131,12 +151,16 @@ export default function ProfileScreen() {
           </View>
 
           {/* Avatar */}
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={48} color="#8B5CF6" />
-          </View>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={48} color="#8B5CF6" />
+            </View>
+          )}
 
-          <Text style={styles.userName}>Juan Perez</Text>
-          <Text style={styles.userBio}>Explorando eventos increibles</Text>
+          <Text style={styles.userName}>{userName}</Text>
+          <Text style={styles.userBio}>{userEmail}</Text>
         </View>
 
         {/* Digital Card */}
@@ -159,8 +183,8 @@ export default function ProfileScreen() {
           </View>
           <DigitalCard
             ref={cardRef}
-            userName="Juan Perez"
-            memberId="WOW-2024-001"
+            userName={userName}
+            memberId={memberId}
             design={cardDesign}
             pins={collectedPins}
           />
@@ -347,6 +371,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     marginBottom: 16,
   },
   userName: {

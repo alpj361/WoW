@@ -27,153 +27,213 @@ import Svg, { Defs, Filter, FeTurbulence, FeColorMatrix, FeDisplacementMap, Rect
 WebBrowser.maybeCompleteAuthSession();
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+// Production URL for web OAuth redirect
+const PRODUCTION_WEB_URL = 'https://wo-w-nu.vercel.app';
+
+// Helper to get the correct redirect URL based on platform and environment
+const getRedirectUrl = () => {
+    if (Platform.OS === 'web') {
+        // In production web, use the production URL
+        // __DEV__ is false in production builds
+        if (!__DEV__) {
+            return `${PRODUCTION_WEB_URL}/auth-callback`;
+        }
+        // In development, makeRedirectUri will use localhost
+        return makeRedirectUri({ path: 'auth-callback' });
+    }
+    // For native apps, use the scheme from app.json
+    return makeRedirectUri({
+        scheme: 'wow-events',
+        path: 'auth-callback',
+    });
+};
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Interactive Background Component with animated gradient orbs
-// Using deep blue/teal tones to contrast with the purple-to-orange logo
-function InteractiveBackground() {
-    const orb1Anim = useRef(new RNAnimated.Value(0)).current;
-    const orb2Anim = useRef(new RNAnimated.Value(0)).current;
-    const orb3Anim = useRef(new RNAnimated.Value(0)).current;
-    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+// Elegant Shape Component - Floating geometric pill shapes
+function ElegantShape({
+    width,
+    height,
+    rotate,
+    gradient,
+    style,
+    delay = 0,
+}: {
+    width: number;
+    height: number;
+    rotate: number;
+    gradient: readonly [string, string, ...string[]];
+    style: any;
+    delay?: number;
+}) {
+    const floatAnim = useRef(new RNAnimated.Value(0)).current;
+    const entryAnim = useRef(new RNAnimated.Value(0)).current;
+    const entryRotate = useRef(new RNAnimated.Value(rotate - 15)).current;
 
     useEffect(() => {
-        // Floating animation for orbs
-        const animateOrb = (anim: RNAnimated.Value, duration: number) => {
-            RNAnimated.loop(
-                RNAnimated.sequence([
-                    RNAnimated.timing(anim, {
-                        toValue: 1,
-                        duration: duration,
-                        useNativeDriver: true,
-                    }),
-                    RNAnimated.timing(anim, {
-                        toValue: 0,
-                        duration: duration,
-                        useNativeDriver: true,
-                    }),
-                ])
-            ).start();
-        };
+        // Entry animation
+        RNAnimated.parallel([
+            RNAnimated.timing(entryAnim, {
+                toValue: 1,
+                duration: 2400,
+                delay: delay,
+                useNativeDriver: true,
+            }),
+            RNAnimated.timing(entryRotate, {
+                toValue: rotate,
+                duration: 2400,
+                delay: delay,
+                useNativeDriver: true,
+            }),
+        ]).start();
 
-        // Pulse animation
+        // Floating animation
         RNAnimated.loop(
             RNAnimated.sequence([
-                RNAnimated.timing(pulseAnim, {
-                    toValue: 1.1,
-                    duration: 3000,
+                RNAnimated.timing(floatAnim, {
+                    toValue: 1,
+                    duration: 6000,
                     useNativeDriver: true,
                 }),
-                RNAnimated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 3000,
+                RNAnimated.timing(floatAnim, {
+                    toValue: 0,
+                    duration: 6000,
                     useNativeDriver: true,
                 }),
             ])
         ).start();
-
-        animateOrb(orb1Anim, 5000);
-        animateOrb(orb2Anim, 6000);
-        animateOrb(orb3Anim, 7000);
     }, []);
 
-    const orb1Style = {
+    const animatedStyle = {
+        opacity: entryAnim,
         transform: [
             {
-                translateY: orb1Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -25],
-                }),
+                translateY: RNAnimated.add(
+                    entryAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-150, 0],
+                    }),
+                    floatAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 15],
+                    })
+                ),
             },
             {
-                translateX: orb1Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 15],
-                }),
-            },
-            { scale: pulseAnim },
-        ],
-    };
-
-    const orb2Style = {
-        transform: [
-            {
-                translateY: orb2Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 30],
-                }),
-            },
-            {
-                translateX: orb2Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -20],
-                }),
-            },
-        ],
-    };
-
-    const orb3Style = {
-        transform: [
-            {
-                translateY: orb3Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -15],
-                }),
-            },
-            {
-                translateX: orb3Anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 25],
+                rotate: entryRotate.interpolate({
+                    inputRange: [rotate - 15, rotate],
+                    outputRange: [`${rotate - 15}deg`, `${rotate}deg`],
                 }),
             },
         ],
     };
 
     return (
+        <RNAnimated.View style={[style, animatedStyle]}>
+            <View
+                style={{
+                    width,
+                    height,
+                    borderRadius: height / 2,
+                    overflow: 'hidden',
+                    borderWidth: 1.5,
+                    borderColor: 'rgba(255, 255, 255, 0.12)',
+                }}
+            >
+                <LinearGradient
+                    colors={gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                        flex: 1,
+                        borderRadius: height / 2,
+                    }}
+                />
+                {/* Inner glow */}
+                <View
+                    style={{
+                        ...StyleSheet.absoluteFillObject,
+                        borderRadius: height / 2,
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    }}
+                />
+            </View>
+        </RNAnimated.View>
+    );
+}
+
+// Interactive Background Component with elegant geometric shapes
+// Using deep blue/teal tones inspired by HeroGeometric
+function InteractiveBackground() {
+    return (
         <View style={StyleSheet.absoluteFill}>
-            {/* Base dark gradient - deep blue/black for contrast with warm logo */}
+            {/* Base dark gradient */}
             <LinearGradient
-                colors={['#050508', '#08101a', '#0a1520', '#050508']}
-                locations={[0, 0.3, 0.7, 1]}
+                colors={['#030303', '#05080f', '#030303']}
+                locations={[0, 0.5, 1]}
                 style={StyleSheet.absoluteFill}
             />
 
-            {/* Animated gradient orbs - cool teal/cyan tones for contrast */}
-            <RNAnimated.View style={[styles.orb, styles.orb1, orb1Style]}>
-                <LinearGradient
-                    colors={['rgba(20, 80, 100, 0.4)', 'rgba(30, 120, 140, 0.2)', 'transparent']}
-                    style={styles.orbGradient}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                />
-            </RNAnimated.View>
-
-            <RNAnimated.View style={[styles.orb, styles.orb2, orb2Style]}>
-                <LinearGradient
-                    colors={['rgba(15, 60, 90, 0.35)', 'rgba(25, 100, 130, 0.15)', 'transparent']}
-                    style={styles.orbGradient}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                />
-            </RNAnimated.View>
-
-            <RNAnimated.View style={[styles.orb, styles.orb3, orb3Style]}>
-                <LinearGradient
-                    colors={['rgba(10, 50, 70, 0.3)', 'rgba(20, 80, 100, 0.15)', 'transparent']}
-                    style={styles.orbGradient}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                />
-            </RNAnimated.View>
-
-            {/* Subtle noise overlay for texture */}
-            <View style={styles.noiseOverlay} />
-
-            {/* Soft vignette effect */}
+            {/* Subtle color wash */}
             <LinearGradient
-                colors={['transparent', 'transparent', 'rgba(0,0,0,0.6)']}
-                locations={[0, 0.6, 1]}
+                colors={['rgba(99, 102, 241, 0.03)', 'transparent', 'rgba(244, 63, 94, 0.03)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
+            />
+
+            {/* Elegant floating shapes */}
+            <ElegantShape
+                delay={300}
+                width={SCREEN_WIDTH * 1.4}
+                height={120}
+                rotate={12}
+                gradient={['rgba(99, 102, 241, 0.12)', 'rgba(99, 102, 241, 0.04)', 'transparent'] as const}
+                style={styles.shape1}
+            />
+
+            <ElegantShape
+                delay={500}
+                width={SCREEN_WIDTH * 1.2}
+                height={100}
+                rotate={-15}
+                gradient={['rgba(244, 63, 94, 0.12)', 'rgba(244, 63, 94, 0.04)', 'transparent'] as const}
+                style={styles.shape2}
+            />
+
+            <ElegantShape
+                delay={400}
+                width={SCREEN_WIDTH * 0.7}
+                height={70}
+                rotate={-8}
+                gradient={['rgba(139, 92, 246, 0.12)', 'rgba(139, 92, 246, 0.04)', 'transparent'] as const}
+                style={styles.shape3}
+            />
+
+            <ElegantShape
+                delay={600}
+                width={SCREEN_WIDTH * 0.5}
+                height={50}
+                rotate={20}
+                gradient={['rgba(6, 182, 212, 0.12)', 'rgba(6, 182, 212, 0.04)', 'transparent'] as const}
+                style={styles.shape4}
+            />
+
+            <ElegantShape
+                delay={700}
+                width={SCREEN_WIDTH * 0.35}
+                height={35}
+                rotate={-25}
+                gradient={['rgba(34, 211, 238, 0.10)', 'rgba(34, 211, 238, 0.03)', 'transparent'] as const}
+                style={styles.shape5}
+            />
+
+            {/* Top and bottom vignette */}
+            <LinearGradient
+                colors={['rgba(3, 3, 3, 0.8)', 'transparent', 'rgba(3, 3, 3, 1)']}
+                locations={[0, 0.4, 1]}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
             />
         </View>
     );
@@ -272,10 +332,7 @@ export default function AuthScreen() {
         setError(null);
 
         try {
-            const redirectUrl = makeRedirectUri({
-                scheme: 'wow',
-                path: 'auth-callback',
-            });
+            const redirectUrl = getRedirectUrl();
 
             const { data, error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -309,10 +366,7 @@ export default function AuthScreen() {
         setError(null);
 
         try {
-            const redirectUrl = makeRedirectUri({
-                scheme: 'wow',
-                path: 'auth-callback',
-            });
+            const redirectUrl = getRedirectUrl();
 
             const { data, error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -379,7 +433,7 @@ export default function AuthScreen() {
                         >
                             <BlurView intensity={20} tint="dark" style={styles.formBlur}>
                                 <LinearGradient
-                                    colors={['rgba(30, 20, 40, 0.8)', 'rgba(20, 15, 30, 0.9)']}
+                                    colors={['rgba(15, 23, 42, 0.85)', 'rgba(10, 15, 30, 0.95)']}
                                     style={styles.formGradient}
                                 >
                                     <View style={styles.formContainer}>
@@ -397,13 +451,13 @@ export default function AuthScreen() {
 
                                         <View style={styles.inputWrapper}>
                                             <LinearGradient
-                                                colors={['rgba(90, 45, 130, 0.3)', 'rgba(242, 71, 55, 0.15)']}
+                                                colors={['rgba(99, 102, 241, 0.3)', 'rgba(34, 211, 238, 0.15)']}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
                                                 style={styles.inputGradientBorder}
                                             >
                                                 <View style={styles.inputContainer}>
-                                                    <Ionicons name="key" size={20} color="#A78BFA" style={styles.inputIcon} />
+                                                    <Ionicons name="key" size={20} color="#818CF8" style={styles.inputIcon} />
                                                     <TextInput
                                                         style={styles.input}
                                                         placeholder="Código de invitación"
@@ -426,7 +480,7 @@ export default function AuthScreen() {
                                             data-testid="validate-code-button"
                                         >
                                             <LinearGradient
-                                                colors={['#5a2d82', '#b22d56', '#ff5733']}
+                                                colors={['#4F46E5', '#6366F1', '#06B6D4']}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 0 }}
                                                 style={styles.buttonGradient}
@@ -561,7 +615,7 @@ export default function AuthScreen() {
                                     }}
                                     data-testid="back-button"
                                 >
-                                    <Ionicons name="arrow-back" size={18} color="#A78BFA" />
+                                    <Ionicons name="arrow-back" size={18} color="#818CF8" />
                                     <Text style={styles.backButtonText}>Cambiar código</Text>
                                 </TouchableOpacity>
                             </View>
@@ -592,39 +646,31 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingBottom: 30,
     },
-    // Animated background orbs
-    orb: {
+    // Elegant geometric shapes
+    shape1: {
         position: 'absolute',
-        borderRadius: 999,
-        overflow: 'hidden',
+        left: -SCREEN_WIDTH * 0.15,
+        top: SCREEN_HEIGHT * 0.12,
     },
-    orb1: {
-        width: SCREEN_WIDTH * 0.8,
-        height: SCREEN_WIDTH * 0.8,
-        top: -SCREEN_WIDTH * 0.2,
-        left: -SCREEN_WIDTH * 0.2,
+    shape2: {
+        position: 'absolute',
+        right: -SCREEN_WIDTH * 0.1,
+        top: SCREEN_HEIGHT * 0.72,
     },
-    orb2: {
-        width: SCREEN_WIDTH * 0.6,
-        height: SCREEN_WIDTH * 0.6,
-        bottom: SCREEN_HEIGHT * 0.15,
-        right: -SCREEN_WIDTH * 0.15,
+    shape3: {
+        position: 'absolute',
+        left: SCREEN_WIDTH * 0.05,
+        bottom: SCREEN_HEIGHT * 0.05,
     },
-    orb3: {
-        width: SCREEN_WIDTH * 0.5,
-        height: SCREEN_WIDTH * 0.5,
-        top: SCREEN_HEIGHT * 0.35,
-        left: -SCREEN_WIDTH * 0.1,
+    shape4: {
+        position: 'absolute',
+        right: SCREEN_WIDTH * 0.12,
+        top: SCREEN_HEIGHT * 0.08,
     },
-    orbGradient: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 999,
-    },
-    noiseOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        opacity: 0.03,
-        backgroundColor: 'transparent',
+    shape5: {
+        position: 'absolute',
+        left: SCREEN_WIDTH * 0.2,
+        top: SCREEN_HEIGHT * 0.03,
     },
     // Logo
     logoContainer: {
@@ -635,10 +681,10 @@ const styles = StyleSheet.create({
         // Remove shadow on web as it creates a square background effect
         ...Platform.select({
             ios: {
-                shadowColor: '#ff5733',
+                shadowColor: '#6366F1',
                 shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.5,
-                shadowRadius: 30,
+                shadowOpacity: 0.4,
+                shadowRadius: 25,
             },
             android: {
                 elevation: 0,
@@ -666,7 +712,7 @@ const styles = StyleSheet.create({
     formGradient: {
         borderRadius: 24,
         borderWidth: 1,
-        borderColor: 'rgba(60, 80, 100, 0.3)',
+        borderColor: 'rgba(99, 102, 241, 0.15)',
     },
     formContainer: {
         padding: 28,
@@ -745,7 +791,7 @@ const styles = StyleSheet.create({
     primaryButton: {
         borderRadius: 14,
         overflow: 'hidden',
-        shadowColor: '#ff5733',
+        shadowColor: '#6366F1',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 12,
@@ -791,7 +837,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     linkHighlight: {
-        color: '#A78BFA',
+        color: '#818CF8',
         fontWeight: '600',
     },
     googleButton: {
@@ -825,7 +871,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     backButtonText: {
-        color: '#A78BFA',
+        color: '#818CF8',
         fontSize: 15,
         fontWeight: '500',
     },

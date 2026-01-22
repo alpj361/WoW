@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as api from '../services/api';
+import { supabase } from '../services/supabase';
 
 export interface Event {
   id: string;
@@ -75,26 +76,130 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   fetchSavedEvents: async () => {
     set({ isLoading: true, error: null });
-    // TODO: Implement with Supabase when user auth is added
-    set({ isLoading: false });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ isLoading: false, savedEvents: [] });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('saved_events')
+        .select(`
+          id,
+          event_id,
+          saved_at,
+          events (
+            id,
+            title,
+            description,
+            category,
+            image,
+            date,
+            time,
+            location,
+            created_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('saved_at', { ascending: false });
+
+      if (error) throw error;
+
+      const savedEvents: SavedEventData[] = (data || []).map((item: any) => ({
+        saved: {
+          id: item.id,
+          event_id: item.event_id,
+          saved_at: item.saved_at,
+        },
+        event: item.events,
+      }));
+
+      set({ savedEvents, isLoading: false });
+    } catch (error: any) {
+      console.error('Error fetching saved events:', error);
+      set({ error: error.message, isLoading: false });
+    }
   },
 
   fetchAttendedEvents: async () => {
     set({ isLoading: true, error: null });
-    // TODO: Implement with Supabase when user auth is added
-    set({ isLoading: false });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ isLoading: false, attendedEvents: [] });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('attended_events')
+        .select(`
+          id,
+          event_id,
+          emoji_rating,
+          attended_at,
+          events (
+            id,
+            title,
+            description,
+            category,
+            image,
+            date,
+            time,
+            location,
+            created_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('attended_at', { ascending: false });
+
+      if (error) throw error;
+
+      const attendedEvents: AttendedEventData[] = (data || []).map((item: any) => ({
+        attended: {
+          id: item.id,
+          event_id: item.event_id,
+          emoji_rating: item.emoji_rating,
+          attended_at: item.attended_at,
+        },
+        event: item.events,
+      }));
+
+      set({ attendedEvents, isLoading: false });
+    } catch (error: any) {
+      console.error('Error fetching attended events:', error);
+      set({ error: error.message, isLoading: false });
+    }
   },
 
   saveEvent: async (eventId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
       const event = get().events.find(e => e.id === eventId);
       if (!event) return;
 
+      // Check if already saved
+      const alreadySaved = get().savedEvents.some(s => s.event.id === eventId);
+      if (alreadySaved) return;
+
+      const { data, error } = await supabase
+        .from('saved_events')
+        .insert({
+          user_id: user.id,
+          event_id: eventId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
       const savedEvent: SavedEventData = {
         saved: {
-          id: `saved-${eventId}`,
-          event_id: eventId,
-          saved_at: new Date().toISOString(),
+          id: data.id,
+          event_id: data.event_id,
+          saved_at: data.saved_at,
         },
         event,
       };
@@ -110,6 +215,17 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   unsaveEvent: async (eventId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('saved_events')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
       set(state => ({
         savedEvents: state.savedEvents.filter(s => s.event.id !== eventId)
       }));
@@ -121,23 +237,72 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   markAttended: async (eventId: string, emoji?: string) => {
     try {
-      const event = get().events.find(e => e.id === eventId);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      // Get event from saved or from all events
+      let event = get().savedEvents.find(s => s.event.id === eventId)?.event;
+      if (!event) {
+        event = get().events.find(e => e.id === eventId);
+      }
       if (!event) return;
 
-      const attendedEvent: AttendedEventData = {
-        attended: {
-          id: `attended-${eventId}`,
-          event_id: eventId,
-          emoji_rating: emoji || null,
-          attended_at: new Date().toISOString(),
-        },
-        event,
-      };
+      // Check if already attended - if so, update emoji rating
+      const existingAttended = get().attendedEvents.find(a => a.event.id === eventId);
 
-      set(state => ({
-        attendedEvents: [...state.attendedEvents, attendedEvent],
-        savedEvents: state.savedEvents.filter(s => s.event.id !== eventId),
-      }));
+      if (existingAttended) {
+        // Update existing
+        const { error } = await supabase
+          .from('attended_events')
+          .update({ emoji_rating: emoji || null })
+          .eq('user_id', user.id)
+          .eq('event_id', eventId);
+
+        if (error) throw error;
+
+        set(state => ({
+          attendedEvents: state.attendedEvents.map(a =>
+            a.event.id === eventId
+              ? { ...a, attended: { ...a.attended, emoji_rating: emoji || null } }
+              : a
+          ),
+        }));
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('attended_events')
+          .insert({
+            user_id: user.id,
+            event_id: eventId,
+            emoji_rating: emoji || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const attendedEvent: AttendedEventData = {
+          attended: {
+            id: data.id,
+            event_id: data.event_id,
+            emoji_rating: data.emoji_rating,
+            attended_at: data.attended_at,
+          },
+          event,
+        };
+
+        // Remove from saved if it was saved
+        await supabase
+          .from('saved_events')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('event_id', eventId);
+
+        set(state => ({
+          attendedEvents: [...state.attendedEvents, attendedEvent],
+          savedEvents: state.savedEvents.filter(s => s.event.id !== eventId),
+        }));
+      }
     } catch (error: any) {
       console.error('Error marking attended:', error);
       throw error;
@@ -146,6 +311,17 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   removeAttended: async (eventId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('attended_events')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
       set(state => ({
         attendedEvents: state.attendedEvents.filter(a => a.event.id !== eventId)
       }));

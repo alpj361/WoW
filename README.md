@@ -49,14 +49,25 @@ WOW/
 │   ├── app.json                 # Configuración de Expo
 │   └── package.json             # Dependencias del proyecto
 │
-├── backend/                     # Backend API (FastAPI + Python)
-│   ├── server.py               # Servidor FastAPI
-│   └── requirements.txt        # Dependencias Python
-│
 └── tests/                       # Tests del proyecto
     └── test_result.md
 
+# Backend (repositorio separado)
+~/Desktop/WoWBack/               # Backend API (Node.js + Express)
+└── event-analyzer/
+    └── server/
+        ├── index.js            # Servidor Express principal
+        ├── routes/
+        │   ├── auth.js         # Autenticación y registro
+        │   ├── events.js       # CRUD de eventos
+        │   └── imageAnalysis.js # Análisis de imágenes con IA
+        └── utils/
+            ├── supabase.js     # Cliente Supabase
+            └── mongodb.js      # Conexión MongoDB
 ```
+
+> **📁 Backend Local**: El backend se encuentra en `~/Desktop/WoWBack` (repositorio separado).
+> En producción está desplegado en `api.standatpd.com`.
 
 ## 🛠️ Stack Tecnológico
 
@@ -70,14 +81,13 @@ WOW/
 - **Expo Linear Gradient** 15.0.8 - Gradientes visuales
 - **TypeScript** 5.8.3 - Tipado estático
 
-### Backend ⚠️ (En desarrollo)
-- **FastAPI** - Framework API Python
-- **MongoDB** - Base de datos NoSQL
-- **Motor** - Driver async MongoDB
+### Backend
+- **Node.js + Express** - Servidor API
+- **Supabase** - Base de datos PostgreSQL + Auth
+- **OpenAI** - Análisis de imágenes para eventos
 
-> **⚠️ IMPORTANTE - Datos Mock Temporales**
->
-> Actualmente, la aplicación usa **datos de ejemplo locales** (mock data) incluidos directamente en el frontend. El backend con FastAPI y MongoDB está disponible pero **no es necesario** para ejecutar la demo. Los datos mock son temporales y serán reemplazados cuando el backend esté completamente integrado.
+> **📁 Ubicación local**: `~/Desktop/WoWBack/event-analyzer/server/`
+> **🌐 Producción**: `api.standatpd.com`
 
 ## 🚀 Instalación y Configuración
 

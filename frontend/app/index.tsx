@@ -40,11 +40,9 @@ export default function ExploreScreen() {
     setCategory,
     fetchEvents,
     saveEvent,
-    seedData,
   } = useEventStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [seeding, setSeeding] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -137,16 +135,6 @@ export default function ExploreScreen() {
     };
   });
 
-  const handleSeed = async () => {
-    setSeeding(true);
-    try {
-      await seedData();
-    } catch (error) {
-      console.error('Error seeding data:', error);
-    }
-    setSeeding(false);
-  };
-
   const renderCardContent = () => {
     if (isLoading) {
       return (
@@ -165,20 +153,6 @@ export default function ExploreScreen() {
           <Text style={styles.emptyText}>
             Parece que no hay eventos disponibles.
           </Text>
-          <TouchableOpacity
-            style={styles.seedButton}
-            onPress={handleSeed}
-            disabled={seeding}
-          >
-            {seeding ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="sparkles" size={20} color="#fff" />
-                <Text style={styles.seedButtonText}>Cargar eventos de ejemplo</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
       );
     }
@@ -340,21 +314,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-  },
-  seedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  seedButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   resetButton: {
     flexDirection: 'row',
