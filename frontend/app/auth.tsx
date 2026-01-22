@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     primaryButton: {
         borderRadius: 14,
         overflow: 'hidden',
-        shadowColor: '#8B5CF6',
+        shadowColor: '#ff5733',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 12,
