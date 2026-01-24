@@ -2,6 +2,30 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.6] - 2026-01-23
+
+### Added
+- 🔗 **"Desde URL" Feature**: Create events from Instagram posts
+  - New "Desde URL" button in image upload section
+  - Modal to paste Instagram post URL
+  - Automatic image extraction from Instagram
+  - AI analysis of extracted flyer image
+  - Auto-fill form fields (title, description, date, time, location)
+- 📡 **API Function**: `analyzeUrl()` in `api.ts`
+  - Calls backend `/api/events/analyze-url`
+  - Returns `UrlAnalysisResult` with extracted image URL and analysis
+
+### Changed
+- 🎨 **Upload Options**: Now shows 3 buttons (Camera, Gallery, URL)
+- 📦 **Import**: Added `analyzeUrl` to api.ts imports in create.tsx
+
+### Technical Details
+```
+Modified:
+- frontend/src/services/api.ts (analyzeUrl function + UrlAnalysisResult interface)
+- frontend/app/create.tsx (URL modal, state, handler, button)
+```
+
 ## [0.0.5] - 2026-01-22
 
 ### Added

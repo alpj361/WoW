@@ -245,14 +245,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
           <View style={styles.settingsGroup}>
-            <SettingItem
-              icon="sync"
-              title="Actualizar eventos"
-              subtitle="Cargar desde el servidor"
-              onPress={handleRefreshEvents}
-              color="#8B5CF6"
-              isLast
-            />
+
             {/* Test de Movimiento - hidden for now
             <SettingItem
               icon="move"
