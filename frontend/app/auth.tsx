@@ -35,11 +35,13 @@ const PRODUCTION_WEB_URL = 'https://wo-w-nu.vercel.app';
 const getRedirectUrl = () => {
     if (Platform.OS === 'web') {
         // In production web, use the production URL
-        // __DEV__ is false in production builds
         if (!__DEV__) {
             return `${PRODUCTION_WEB_URL}/auth-callback`;
         }
-        // In development, makeRedirectUri will use localhost
+        // In development, use the current origin to ensure it matches what Supabase expects (e.g., http://localhost:8081)
+        if (typeof window !== 'undefined') {
+            return `${window.location.origin}/auth-callback`;
+        }
         return makeRedirectUri({ path: 'auth-callback' });
     }
     // For native apps, use the scheme from app.json
@@ -440,7 +442,7 @@ export default function AuthScreen() {
                 >
                     <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
                         {/* Logo Section */}
-                        <RNAnimated.View 
+                        <RNAnimated.View
                             style={[
                                 styles.logoContainer,
                                 {
@@ -456,7 +458,7 @@ export default function AuthScreen() {
                         </RNAnimated.View>
 
                         {/* Form Section */}
-                        <RNAnimated.View 
+                        <RNAnimated.View
                             style={[
                                 styles.formWrapper,
                                 {
@@ -553,7 +555,7 @@ export default function AuthScreen() {
                         </RNAnimated.View>
 
                         {/* Footer */}
-                        <RNAnimated.Text 
+                        <RNAnimated.Text
                             style={[
                                 styles.footerText,
                                 { opacity: formFadeAnim }
@@ -573,7 +575,7 @@ export default function AuthScreen() {
             <InteractiveBackground />
             <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
                 {/* Logo Section */}
-                <RNAnimated.View 
+                <RNAnimated.View
                     style={[
                         styles.logoContainer,
                         {
@@ -589,7 +591,7 @@ export default function AuthScreen() {
                 </RNAnimated.View>
 
                 {/* Form Section */}
-                <RNAnimated.View 
+                <RNAnimated.View
                     style={[
                         styles.formWrapper,
                         {

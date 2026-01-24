@@ -81,22 +81,37 @@ export default function AuthCallbackScreen() {
             setStatus('Verificando sesión...');
             let session = null;
             for (let i = 0; i < 5; i++) {
-                console.log(`🔍 Getting session attempt ${i + 1}`);
-                const { data, error: sessError } = await supabase.auth.getSession();
-                if (sessError) {
-                    console.error('Session fetch error:', sessError);
-                }
-                if (data.session?.user) {
-                    session = data.session;
-                    console.log('✅ Session found:', session.user.email);
-                    break;
+                try {
+                    console.log(`🔍 Getting session attempt ${i + 1}`);
+                    const { data, error: sessError } = await supabase.auth.getSession();
+                    if (sessError) {
+                        // Check if it's an abort error
+                        if (sessError.name === 'AbortError' || sessError.message?.includes('aborted')) {
+                            console.log('⚠️ Session fetch aborted (attempt ' + (i + 1) + ')');
+                        } else {
+                            console.error('Session fetch error:', sessError);
+                        }
+                    }
+                    if (data?.session?.user) {
+                        session = data.session;
+                        console.log('✅ Session found:', session.user.email);
+                        break;
+                    }
+                } catch (e: any) {
+                    if (e.name === 'AbortError' || e?.message?.includes('aborted')) {
+                        console.log('⚠️ Session fetch threw abort');
+                    } else {
+                        console.error('Session fetch loop error:', e);
+                    }
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
             if (!session) {
                 console.error('❌ No session after retries');
-                throw new Error('No se pudo obtener la sesión');
+                // If we really don't have a session, we can't proceed with registration or login
+                setStatus('Error de conexión...');
+                throw new Error('No se pudo verificar la sesión. Revisa tu conexión.');
             }
 
             // REGISTRATION FLOW: Has code → Create profile

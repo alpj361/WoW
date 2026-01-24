@@ -99,8 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(null);
                 }
             }
-        } catch (error) {
-            console.error('Init auth error:', error);
+        } catch (error: any) {
+            // Ignore abort errors which happen on hot reload or fast navigation
+            if (error.name === 'AbortError' || error?.message?.includes('aborted')) {
+                console.log('⚠️ Auth init aborted (safe to ignore)');
+            } else {
+                console.error('Init auth error:', error);
+            }
         } finally {
             setLoading(false);
         }
@@ -108,25 +113,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Fetch profile, returns profile data or null
     const fetchProfile = async (userId: string): Promise<any | null> => {
-        try {
-            console.log('🔍 Fetching profile for:', userId);
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
+        // Retry logic for profile fetch (handle network blips)
+        for (let i = 0; i < 3; i++) {
+            try {
+                console.log(`🔍 Fetching profile for: ${userId} (attempt ${i + 1})`);
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
 
-            if (data && !error) {
-                console.log('✅ Profile found:', data.email);
-                return data;
-            } else {
-                console.log('❌ No profile found');
-                return null;
+                if (error) {
+                    // unexpected error (network, etc)
+                    console.warn(`⚠️ Profile fetch error (attempt ${i + 1}):`, error.message);
+                    if (i === 2) return null; // Give up after 3 tries
+                    await new Promise(r => setTimeout(r, 1000)); // Wait 1s
+                    continue;
+                }
+
+                if (data) {
+                    console.log('✅ Profile found:', data.email);
+                    return data;
+                } else {
+                    console.log('❌ No profile found (data is null)');
+                    return null;
+                }
+            } catch (error: any) {
+                console.error(`❌ Profile fetch exception (attempt ${i + 1}):`, error);
+                if (i === 2) return null;
+                await new Promise(r => setTimeout(r, 1000));
             }
-        } catch (error) {
-            console.error('Fetch profile error:', error);
-            return null;
         }
+        return null;
     };
 
     const refreshProfile = async () => {

@@ -44,7 +44,7 @@ function RootLayoutNav() {
     const timeout = setTimeout(() => {
       console.log('⚠️ _layout: Auth loading timed out, forcing redirect');
       setHasTimedOut(true);
-    }, 5000); // 5 second timeout
+    }, 10000); // 10 second timeout
 
     return () => clearTimeout(timeout);
   }, [loading]);
@@ -88,16 +88,9 @@ function RootLayoutNav() {
     }
   }, [user, loading, hasTimedOut, isAuthRoute, isProcessingAuth, segments, router]);
 
-  // While loading auth state, show loading indicator (not just black screen)
-  if (loading && !hasTimedOut) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-      </View>
-    );
-  }
-
   // If on auth route, render just that screen (let it handle its flow)
+  // CRITICAL: Check this BEFORE loading state, otherwise auth-callback is blocked
+  // by the session check it is supposed to resolve!
   if (isAuthRoute) {
     return (
       <WebViewport>
@@ -105,6 +98,15 @@ function RootLayoutNav() {
           <Slot />
         </View>
       </WebViewport>
+    );
+  }
+
+  // While loading auth state, show loading indicator (not just black screen)
+  if (loading && !hasTimedOut) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
     );
   }
 
