@@ -20,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEventStore } from '../src/store/eventStore';
 import { router } from 'expo-router';
-import { analyzeImage } from '../src/services/api';
+import { analyzeImage, analyzeUrl } from '../src/services/api';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -45,6 +45,11 @@ export default function CreateEventScreen() {
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // URL Modal state
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [postUrl, setPostUrl] = useState('');
+  const [isExtractingUrl, setIsExtractingUrl] = useState(false);
 
   // Format date for display
   const formatDate = (date: Date): string => {
@@ -197,6 +202,66 @@ export default function CreateEventScreen() {
     }
   };
 
+  const handleAnalyzeUrl = async () => {
+    if (!postUrl.trim()) return;
+
+    setIsExtractingUrl(true);
+    try {
+      const result = await analyzeUrl(postUrl.trim());
+
+      if (result.success) {
+        // Set extracted image
+        setImage(result.extracted_image_url);
+
+        // Auto-fill form fields
+        if (result.analysis) {
+          setTitle(result.analysis.event_name || title);
+          setDescription(result.analysis.description || description);
+          setLocation(result.analysis.location || location);
+
+          // Parse Date
+          if (result.analysis.date && result.analysis.date !== 'No especificado') {
+            let parsedDate = new Date();
+            const dateParts = result.analysis.date.split(/[-/]/);
+            if (dateParts.length === 3) {
+              parsedDate = new Date(result.analysis.date);
+            } else if (dateParts.length === 2) {
+              const currentYear = new Date().getFullYear();
+              const day = parseInt(dateParts[0]);
+              const month = parseInt(dateParts[1]) - 1;
+              parsedDate.setFullYear(currentYear);
+              parsedDate.setMonth(month);
+              parsedDate.setDate(day);
+            }
+            if (!isNaN(parsedDate.getTime())) {
+              setSelectedDate(parsedDate);
+            }
+          }
+
+          // Parse Time
+          if (result.analysis.time && result.analysis.time !== 'No especificado') {
+            const timeParts = result.analysis.time.split(':');
+            if (timeParts.length >= 2) {
+              const parsedTime = new Date();
+              parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+              setSelectedTime(parsedTime);
+            }
+          }
+        }
+
+        setShowUrlModal(false);
+        setPostUrl('');
+        Alert.alert('¡Listo!', 'Hemos extraído la imagen y llenado los campos detectados.');
+      }
+    } catch (error: any) {
+      console.error('URL extraction error:', error);
+      const errorMessage = error.response?.data?.error || 'No pudimos extraer el contenido del post. Verifica la URL.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsExtractingUrl(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Por favor ingresa un título para el evento.');
@@ -281,6 +346,10 @@ export default function CreateEventScreen() {
               <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
                 <Ionicons name="images" size={32} color="#8B5CF6" />
                 <Text style={styles.uploadText}>Galería</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.uploadButton} onPress={() => setShowUrlModal(true)}>
+                <Ionicons name="link" size={32} color="#8B5CF6" />
+                <Text style={styles.uploadText}>Desde URL</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -547,6 +616,60 @@ export default function CreateEventScreen() {
           is24Hour={false}
         />
       )}
+
+      {/* URL Input Modal */}
+      <Modal
+        visible={showUrlModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUrlModal(false)}
+      >
+        <View style={styles.pickerModalOverlay}>
+          <Pressable
+            style={styles.pickerModalDismiss}
+            onPress={() => setShowUrlModal(false)}
+          />
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Agregar desde Instagram</Text>
+              <TouchableOpacity onPress={() => setShowUrlModal(false)}>
+                <Text style={styles.pickerModalDone}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 16 }}>
+              <Text style={styles.inputLabel}>URL del Post de Instagram</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="https://instagram.com/p/ABC123..."
+                placeholderTextColor="#6B7280"
+                value={postUrl}
+                onChangeText={setPostUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  { marginTop: 16 },
+                  (!postUrl.trim() || isExtractingUrl) && styles.submitButtonDisabled
+                ]}
+                onPress={handleAnalyzeUrl}
+                disabled={!postUrl.trim() || isExtractingUrl}
+              >
+                {isExtractingUrl ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="sparkles" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>Extraer y Analizar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

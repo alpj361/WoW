@@ -82,4 +82,22 @@ export async function analyzeImage(base64Image: string, title?: string): Promise
     return response.data;
 }
 
+export interface UrlAnalysisResult extends AnalysisResult {
+    source_url: string;
+    platform: 'instagram';
+    extracted_image_url: string;
+    post_metadata?: {
+        author?: string;
+        description?: string;
+    };
+}
+
+/**
+ * Analyze an event from an Instagram post URL
+ */
+export async function analyzeUrl(url: string): Promise<UrlAnalysisResult> {
+    const response = await api.post('/events/analyze-url', { url });
+    return response.data;
+}
+
 export default api;

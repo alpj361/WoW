@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Tabs, Slot, useSegments, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebViewport } from '../src/components/WebViewport';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
@@ -15,6 +15,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const [isProcessingAuth, setIsProcessingAuth] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
   const navigationRef = useRef(false);
 
   // Check if we're on an auth route
@@ -33,10 +34,25 @@ function RootLayoutNav() {
     return () => unsubscribe();
   }, []);
 
+  // Timeout protection: if loading takes too long, force redirect
+  useEffect(() => {
+    if (!loading) {
+      setHasTimedOut(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      console.log('⚠️ _layout: Auth loading timed out, forcing redirect');
+      setHasTimedOut(true);
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
   // Handle navigation based on auth state
   useEffect(() => {
-    // Don't navigate while loading or processing auth
-    if (loading || isProcessingAuth) {
+    // Don't navigate while loading or processing auth (unless timed out)
+    if ((loading && !hasTimedOut) || isProcessingAuth) {
       return;
     }
 
@@ -51,7 +67,8 @@ function RootLayoutNav() {
       return;
     }
 
-    // Case 2: Not authenticated and not on auth route - go to auth
+    // Case 2: Not authenticated (no user) and not on auth route - go to auth
+    // Also redirect if session exists but no user (incomplete auth state)
     if (!user && !isAuthRoute) {
       console.log('🔍 _layout: No user, not on auth route, redirecting to /auth');
       navigationRef.current = true;
@@ -69,12 +86,14 @@ function RootLayoutNav() {
       setTimeout(() => { navigationRef.current = false; }, 1000);
       return;
     }
-  }, [user, loading, isAuthRoute, isProcessingAuth, segments, router]);
+  }, [user, loading, hasTimedOut, isAuthRoute, isProcessingAuth, segments, router]);
 
-  // While loading auth state, show dark screen
-  if (loading) {
+  // While loading auth state, show loading indicator (not just black screen)
+  if (loading && !hasTimedOut) {
     return (
-      <View style={styles.container} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
     );
   }
 
@@ -89,10 +108,12 @@ function RootLayoutNav() {
     );
   }
 
-  // If not authenticated and not on auth route, show dark screen while redirecting
+  // If not authenticated and not on auth route, show loading briefly while redirecting
   if (!user) {
     return (
-      <View style={styles.container} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
     );
   }
 
@@ -192,5 +213,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0F0F0F',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#0F0F0F',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
