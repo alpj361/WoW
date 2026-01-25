@@ -8,14 +8,19 @@ import {
   Alert,
   Modal,
   Image,
+  Animated,
+  LayoutChangeEvent,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import QRCode from 'react-native-qrcode-svg';
 import { useEventStore } from '../src/store/eventStore';
 import { useAuth } from '../src/context/AuthContext';
 import { DigitalCard, CardDesign, DigitalCardRef, CollectedPin } from '../src/components/DigitalCard';
 import { PinMovementTest } from '../src/components/pins/PinMovementTest';
 import { PinAwardOverlay } from '../src/components/pins/PinAwardOverlay';
+
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -81,7 +86,30 @@ export default function ProfileScreen() {
   const [showPinTest, setShowPinTest] = useState(false);
   const [showPinAward, setShowPinAward] = useState(false);
   const [collectedPins, setCollectedPins] = useState<CollectedPin[]>([]);
+  const [activeTab, setActiveTab] = useState<'ecard' | 'escanear'>('ecard');
+  const [cardWidth, setCardWidth] = useState(0);
   const cardRef = useRef<DigitalCardRef>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Get container width on layout
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    setCardWidth(width);
+  };
+
+  // Handle tab switch with animation
+  const handleTabSwitch = (tab: 'ecard' | 'escanear') => {
+    if (tab === activeTab) return;
+
+    Animated.spring(slideAnim, {
+      toValue: tab === 'escanear' ? -cardWidth : 0,
+      friction: 10,
+      tension: 50,
+      useNativeDriver: true,
+    }).start();
+
+    setActiveTab(tab);
+  };
 
   // Get user display name
   const userName = profile?.full_name || user?.user_metadata?.full_name || 'Usuario';
@@ -181,23 +209,88 @@ export default function ProfileScreen() {
               <Text style={styles.editCardText}>Cambiar</Text>
             </TouchableOpacity>
           </View>
-          <DigitalCard
-            ref={cardRef}
-            userName={userName}
-            memberId={memberId}
-            design={cardDesign}
-            pins={collectedPins}
-          />
 
-          {/* Obtener PIN Button */}
-          <TouchableOpacity
-            style={styles.obtainPinButton}
-            onPress={handleObtainPin}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="star" size={18} color="#fff" />
-            <Text style={styles.obtainPinText}>Obtener PIN</Text>
-          </TouchableOpacity>
+          {/* Tab Toggle: ECARD | ESCANEAR */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'ecard' && styles.tabActive]}
+              onPress={() => handleTabSwitch('ecard')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, activeTab === 'ecard' && styles.tabTextActive]}>
+                ECARD
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'escanear' && styles.tabActive]}
+              onPress={() => handleTabSwitch('escanear')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, activeTab === 'escanear' && styles.tabTextActive]}>
+                ESCANEAR
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Cards Slider Container */}
+          <View style={styles.cardsSliderContainer} onLayout={handleContainerLayout}>
+            <Animated.View
+              style={[
+                styles.cardsSlider,
+                { transform: [{ translateX: slideAnim }] },
+              ]}
+            >
+              {/* Original Digital Card */}
+              <View style={[styles.cardSlide, { width: cardWidth }]}>
+                <DigitalCard
+                  ref={cardRef}
+                  userName={userName}
+                  memberId={memberId}
+                  design={cardDesign}
+                  pins={collectedPins}
+                />
+              </View>
+
+              {/* QR Code Card */}
+              <View style={[styles.cardSlide, { width: cardWidth }]}>
+                <View style={styles.qrCardContainer}>
+                  <LinearGradient
+                    colors={['#1a1a2e', '#16213e', '#0f0f23']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.qrCard}
+                  >
+                    {/* Card Border */}
+                    <View style={styles.qrCardBorder} />
+
+                    {/* QR Code */}
+                    <View style={styles.qrCodeWrapper}>
+                      <View style={styles.qrCodeContainer}>
+                        <QRCode
+                          value={`wow://user/${user?.id || memberId}`}
+                          size={150}
+                          backgroundColor="#fff"
+                          color="#1a1a2e"
+                        />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+
+          {/* Obtener PIN Button - only show on ECARD tab */}
+          {activeTab === 'ecard' && (
+            <TouchableOpacity
+              style={styles.obtainPinButton}
+              onPress={handleObtainPin}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="star" size={18} color="#fff" />
+              <Text style={styles.obtainPinText}>Obtener PIN</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Stats */}
@@ -555,5 +648,78 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
+  },
+  // Tab Toggle Styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  tabActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    letterSpacing: 1,
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  // Cards Slider Styles
+  cardsSliderContainer: {
+    overflow: 'hidden',
+    width: '100%',
+  },
+  cardsSlider: {
+    flexDirection: 'row',
+  },
+  cardSlide: {
+  },
+  // QR Card Styles
+  qrCardContainer: {
+    height: 220,
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  qrCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  qrCardBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  qrCodeWrapper: {
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+  },
+  qrCodeContainer: {
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 10,
   },
 });

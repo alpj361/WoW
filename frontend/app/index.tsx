@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -7,7 +8,12 @@ import {
   Dimensions,
   TouchableOpacity,
   Platform,
+  Modal,
+  Pressable,
+  Image,
+  Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -40,6 +46,9 @@ export default function ExploreScreen() {
     setCategory,
     fetchEvents,
     saveEvent,
+    denyEvent,
+    fetchSavedEvents,
+    fetchDeniedEvents,
   } = useEventStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -50,7 +59,12 @@ export default function ExploreScreen() {
   const scale = useSharedValue(1);
 
   useEffect(() => {
-    fetchEvents();
+    // Load saved/denied FIRST, then fetch events to ensure filtering works
+    const init = async () => {
+      await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+      fetchEvents();
+    };
+    init();
   }, []);
 
   useEffect(() => {
@@ -74,20 +88,70 @@ export default function ExploreScreen() {
     resetPosition();
   }, [currentIndex, events.length, resetPosition]);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentAlert, setShowPaymentAlert] = useState(false);
+  const [paymentReceiptUrl, setPaymentReceiptUrl] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { registerForEvent } = useEventStore();
+
   const handleSwipeRight = useCallback(async () => {
+    console.log('🎯 handleSwipeRight called');
     if (currentEvent) {
+      console.log('📋 Current event:', {
+        id: currentEvent.id,
+        title: currentEvent.title,
+        price: currentEvent.price,
+        priceType: typeof currentEvent.price
+      });
+
       try {
-        await saveEvent(currentEvent.id);
+        // Check if event has price
+        const eventPrice = currentEvent.price ? parseFloat(String(currentEvent.price)) : 0;
+        const hasPrice = eventPrice > 0;
+        const isHostEvent = !!currentEvent.user_id;
+
+        console.log('💰 Price check:', { eventPrice, hasPrice, isHostEvent });
+
+        if (hasPrice) {
+          if (isHostEvent) {
+            console.log('🚪 Host Event HAS price, showing payment alert');
+            // Show payment alert modal IMMEDIATELY (don't wait for save)
+            setShowPaymentAlert(true);
+          } else {
+            console.log('ℹ️ Public Event HAS price, showing info alert');
+            // For public events with price, just show info but don't ask for payment
+            // Save immediately
+            await saveEvent(currentEvent.id);
+
+            Alert.alert(
+              'Evento con Costo',
+              `Este evento tiene un costo de Q${eventPrice.toFixed(2)}. Contacta al organizador o revisa la descripción para pagar.`,
+              [{ text: 'Entendido', onPress: goToNextCard }]
+            );
+          }
+        } else {
+          console.log('🆓 Event is FREE, just saving');
+          // Free event, just save
+          await saveEvent(currentEvent.id);
+          goToNextCard();
+        }
       } catch (error) {
-        console.error('Error saving event:', error);
+        console.error('❌ Error saving event:', error);
+        goToNextCard();
       }
+    } else {
+      console.log('⚠️ No current event');
+      goToNextCard();
     }
-    goToNextCard();
   }, [currentEvent, saveEvent, goToNextCard]);
 
-  const handleSwipeLeft = useCallback(() => {
+  const handleSwipeLeft = useCallback(async () => {
+    if (currentEvent) {
+      console.log('🚫 Denying event:', currentEvent.id);
+      denyEvent(currentEvent.id); // Fire and forget
+    }
     goToNextCard();
-  }, [goToNextCard]);
+  }, [goToNextCard, currentEvent, denyEvent]);
 
   const animateSwipe = useCallback(
     (direction: 'left' | 'right') => {
@@ -216,6 +280,54 @@ export default function ExploreScreen() {
     );
   };
 
+  const pickReceipt = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para subir el comprobante.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setPaymentReceiptUrl(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!currentEvent) return;
+
+    if (!paymentReceiptUrl) {
+      Alert.alert('Error', 'Por favor sube el comprobante de pago');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await registerForEvent(
+        currentEvent.id,
+        paymentReceiptUrl,
+        currentEvent.registration_form_url ? true : false
+      );
+      setShowPaymentModal(false);
+      setPaymentReceiptUrl('');
+      Alert.alert(
+        '¡Solicitud enviada!',
+        'Tu solicitud de registro ha sido enviada. El organizador la revisará pronto.',
+        [{ text: 'OK', onPress: goToNextCard }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo enviar la solicitud. Intenta de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
@@ -231,6 +343,148 @@ export default function ExploreScreen() {
       <View style={styles.cardsContainer}>
         {renderCardContent()}
       </View>
+
+      {/* Payment Alert Modal */}
+      <Modal
+        visible={showPaymentAlert}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPaymentAlert(false)}
+      >
+        <View style={styles.alertOverlay}>
+          <Pressable
+            style={styles.alertBackdrop}
+            onPress={() => {
+              setShowPaymentAlert(false);
+              goToNextCard();
+            }}
+          />
+          <View style={styles.alertBox}>
+            <View style={styles.alertIconContainer}>
+              <Ionicons name="cash" size={48} color="#F59E0B" />
+            </View>
+
+            <Text style={styles.alertTitle}>Este evento requiere pago</Text>
+
+            {currentEvent?.price && (
+              <Text style={styles.alertPrice}>Q{currentEvent.price.toFixed(2)}</Text>
+            )}
+
+            <Text style={styles.alertMessage}>
+              Has guardado este evento en tus favoritos. Para asistir, necesitas completar el pago.
+            </Text>
+
+            <View style={styles.alertButtons}>
+              <TouchableOpacity
+                style={styles.alertButtonPrimary}
+                onPress={() => {
+                  setShowPaymentAlert(false);
+                  setShowPaymentModal(true);
+                }}
+              >
+                <Ionicons name="card" size={20} color="#FFF" />
+                <Text style={styles.alertButtonPrimaryText}>Completar Pago</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.alertButtonSecondary}
+                onPress={() => {
+                  setShowPaymentAlert(false);
+                  goToNextCard();
+                }}
+              >
+                <Text style={styles.alertButtonSecondaryText}>Más Tarde</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalDismiss}
+            onPress={() => setShowPaymentModal(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Comprobante de Pago</Text>
+              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                <Ionicons name="close" size={28} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {currentEvent?.price && (
+                <View style={styles.priceCard}>
+                  <Text style={styles.priceLabel}>Precio del Evento</Text>
+                  <Text style={styles.priceAmount}>Q{currentEvent.price.toFixed(2)}</Text>
+                </View>
+              )}
+
+              {currentEvent?.bank_name && currentEvent?.bank_account_number && (
+                <View style={styles.bankInfo}>
+                  <Text style={styles.bankInfoLabel}>Información de Pago</Text>
+                  <View style={styles.bankInfoRow}>
+                    <Ionicons name="business" size={16} color="#9CA3AF" />
+                    <Text style={styles.bankInfoText}>{currentEvent.bank_name}</Text>
+                  </View>
+                  <View style={styles.bankInfoRow}>
+                    <Ionicons name="card" size={16} color="#9CA3AF" />
+                    <Text style={styles.bankInfoText}>{currentEvent.bank_account_number}</Text>
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.uploadLabel}>Sube el comprobante de pago</Text>
+
+              {paymentReceiptUrl ? (
+                <View style={styles.receiptPreview}>
+                  <Image source={{ uri: paymentReceiptUrl }} style={styles.receiptImage} />
+                  <TouchableOpacity
+                    style={styles.removeReceipt}
+                    onPress={() => setPaymentReceiptUrl('')}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={pickReceipt}
+                >
+                  <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
+                  <Text style={styles.uploadButtonText}>Seleccionar Imagen</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                (!paymentReceiptUrl || isSubmitting) && styles.modalButtonDisabled
+              ]}
+              onPress={handleSubmitPayment}
+              disabled={!paymentReceiptUrl || isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                  <Text style={styles.modalButtonText}>Enviar Solicitud</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -327,6 +581,217 @@ const styles = StyleSheet.create({
   },
   resetButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalDismiss: {
+    flex: 1,
+  },
+  modalContent: {
+    backgroundColor: '#1F1F1F',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalButton: {
+    flexDirection: 'row',
+    backgroundColor: '#8B5CF6',
+    padding: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 16,
+  },
+  modalButtonDisabled: {
+    backgroundColor: '#4B5563',
+    opacity: 0.6,
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  priceCard: {
+    backgroundColor: '#8B5CF6',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  priceLabel: {
+    color: '#E9D5FF',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  priceAmount: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  bankInfo: {
+    backgroundColor: '#2A2A2A',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  bankInfoLabel: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  bankInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  bankInfoText: {
+    color: '#FFF',
+    fontSize: 14,
+  },
+  uploadLabel: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  uploadButton: {
+    backgroundColor: '#2A2A2A',
+    borderWidth: 2,
+    borderColor: '#374151',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  uploadButtonText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  receiptPreview: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  receiptImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  removeReceipt: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+  },
+  // Alert Modal styles
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  alertBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  alertBox: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    gap: 16,
+  },
+  alertIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  alertTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFF',
+    textAlign: 'center',
+  },
+  alertPrice: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+    marginVertical: 8,
+  },
+  alertMessage: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  alertButtons: {
+    width: '100%',
+    gap: 12,
+    marginTop: 8,
+  },
+  alertButtonPrimary: {
+    flexDirection: 'row',
+    backgroundColor: '#F59E0B',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  alertButtonPrimaryText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  alertButtonSecondary: {
+    backgroundColor: '#2A2A2A',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertButtonSecondaryText: {
+    color: '#9CA3AF',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -21,6 +21,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { useEventStore } from '../src/store/eventStore';
 import { router } from 'expo-router';
 import { analyzeImage, analyzeUrl } from '../src/services/api';
+import { useAuth } from '../src/context/AuthContext';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -32,6 +33,14 @@ export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const { createEvent } = useEventStore();
 
+  const { user, profile } = useAuth();
+
+  // Check if user has permission to use URL feature (admin, alpha, or beta)
+  const showUrlOption = React.useMemo(() => {
+    const role = profile?.role?.toLowerCase() || '';
+    return ['admin', 'alpha', 'beta'].includes(role);
+  }, [profile]);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('general');
@@ -41,6 +50,13 @@ export default function CreateEventScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+
+  // Payment & Registration fields
+  const [price, setPrice] = useState('');
+  const [registrationFormUrl, setRegistrationFormUrl] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
 
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -268,6 +284,15 @@ export default function CreateEventScreen() {
       return;
     }
 
+    // Validate payment fields if price > 0 (only for host events)
+    const priceNum = parseFloat(price);
+    if (priceNum > 0 && isHost) {
+      if (!bankName.trim() || !bankAccountNumber.trim()) {
+        Alert.alert('Error', 'Por favor completa la información bancaria para eventos de pago.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await createEvent({
@@ -278,6 +303,12 @@ export default function CreateEventScreen() {
         time: selectedTime ? formatTimeForStorage(selectedTime) : null,
         location: location.trim() || null,
         image,
+        user_id: isHost ? user?.id : null,
+        // Price and registration fields available for all events
+        price: price && priceNum > 0 ? priceNum : null,
+        registration_form_url: registrationFormUrl.trim() ? registrationFormUrl.trim() : null,
+        bank_name: priceNum > 0 && bankName.trim() ? bankName.trim() : null,
+        bank_account_number: priceNum > 0 && bankAccountNumber.trim() ? bankAccountNumber.trim() : null,
       });
       // Reset form and navigate to events
       setTitle('');
@@ -287,6 +318,11 @@ export default function CreateEventScreen() {
       setSelectedTime(null);
       setLocation('');
       setImage(null);
+      setIsHost(false);
+      setPrice('');
+      setRegistrationFormUrl('');
+      setBankName('');
+      setBankAccountNumber('');
       router.replace('/');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
@@ -347,10 +383,16 @@ export default function CreateEventScreen() {
                 <Ionicons name="images" size={32} color="#8B5CF6" />
                 <Text style={styles.uploadText}>Galería</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.uploadButton} onPress={() => setShowUrlModal(true)}>
-                <Ionicons name="link" size={32} color="#8B5CF6" />
-                <Text style={styles.uploadText}>Desde URL</Text>
-              </TouchableOpacity>
+
+              {showUrlOption && (
+                <TouchableOpacity style={styles.uploadButton} onPress={() => setShowUrlModal(true)}>
+                  <View style={styles.experimentalBadge}>
+                    <Ionicons name="flask" size={12} color="#fff" />
+                  </View>
+                  <Ionicons name="link" size={32} color="#8B5CF6" />
+                  <Text style={styles.uploadText}>Desde URL</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -504,6 +546,101 @@ export default function CreateEventScreen() {
               onChangeText={setLocation}
             />
           </View>
+
+          {/* Payment & Registration Fields - Available for all events */}
+          <View style={styles.divider} />
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Registro y Pago (Opcional)</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Precio de Entrada (Q)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0.00"
+              placeholderTextColor="#6B7280"
+              value={price}
+              onChangeText={(text) => {
+                // Only allow numbers and decimal point
+                const cleaned = text.replace(/[^0-9.]/g, '');
+                // Allow only one decimal point
+                const parts = cleaned.split('.');
+                if (parts.length > 2) return;
+                setPrice(cleaned);
+              }}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.inputHint}>
+              Deja en 0 o vacío si el evento es gratuito
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>URL del Formulario de Registro</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="https://forms.google.com/..."
+              placeholderTextColor="#6B7280"
+              value={registrationFormUrl}
+              onChangeText={setRegistrationFormUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <Text style={styles.inputHint}>
+              Opcional: Google Forms, Typeform, etc.
+            </Text>
+          </View>
+
+          {/* Bank info - only show if price > 0 AND isHost */}
+          {parseFloat(price) > 0 && isHost && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Banco *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Banco Industrial, BAM, etc."
+                  placeholderTextColor="#6B7280"
+                  value={bankName}
+                  onChangeText={setBankName}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Número de Cuenta *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Número de cuenta bancaria"
+                  placeholderTextColor="#6B7280"
+                  value={bankAccountNumber}
+                  onChangeText={setBankAccountNumber}
+                  keyboardType="number-pad"
+                />
+                <Text style={styles.inputHint}>
+                  Los usuarios enviarán el comprobante de pago aquí
+                </Text>
+              </View>
+            </>
+          )}
+
+          {/* Host Toggle - Moved to bottom */}
+          <View style={styles.divider} />
+          <View style={styles.hostToggleContainer}>
+            <View style={styles.hostToggleInfo}>
+              <Ionicons name="person-circle" size={24} color="#8B5CF6" />
+              <View>
+                <Text style={styles.hostToggleTitle}>Soy el Anfitrión</Text>
+                <Text style={styles.hostToggleSubtitle}>
+                  Gestiona las solicitudes de registro
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleButton, isHost && styles.toggleButtonActive]}
+              onPress={() => setIsHost(!isHost)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.toggleKnob, isHost && styles.toggleKnobActive]} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Submit Button */}
@@ -529,93 +666,101 @@ export default function CreateEventScreen() {
       </ScrollView>
 
       {/* Date Picker Modal (iOS) */}
-      {Platform.OS === 'ios' && showDatePicker && (
-        <Modal
-          transparent
-          animationType="slide"
-          visible={showDatePicker}
-          onRequestClose={() => setShowDatePicker(false)}
-        >
-          <View style={styles.pickerModalOverlay}>
-            <Pressable
-              style={styles.pickerModalDismiss}
-              onPress={() => setShowDatePicker(false)}
-            />
-            <View style={styles.pickerModalContent}>
-              <View style={styles.pickerModalHeader}>
-                <Text style={styles.pickerModalTitle}>Seleccionar Fecha</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.pickerModalDone}>Listo</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={selectedDate || new Date()}
-                mode="date"
-                display="spinner"
-                onChange={onDateChange}
-                minimumDate={new Date()}
-                locale="es-MX"
-                textColor="#fff"
+      {
+        Platform.OS === 'ios' && showDatePicker && (
+          <Modal
+            transparent
+            animationType="slide"
+            visible={showDatePicker}
+            onRequestClose={() => setShowDatePicker(false)}
+          >
+            <View style={styles.pickerModalOverlay}>
+              <Pressable
+                style={styles.pickerModalDismiss}
+                onPress={() => setShowDatePicker(false)}
               />
+              <View style={styles.pickerModalContent}>
+                <View style={styles.pickerModalHeader}>
+                  <Text style={styles.pickerModalTitle}>Seleccionar Fecha</Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.pickerModalDone}>Listo</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={selectedDate || new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={onDateChange}
+                  minimumDate={new Date()}
+                  locale="es-MX"
+                  textColor="#fff"
+                />
+              </View>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        )
+      }
 
       {/* Time Picker Modal (iOS) */}
-      {Platform.OS === 'ios' && showTimePicker && (
-        <Modal
-          transparent
-          animationType="slide"
-          visible={showTimePicker}
-          onRequestClose={() => setShowTimePicker(false)}
-        >
-          <View style={styles.pickerModalOverlay}>
-            <Pressable
-              style={styles.pickerModalDismiss}
-              onPress={() => setShowTimePicker(false)}
-            />
-            <View style={styles.pickerModalContent}>
-              <View style={styles.pickerModalHeader}>
-                <Text style={styles.pickerModalTitle}>Seleccionar Hora</Text>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <Text style={styles.pickerModalDone}>Listo</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={selectedTime || new Date()}
-                mode="time"
-                display="spinner"
-                onChange={onTimeChange}
-                locale="es-MX"
-                textColor="#fff"
+      {
+        Platform.OS === 'ios' && showTimePicker && (
+          <Modal
+            transparent
+            animationType="slide"
+            visible={showTimePicker}
+            onRequestClose={() => setShowTimePicker(false)}
+          >
+            <View style={styles.pickerModalOverlay}>
+              <Pressable
+                style={styles.pickerModalDismiss}
+                onPress={() => setShowTimePicker(false)}
               />
+              <View style={styles.pickerModalContent}>
+                <View style={styles.pickerModalHeader}>
+                  <Text style={styles.pickerModalTitle}>Seleccionar Hora</Text>
+                  <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                    <Text style={styles.pickerModalDone}>Listo</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={selectedTime || new Date()}
+                  mode="time"
+                  display="spinner"
+                  onChange={onTimeChange}
+                  locale="es-MX"
+                  textColor="#fff"
+                />
+              </View>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        )
+      }
 
       {/* Android Date Picker */}
-      {Platform.OS === 'android' && showDatePicker && (
-        <DateTimePicker
-          value={selectedDate || new Date()}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-          minimumDate={new Date()}
-        />
-      )}
+      {
+        Platform.OS === 'android' && showDatePicker && (
+          <DateTimePicker
+            value={selectedDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+            minimumDate={new Date()}
+          />
+        )
+      }
 
       {/* Android Time Picker */}
-      {Platform.OS === 'android' && showTimePicker && (
-        <DateTimePicker
-          value={selectedTime || new Date()}
-          mode="time"
-          display="default"
-          onChange={onTimeChange}
-          is24Hour={false}
-        />
-      )}
+      {
+        Platform.OS === 'android' && showTimePicker && (
+          <DateTimePicker
+            value={selectedTime || new Date()}
+            mode="time"
+            display="default"
+            onChange={onTimeChange}
+            is24Hour={false}
+          />
+        )
+      }
 
       {/* URL Input Modal */}
       <Modal
@@ -670,7 +815,7 @@ export default function CreateEventScreen() {
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView >
   );
 }
 
@@ -773,6 +918,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  experimentalBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    padding: 4,
+    zIndex: 10,
+  },
   categoryButton: {
     flex: 1,
     padding: 12,
@@ -798,6 +952,50 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#9CA3AF',
     marginBottom: 8,
+  },
+  hostToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1F1F1F',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  hostToggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  hostToggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  hostToggleSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
+  toggleButton: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#374151',
+    padding: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
   },
   input: {
     backgroundColor: '#1F1F1F',
@@ -886,5 +1084,15 @@ const styles = StyleSheet.create({
   },
   pickerModalDismiss: {
     flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#2A2A2A',
+    marginVertical: 16,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 6,
   },
 });

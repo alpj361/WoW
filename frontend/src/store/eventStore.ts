@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as api from '../services/api';
 import { supabase } from '../services/supabase';
+import type { EventRegistration } from '../services/api';
 
 export interface Event {
   id: string;
@@ -11,7 +12,13 @@ export interface Event {
   date: string | null;
   time: string | null;
   location: string | null;
+  user_id?: string | null;
   created_at: string;
+  // Nuevos campos para eventos de pago y registro
+  price?: number | null;
+  registration_form_url?: string | null;
+  bank_account_number?: string | null;
+  bank_name?: string | null;
 }
 
 export interface SavedEventData {
@@ -21,6 +28,11 @@ export interface SavedEventData {
     saved_at: string;
   };
   event: Event;
+  registration?: {
+    id: string;
+    status: 'pending' | 'approved' | 'rejected';
+    rejection_reason?: string | null;
+  } | null;
 }
 
 export interface AttendedEventData {
@@ -33,33 +45,67 @@ export interface AttendedEventData {
   event: Event;
 }
 
+export interface DeniedEventData {
+  id: string;
+  event_id: string;
+  denied_at: string;
+}
+
+export interface HostedEventData {
+  event: Event & {
+    attendee_count?: number;
+  };
+}
+
 interface EventStore {
   events: Event[];
   savedEvents: SavedEventData[];
   attendedEvents: AttendedEventData[];
+  hostedEvents: HostedEventData[];
+  deniedEvents: DeniedEventData[];
   currentCategory: string;
   isLoading: boolean;
   error: string | null;
+
+  // Registration management
+  pendingRegistrations: EventRegistration[];
+  userRegistrations: EventRegistration[];
 
   // Actions
   fetchEvents: (category?: string) => Promise<void>;
   fetchSavedEvents: () => Promise<void>;
   fetchAttendedEvents: () => Promise<void>;
+  fetchHostedEvents: () => Promise<void>;
+  fetchDeniedEvents: () => Promise<void>;
+  fetchEventAttendees: (eventId: string) => Promise<any[]>;
   saveEvent: (eventId: string) => Promise<void>;
   unsaveEvent: (eventId: string) => Promise<void>;
+  denyEvent: (eventId: string) => Promise<void>;
   markAttended: (eventId: string, emoji?: string) => Promise<void>;
   removeAttended: (eventId: string) => Promise<void>;
-  createEvent: (eventData: Partial<Event>) => Promise<Event>;
+  createEvent: (eventData: Partial<Event> & { user_id?: string | null }) => Promise<Event>;
   setCategory: (category: string) => void;
+
+  // Registration actions
+  registerForEvent: (eventId: string, paymentReceiptUrl?: string, registrationFormCompleted?: boolean) => Promise<void>;
+  fetchEventRegistrations: (eventId: string) => Promise<EventRegistration[]>;
+  fetchUserRegistrations: () => Promise<void>;
+  approveRegistration: (registrationId: string) => Promise<void>;
+  rejectRegistration: (registrationId: string, rejectionReason?: string) => Promise<void>;
+  resubmitRegistration: (eventId: string, paymentReceiptUrl?: string) => Promise<void>;
 }
 
 export const useEventStore = create<EventStore>((set, get) => ({
   events: [],
   savedEvents: [],
   attendedEvents: [],
+  hostedEvents: [],
+  deniedEvents: [],
   currentCategory: 'all',
   isLoading: false,
   error: null,
+  pendingRegistrations: [],
+  userRegistrations: [],
 
   fetchEvents: async (category?: string) => {
     set({ isLoading: true, error: null });
@@ -67,7 +113,29 @@ export const useEventStore = create<EventStore>((set, get) => ({
     try {
       const cat = category || get().currentCategory;
       const events = await api.fetchEvents(cat);
-      set({ events, isLoading: false });
+
+      // Filter events:
+      // 1. Remove events that are already saved (liked)
+      // 2. Remove events that are denied within the last 48 hours
+      const { savedEvents, deniedEvents } = get();
+      const savedEventIds = new Set(savedEvents.map(s => s.event.id));
+
+      const now = new Date();
+      const deniedEventIds = new Set(
+        deniedEvents
+          .filter(d => {
+            const deniedDate = new Date(d.denied_at);
+            const hoursDiff = (now.getTime() - deniedDate.getTime()) / (1000 * 60 * 60);
+            return hoursDiff < 48; // Keep only if denied less than 48h ago
+          })
+          .map(d => d.event_id)
+      );
+
+      const filteredEvents = events.filter(event =>
+        !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)
+      );
+
+      set({ events: filteredEvents, isLoading: false });
     } catch (error: any) {
       console.error('Error fetching events:', error.message);
       set({ error: error.message, isLoading: false, events: [] });
@@ -98,13 +166,30 @@ export const useEventStore = create<EventStore>((set, get) => ({
             date,
             time,
             location,
-            created_at
+            created_at,
+            price,
+            registration_form_url,
+            bank_name,
+            bank_account_number,
+            user_id
           )
         `)
         .eq('user_id', user.id)
         .order('saved_at', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch registrations for these events
+      const eventIds = (data || []).map((item: any) => item.event_id);
+      const { data: registrations } = await supabase
+        .from('event_registrations')
+        .select('id, event_id, status, rejection_reason')
+        .eq('user_id', user.id)
+        .in('event_id', eventIds);
+
+      const registrationMap = new Map(
+        (registrations || []).map(reg => [reg.event_id, reg])
+      );
 
       const savedEvents: SavedEventData[] = (data || []).map((item: any) => ({
         saved: {
@@ -113,6 +198,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
           saved_at: item.saved_at,
         },
         event: item.events,
+        registration: registrationMap.get(item.event_id) || null,
       }));
 
       set({ savedEvents, isLoading: false });
@@ -147,7 +233,12 @@ export const useEventStore = create<EventStore>((set, get) => ({
             date,
             time,
             location,
-            created_at
+            created_at,
+            price,
+            registration_form_url,
+            bank_name,
+            bank_account_number,
+            user_id
           )
         `)
         .eq('user_id', user.id)
@@ -169,6 +260,89 @@ export const useEventStore = create<EventStore>((set, get) => ({
     } catch (error: any) {
       console.error('Error fetching attended events:', error);
       set({ error: error.message, isLoading: false });
+    }
+  },
+
+  fetchHostedEvents: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ isLoading: false, hostedEvents: [] });
+        return;
+      }
+
+      const events = await api.fetchHostedEvents(user.id);
+      set({
+        hostedEvents: events.map(event => ({ event })),
+        isLoading: false
+      });
+    } catch (error: any) {
+      console.error('Error fetching hosted events:', error);
+      set({ error: error.message, isLoading: false });
+    }
+  },
+
+  fetchDeniedEvents: async () => {
+    // Don't set global loading here to avoid flickering if called in background
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ deniedEvents: [] });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('denied_events')
+        .select('id, event_id, denied_at')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      set({ deniedEvents: data as DeniedEventData[] });
+    } catch (error: any) {
+      console.error('Error fetching denied events:', error);
+      // We don't block the UI for this error
+    }
+  },
+
+  denyEvent: async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return; // Silent fail if not logged in
+
+      // Optimistic update: remove from current events list - REMOVED to preserve list index stability
+      // The UI handles "next card" transition separately.
+      // set(state => ({
+      //     events: state.events.filter(e => e.id !== eventId)
+      // }));
+
+      const { data, error } = await supabase
+        .from('denied_events')
+        .insert({
+          user_id: user.id,
+          event_id: eventId
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set(state => ({
+        deniedEvents: [...state.deniedEvents, data as DeniedEventData]
+      }));
+
+    } catch (error: any) {
+      console.error('Error denying event:', error);
+    }
+  },
+
+  fetchEventAttendees: async (eventId: string) => {
+    try {
+      return await api.fetchEventAttendees(eventId);
+    } catch (error: any) {
+      console.error('Error fetching attendees:', error);
+      throw error;
     }
   },
 
@@ -331,7 +505,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
     }
   },
 
-  createEvent: async (eventData: Partial<Event>) => {
+  createEvent: async (eventData: Partial<Event> & { user_id?: string | null }) => {
     try {
       const newEvent = await api.createEvent({
         title: eventData.title || '',
@@ -341,6 +515,11 @@ export const useEventStore = create<EventStore>((set, get) => ({
         date: eventData.date,
         time: eventData.time,
         location: eventData.location || undefined,
+        user_id: eventData.user_id || undefined,
+        price: eventData.price || undefined,
+        registration_form_url: eventData.registration_form_url || undefined,
+        bank_account_number: eventData.bank_account_number || undefined,
+        bank_name: eventData.bank_name || undefined,
       });
 
       // Refresh events list
@@ -356,5 +535,107 @@ export const useEventStore = create<EventStore>((set, get) => ({
   setCategory: (category: string) => {
     set({ currentCategory: category });
     get().fetchEvents(category);
+  },
+
+  // Registration actions
+  registerForEvent: async (eventId: string, paymentReceiptUrl?: string, registrationFormCompleted?: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      await api.registerForEvent(eventId, user.id, paymentReceiptUrl, registrationFormCompleted);
+
+      // Refresh user registrations
+      await get().fetchUserRegistrations();
+    } catch (error: any) {
+      console.error('Error registering for event:', error);
+      throw error;
+    }
+  },
+
+  fetchEventRegistrations: async (eventId: string) => {
+    try {
+      const registrations = await api.fetchEventRegistrations(eventId);
+      set({ pendingRegistrations: registrations });
+      return registrations;
+    } catch (error: any) {
+      console.error('Error fetching event registrations:', error);
+      throw error;
+    }
+  },
+
+  fetchUserRegistrations: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ userRegistrations: [] });
+        return;
+      }
+
+      const registrations = await api.fetchUserRegistrations(user.id);
+      set({ userRegistrations: registrations });
+    } catch (error: any) {
+      console.error('Error fetching user registrations:', error);
+      set({ error: error.message });
+    }
+  },
+
+  approveRegistration: async (registrationId: string) => {
+    try {
+      await api.approveRegistration(registrationId);
+
+      // Update the registration in state
+      set(state => ({
+        pendingRegistrations: state.pendingRegistrations.map(reg =>
+          reg.id === registrationId ? { ...reg, status: 'approved' as const } : reg
+        ),
+      }));
+    } catch (error: any) {
+      console.error('Error approving registration:', error);
+      throw error;
+    }
+  },
+
+  rejectRegistration: async (registrationId: string, rejectionReason?: string) => {
+    try {
+      await api.rejectRegistration(registrationId, rejectionReason);
+
+      // Update the registration in state
+      set(state => ({
+        pendingRegistrations: state.pendingRegistrations.map(reg =>
+          reg.id === registrationId
+            ? { ...reg, status: 'rejected' as const, rejection_reason: rejectionReason || null }
+            : reg
+        ),
+      }));
+    } catch (error: any) {
+      console.error('Error rejecting registration:', error);
+      throw error;
+    }
+  },
+
+  resubmitRegistration: async (eventId: string, paymentReceiptUrl?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      // Delete old registration first
+      const { error: deleteError } = await supabase
+        .from('event_registrations')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('user_id', user.id);
+
+      if (deleteError) throw deleteError;
+
+      // Create new registration
+      await api.registerForEvent(eventId, user.id, paymentReceiptUrl);
+
+      // Refresh user registrations
+      await get().fetchUserRegistrations();
+    } catch (error: any) {
+      console.error('Error resubmitting registration:', error);
+      throw error;
+    }
   },
 }));

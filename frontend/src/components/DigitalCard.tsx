@@ -6,6 +6,7 @@ import {
     StyleSheet,
     Pressable,
     Animated,
+    Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AttachedPin } from './pins/AttachedPin';
@@ -62,7 +63,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
                     toValue: 1,
                     friction: 8,
                     tension: 10,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }).start();
                 setIsFlipped(true);
             }
@@ -73,7 +74,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
                     toValue: 0,
                     friction: 8,
                     tension: 10,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }).start();
                 setIsFlipped(false);
             }
@@ -87,7 +88,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
             toValue,
             friction: 8,
             tension: 10,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
         }).start();
 
         setIsFlipped(!isFlipped);
@@ -97,7 +98,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
         Animated.timing(glowOpacity, {
             toValue: 0.35,
             duration: 200,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
         }).start();
     };
 
@@ -105,7 +106,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
         Animated.timing(glowOpacity, {
             toValue: 0.15,
             duration: 200,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
         }).start();
     };
 

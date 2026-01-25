@@ -6,7 +6,9 @@ import {
   useWindowDimensions,
   TouchableOpacity,
   Image,
+  Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Event } from '../store/eventStore';
@@ -18,7 +20,7 @@ interface EventCardProps {
   showActions?: boolean;
 }
 
-const getCategoryGradient = (category: string): string[] => {
+const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
     case 'music':
       return ['#8B5CF6', '#6D28D9'];
@@ -65,9 +67,21 @@ export const EventCard: React.FC<EventCardProps> = ({
   // Dimensiones dinámicas de la tarjeta - ancho relativo, altura flexible
   const cardWidth = Math.min(screenWidth * 0.9, 340);
 
+  const router = useRouter();
+
+  const handlePress = () => {
+    if (event.id) {
+      router.push(`/event/${event.id}`);
+    }
+  };
+
   return (
     <View style={styles.cardWrapper}>
-      <View style={[styles.card, { width: cardWidth }]}>
+      <TouchableOpacity
+        style={[styles.card, { width: cardWidth }]}
+        activeOpacity={0.9}
+        onPress={handlePress}
+      >
         <LinearGradient
           colors={gradient}
           style={styles.gradient}
@@ -150,7 +164,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };

@@ -42,9 +42,9 @@ function RootLayoutNav() {
     }
 
     const timeout = setTimeout(() => {
-      console.log('⚠️ _layout: Auth loading timed out, forcing redirect');
+      console.log('⚠️ _layout: Auth loading timed out after 30s, forcing redirect');
       setHasTimedOut(true);
-    }, 10000); // 10 second timeout
+    }, 30000); // 30 second timeout (increased for slower networks)
 
     return () => clearTimeout(timeout);
   }, [loading]);
@@ -193,6 +193,12 @@ function RootLayoutNav() {
           />
           <Tabs.Screen
             name="auth-verify"
+            options={{
+              href: null,
+            }}
+          />
+          <Tabs.Screen
+            name="event/[id]"
             options={{
               href: null,
             }}

@@ -20,7 +20,13 @@ export interface Event {
     date: string | null;
     time: string | null;
     location: string | null;
+    user_id?: string | null;
     created_at: string;
+    // Nuevos campos para eventos de pago y registro
+    price?: number | null;
+    registration_form_url?: string | null;
+    bank_account_number?: string | null;
+    bank_name?: string | null;
 }
 
 export interface CreateEventData {
@@ -31,6 +37,45 @@ export interface CreateEventData {
     date?: string | null;
     time?: string | null;
     location?: string | null;
+    user_id?: string | null;
+    // Nuevos campos para eventos de pago y registro
+    price?: number | null;
+    registration_form_url?: string | null;
+    bank_account_number?: string | null;
+    bank_name?: string | null;
+}
+
+export interface EventRegistration {
+    id: string;
+    event_id: string;
+    user_id: string;
+    status: 'pending' | 'approved' | 'rejected';
+    payment_receipt_url?: string | null;
+    registration_form_completed: boolean;
+    rejection_reason?: string | null;
+    created_at: string;
+    updated_at: string;
+    user?: {
+        id: string;
+        full_name: string | null;
+        email: string | null;
+        avatar_url: string | null;
+    };
+}
+
+export interface HostedEvent extends Event {
+    attendee_count: number;
+}
+
+export interface Attendee {
+    id: string;
+    saved_at: string;
+    profiles: {
+        id: string;
+        full_name: string | null;
+        email: string | null;
+        avatar_url: string | null;
+    };
 }
 
 /**
@@ -98,6 +143,76 @@ export interface UrlAnalysisResult extends AnalysisResult {
 export async function analyzeUrl(url: string): Promise<UrlAnalysisResult> {
     const response = await api.post('/events/analyze-url', { url });
     return response.data;
+}
+
+/**
+ * Fetch events hosted by a specific user
+ */
+export async function fetchHostedEvents(userId: string): Promise<HostedEvent[]> {
+    const response = await api.get(`/events/hosted/${userId}`);
+    return response.data.events;
+}
+
+/**
+ * Fetch attendees for a specific event
+ */
+export async function fetchEventAttendees(eventId: string): Promise<Attendee[]> {
+    const response = await api.get(`/events/${eventId}/attendees`);
+    return response.data.attendees;
+}
+
+/**
+ * Register for an event (creates a pending registration request)
+ */
+export async function registerForEvent(
+    eventId: string,
+    userId: string,
+    paymentReceiptUrl?: string,
+    registrationFormCompleted?: boolean
+): Promise<EventRegistration> {
+    const response = await api.post(`/events/${eventId}/register`, {
+        user_id: userId,
+        payment_receipt_url: paymentReceiptUrl,
+        registration_form_completed: registrationFormCompleted
+    });
+    return response.data.registration;
+}
+
+/**
+ * Fetch all registrations for a specific event (host only)
+ */
+export async function fetchEventRegistrations(eventId: string): Promise<EventRegistration[]> {
+    const response = await api.get(`/events/${eventId}/registrations`);
+    return response.data.registrations;
+}
+
+/**
+ * Approve a registration request
+ */
+export async function approveRegistration(registrationId: string): Promise<EventRegistration> {
+    const response = await api.patch(`/events/registrations/${registrationId}/approve`);
+    return response.data.registration;
+}
+
+/**
+ * Reject a registration request with optional reason
+ */
+export async function rejectRegistration(
+    registrationId: string,
+    rejectionReason?: string
+): Promise<EventRegistration> {
+    const response = await api.patch(`/events/registrations/${registrationId}/reject`, {
+        rejection_reason: rejectionReason
+    });
+    return response.data.registration;
+}
+
+/**
+ * Fetch all registrations for a specific user
+ */
+export async function fetchUserRegistrations(userId: string): Promise<EventRegistration[]> {
+    const response = await api.get(`/events/registrations/user/${userId}`);
+    return response.data.registrations;
 }
 
 export default api;

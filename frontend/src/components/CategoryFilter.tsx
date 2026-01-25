@@ -16,7 +16,7 @@ interface Category {
 
 const categories: Category[] = [
   { id: 'all', label: 'Todos', icon: 'grid', color: '#6B7280' },
-  { id: 'music', label: 'Música', icon: 'musical-notes', color: '#8B5CF6' },
+  { id: 'entertainment', label: 'Entretenimiento', icon: 'musical-notes', color: '#8B5CF6' },
   { id: 'volunteer', label: 'Voluntariado', icon: 'heart', color: '#EC4899' },
   { id: 'general', label: 'General', icon: 'fast-food', color: '#F59E0B' },
 ];
