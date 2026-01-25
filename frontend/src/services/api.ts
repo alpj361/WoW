@@ -76,6 +76,22 @@ export interface Attendee {
         email: string | null;
         avatar_url: string | null;
     };
+    // Attendance tracking
+    scanned_by_host?: boolean;
+    scanned_at?: string | null;
+    attended?: boolean;
+}
+
+export interface AttendanceListItem {
+    user_id: string;
+    user_name: string | null;
+    user_email: string | null;
+    user_avatar: string | null;
+    confirmed: boolean; // Saved event or approved registration
+    attended: boolean; // Marked as attended
+    scanned_by_host: boolean; // QR scanned by host
+    scanned_at: string | null;
+    registration_status?: 'pending' | 'approved' | 'rejected' | null;
 }
 
 /**
@@ -213,6 +229,37 @@ export async function rejectRegistration(
 export async function fetchUserRegistrations(userId: string): Promise<EventRegistration[]> {
     const response = await api.get(`/events/registrations/user/${userId}`);
     return response.data.registrations;
+}
+
+/**
+ * Scan a user's QR code to mark attendance at an event
+ */
+export async function scanAttendance(eventId: string, scannedUserId: string): Promise<void> {
+    const response = await api.post(`/events/${eventId}/scan-attendance`, {
+        scanned_user_id: scannedUserId
+    });
+    return response.data;
+}
+
+/**
+ * Get attendance list for an event (host only)
+ */
+export async function getAttendanceList(eventId: string): Promise<AttendanceListItem[]> {
+    const response = await api.get(`/events/${eventId}/attendance-list`);
+    return response.data.attendees;
+}
+
+/**
+ * Update attendance requirement for an event (host only)
+ */
+export async function updateAttendanceRequirement(
+    eventId: string, 
+    requiresAttendance: boolean
+): Promise<void> {
+    const response = await api.patch(`/events/${eventId}/attendance-requirement`, {
+        requires_attendance_check: requiresAttendance
+    });
+    return response.data;
 }
 
 export default api;

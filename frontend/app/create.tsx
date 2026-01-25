@@ -57,6 +57,9 @@ export default function CreateEventScreen() {
   const [registrationFormUrl, setRegistrationFormUrl] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
+  
+  // Attendance tracking
+  const [requiresAttendance, setRequiresAttendance] = useState(false);
 
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -309,6 +312,8 @@ export default function CreateEventScreen() {
         registration_form_url: registrationFormUrl.trim() ? registrationFormUrl.trim() : null,
         bank_name: priceNum > 0 && bankName.trim() ? bankName.trim() : null,
         bank_account_number: priceNum > 0 && bankAccountNumber.trim() ? bankAccountNumber.trim() : null,
+        // Attendance tracking
+        requires_attendance_check: isHost && requiresAttendance ? true : null,
       });
       // Reset form and navigate to events
       setTitle('');
@@ -323,6 +328,7 @@ export default function CreateEventScreen() {
       setRegistrationFormUrl('');
       setBankName('');
       setBankAccountNumber('');
+      setRequiresAttendance(false);
       router.replace('/');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
@@ -641,6 +647,28 @@ export default function CreateEventScreen() {
               <View style={[styles.toggleKnob, isHost && styles.toggleKnobActive]} />
             </TouchableOpacity>
           </View>
+
+          {/* Attendance Toggle - Only visible when isHost is true */}
+          {isHost && (
+            <View style={styles.hostToggleContainer}>
+              <View style={styles.hostToggleInfo}>
+                <Ionicons name="qr-code-outline" size={24} color="#F59E0B" />
+                <View>
+                  <Text style={styles.hostToggleTitle}>Llevar asistencia</Text>
+                  <Text style={styles.hostToggleSubtitle}>
+                    Solo asistidos si escaneo su QR personal
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.toggleButton, requiresAttendance && styles.toggleButtonActive]}
+                onPress={() => setRequiresAttendance(!requiresAttendance)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.toggleKnob, requiresAttendance && styles.toggleKnobActive]} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Submit Button */}

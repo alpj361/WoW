@@ -19,6 +19,8 @@ export interface Event {
   registration_form_url?: string | null;
   bank_account_number?: string | null;
   bank_name?: string | null;
+  // Attendance tracking
+  requires_attendance_check?: boolean | null;
 }
 
 export interface SavedEventData {

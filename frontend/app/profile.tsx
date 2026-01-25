@@ -20,6 +20,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { DigitalCard, CardDesign, DigitalCardRef, CollectedPin } from '../src/components/DigitalCard';
 import { PinMovementTest } from '../src/components/pins/PinMovementTest';
 import { PinAwardOverlay } from '../src/components/pins/PinAwardOverlay';
+import { UserQRCode } from '../src/components/UserQRCode';
 
 
 interface SettingItemProps {
@@ -85,6 +86,7 @@ export default function ProfileScreen() {
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
   const [showPinTest, setShowPinTest] = useState(false);
   const [showPinAward, setShowPinAward] = useState(false);
+  const [showUserQR, setShowUserQR] = useState(false);
   const [collectedPins, setCollectedPins] = useState<CollectedPin[]>([]);
   const [activeTab, setActiveTab] = useState<'ecard' | 'escanear'>('ecard');
   const [cardWidth, setCardWidth] = useState(0);
@@ -253,7 +255,11 @@ export default function ProfileScreen() {
 
               {/* QR Code Card */}
               <View style={[styles.cardSlide, { width: cardWidth }]}>
-                <View style={styles.qrCardContainer}>
+                <TouchableOpacity
+                  style={styles.qrCardContainer}
+                  onPress={() => setShowUserQR(true)}
+                  activeOpacity={0.9}
+                >
                   <LinearGradient
                     colors={['#1a1a2e', '#16213e', '#0f0f23']}
                     start={{ x: 0, y: 0 }}
@@ -267,15 +273,21 @@ export default function ProfileScreen() {
                     <View style={styles.qrCodeWrapper}>
                       <View style={styles.qrCodeContainer}>
                         <QRCode
-                          value={`wow://user/${user?.id || memberId}`}
+                          value={`WOW-USER-${user?.id || memberId}`}
                           size={150}
                           backgroundColor="#fff"
                           color="#1a1a2e"
                         />
                       </View>
                     </View>
+
+                    {/* Tap to enlarge hint */}
+                    <View style={styles.tapHint}>
+                      <Ionicons name="expand-outline" size={16} color="#8B5CF6" />
+                      <Text style={styles.tapHintText}>Toca para ampliar</Text>
+                    </View>
                   </LinearGradient>
-                </View>
+                </TouchableOpacity>
               </View>
             </Animated.View>
           </View>
@@ -421,6 +433,14 @@ export default function ProfileScreen() {
           />
         </GestureHandlerRootView>
       )}
+
+      {/* User QR Code Modal */}
+      <UserQRCode
+        visible={showUserQR}
+        onClose={() => setShowUserQR(false)}
+        userId={user?.id || ''}
+        userName={userName}
+      />
     </>
   );
 }
@@ -721,5 +741,20 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#fff',
     borderRadius: 10,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 8,
+  },
+  tapHintText: {
+    fontSize: 11,
+    color: '#8B5CF6',
+    fontWeight: '600',
   },
 });
