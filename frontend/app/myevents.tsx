@@ -884,6 +884,15 @@ export default function MyEventsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Toast notification */}
+      <AnimatedToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        duration={2000}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
+
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.title}>Mis Eventos</Text>
         <Text style={styles.subtitle}>Tu historial personal</Text>
