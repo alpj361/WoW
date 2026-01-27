@@ -970,41 +970,74 @@ export default function MyEventsScreen() {
           />
         }
       >
-        {activeTab === 'saved' ? (
+        {isLoading ? (
+          <EventListSkeleton count={3} />
+        ) : activeTab === 'saved' ? (
           savedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="bookmark-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos guardados</Text>
               <Text style={styles.emptyText}>
                 Los eventos que guardes aparecerán aquí
               </Text>
-            </View>
+              <TouchableOpacity 
+                style={styles.exploreButton}
+                onPress={() => router.push('/')}
+              >
+                <Ionicons name="compass" size={18} color="#fff" />
+                <Text style={styles.exploreButtonText}>Explorar eventos</Text>
+              </TouchableOpacity>
+            </Animated.View>
           ) : (
-            savedEvents.map(renderSavedItem)
+            savedEvents.map((item, index) => (
+              <Animated.View 
+                key={item.event.id} 
+                entering={FadeInDown.delay(index * 80).duration(400)}
+                layout={Layout.springify()}
+              >
+                {renderSavedItem(item)}
+              </Animated.View>
+            ))
           )
         ) : activeTab === 'attended' ? (
           attendedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="checkmark-done-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos asistidos</Text>
               <Text style={styles.emptyText}>
                 Marca los eventos a los que has asistido
               </Text>
-            </View>
+            </Animated.View>
           ) : (
-            attendedEvents.map(renderAttendedItem)
+            attendedEvents.map((item, index) => (
+              <Animated.View 
+                key={item.event.id} 
+                entering={FadeInDown.delay(index * 80).duration(400)}
+                layout={Layout.springify()}
+              >
+                {renderAttendedItem(item)}
+              </Animated.View>
+            ))
           )
         ) : (
           hostedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="person-circle-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos organizados</Text>
               <Text style={styles.emptyText}>
                 Tus eventos creados aparecerán aquí
               </Text>
-            </View>
+            </Animated.View>
           ) : (
-            hostedEvents.map(renderHostedItem)
+            hostedEvents.map((item, index) => (
+              <Animated.View 
+                key={item.event.id} 
+                entering={FadeInDown.delay(index * 80).duration(400)}
+                layout={Layout.springify()}
+              >
+                {renderHostedItem(item)}
+              </Animated.View>
+            ))
           )
         )}
 
