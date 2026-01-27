@@ -41,7 +41,7 @@ import { AnimatedToast } from '../src/components/AnimatedToast';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
-const getCategoryGradient = (category: string): string[] => {
+const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
     case 'music':
       return ['#8B5CF6', '#6D28D9'];
