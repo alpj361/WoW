@@ -238,9 +238,14 @@ export async function fetchUserRegistrations(userId: string): Promise<EventRegis
 /**
  * Scan a user's QR code to mark attendance at an event
  */
-export async function scanAttendance(eventId: string, scannedUserId: string): Promise<void> {
+export async function scanAttendance(
+    eventId: string, 
+    scannedUserId: string, 
+    hostUserId: string
+): Promise<void> {
     const response = await api.post(`/events/${eventId}/scan-attendance`, {
-        scanned_user_id: scannedUserId
+        scanned_user_id: scannedUserId,
+        host_user_id: hostUserId
     });
     return response.data;
 }

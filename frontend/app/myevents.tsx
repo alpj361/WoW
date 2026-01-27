@@ -398,13 +398,49 @@ export default function MyEventsScreen() {
 
     try {
       // scannedData should be the user_id from the QR code
-      await scanAttendance(scannerModal.eventId, scannedData);
-      Alert.alert('✅ Asistencia Registrada', 'El usuario fue marcado como asistente');
+      await scanAttendance(scannerModal.eventId, scannedData, user.id);
+      
+      // Refresh the attendance list to show updated status
+      if (attendanceListModal.eventId === scannerModal.eventId) {
+        const attendees = await getAttendanceList(scannerModal.eventId);
+        setAttendanceListModal(prev => ({ ...prev, attendees }));
+      }
+      
       // Refresh hosted events
       await fetchHostedEvents();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'No se pudo registrar la asistencia';
-      Alert.alert('Error', errorMessage);
+      console.error('Error scanning attendance:', error);
+      
+      // Extract error message from response
+      let errorMessage = 'No se pudo registrar la asistencia';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Show user-friendly error messages
+      if (errorMessage.includes('not confirmed')) {
+        Alert.alert(
+          'Usuario No Confirmado', 
+          'Este usuario no está confirmado para el evento. Debe estar registrado y aprobado primero.'
+        );
+      } else if (errorMessage.includes('not require attendance')) {
+        Alert.alert(
+          'Asistencia No Requerida', 
+          'Este evento no tiene habilitada la opción de llevar asistencia.'
+        );
+      } else if (errorMessage.includes('Only the event host')) {
+        Alert.alert(
+          'Sin Permiso', 
+          'Solo el organizador del evento puede escanear asistencias.'
+        );
+      } else {
+        Alert.alert('Error al Escanear', errorMessage);
+      }
+      
+      throw error; // Re-throw to let QRScanner handle it
     }
   };
 
