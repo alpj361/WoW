@@ -13,6 +13,7 @@ import {
   TextInput,
   Pressable,
 } from 'react-native';
+import { TouchableOpacity as GestureTouchable, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -494,16 +495,17 @@ export default function MyEventsScreen() {
               <Ionicons name="list" size={16} color="#F59E0B" />
               <Text style={styles.viewAttendeesText}>Lista</Text>
             </TouchableOpacity>
-            <Pressable
-              style={({ pressed }) => [
-                styles.removeButton,
-                pressed && { opacity: 0.6 }
-              ]}
-              onPress={() => handleDeleteHosted(event.id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            <GestureTouchable
+              style={styles.removeButton}
+              onPress={() => {
+                console.log('Delete hosted pressed:', event.id);
+                handleDeleteHosted(event.id);
+              }}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              activeOpacity={0.6}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </Pressable>
+            </GestureTouchable>
           </View>
         </View>
       </View>
@@ -635,16 +637,17 @@ export default function MyEventsScreen() {
                 <Text style={styles.attendButtonText}>Asistí</Text>
               </TouchableOpacity>
             ) : null}
-            <Pressable
-              style={({ pressed }) => [
-                styles.removeButton,
-                pressed && { opacity: 0.6 }
-              ]}
-              onPress={() => handleUnsave(event.id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            <GestureTouchable
+              style={styles.removeButton}
+              onPress={() => {
+                console.log('Delete saved pressed:', event.id);
+                handleUnsave(event.id);
+              }}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              activeOpacity={0.6}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </Pressable>
+            </GestureTouchable>
           </View>
         </View>
       </View>
@@ -706,16 +709,17 @@ export default function MyEventsScreen() {
                 {attended.emoji_rating ? 'Cambiar' : 'Calificar'}
               </Text>
             </TouchableOpacity>
-            <Pressable
-              style={({ pressed }) => [
-                styles.removeButton,
-                pressed && { opacity: 0.6 }
-              ]}
-              onPress={() => handleRemoveAttended(event.id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            <GestureTouchable
+              style={styles.removeButton}
+              onPress={() => {
+                console.log('Delete attended pressed:', event.id);
+                handleRemoveAttended(event.id);
+              }}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              activeOpacity={0.6}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </Pressable>
+            </GestureTouchable>
           </View>
         </View>
       </View>
@@ -789,7 +793,7 @@ export default function MyEventsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <GestureScrollView
         style={styles.content}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
@@ -840,7 +844,7 @@ export default function MyEventsScreen() {
         )}
 
         <View style={{ height: insets.bottom + 20 }} />
-      </ScrollView>
+      </GestureScrollView>
 
       <EmojiRating
         visible={ratingModal.visible}
