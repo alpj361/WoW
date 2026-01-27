@@ -2,6 +2,52 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.12] - 2026-01-27
+
+### Fixed
+- 🐛 **QR Attendance Scanning Bug**: Fixed critical bug where QR scanning failed due to missing `host_user_id` parameter
+  - **Root Cause**: Backend endpoint `/api/events/:eventId/scan-attendance` requires 3 parameters but frontend was only sending 2
+  - **Solution**: Updated `scanAttendance()` in `api.ts` to accept and send `hostUserId` parameter
+  - **Impact**: QR attendance scanning now works correctly for host users
+  - **Error Messages**: Added comprehensive error handling with user-friendly Spanish messages:
+    - Usuario no confirmado para eventos de pago
+    - Evento no requiere control de asistencia
+    - Solo el host puede escanear
+  - **Auto-Refresh**: Attendance list now refreshes automatically after successful scan
+
+### Changed
+- ✅ **Better Error Handling in QR Scanner**:
+  - Improved `handleQRScanned()` in `myevents.tsx` with specific error messages
+  - Extracts and displays backend error messages when available
+  - Fallback generic message if backend doesn't provide details
+
+### Technical Details
+```
+Modified:
+- frontend/src/services/api.ts (added hostUserId parameter to scanAttendance function)
+- frontend/app/myevents.tsx (updated handleQRScanned to pass user.id, better error handling, auto-refresh)
+
+API Call Changes:
+Before: scanAttendance(eventId, scannedUserId)
+After:  scanAttendance(eventId, scannedUserId, hostUserId)
+
+Backend Endpoint:
+POST /api/events/:eventId/scan-attendance
+Body: { scanned_user_id, host_user_id }
+```
+
+### Testing
+```
+✅ Host can scan user QR codes
+✅ Validates user confirmation status
+✅ Prevents duplicate scans
+✅ Shows specific error messages
+✅ Refreshes attendance list after scan
+✅ Only event host can scan
+```
+
+---
+
 ## [0.0.11] - 2026-01-27
 
 ### Added
