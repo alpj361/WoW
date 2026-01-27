@@ -1,43 +1,72 @@
-# WOW! Events App - PRD
+# WOW - App de Eventos
 
-## Original Problem Statement
-Improve the UI of the Login screen with:
-1. Interactive animated background
-2. Use logo colors as theme (purple #5a2d82 to orange #ff5733 gradient)
-3. Auth verification loading should show splash screen video adapted to phone size
-4. Medium animation intensity
+## Descripción
+App de eventos tipo swipe (similar a Tinder) con colección de eventos asistidos estilo Letterboxd.
 
-## Architecture
-- **Framework**: React Native / Expo
-- **Auth**: Supabase (Google OAuth)
-- **Storage**: Supabase Database
+## Stack Tecnológico
+- **Frontend:** Expo + React Native + TypeScript
+- **Backend:** FastAPI + Supabase
+- **Animaciones:** React Native Reanimated
+- **Gestos:** React Native Gesture Handler
 
-## What's Been Implemented (Jan 2026)
-### Login UI Improvements
-- ✅ Interactive animated background with floating gradient orbs
-- ✅ Dark blue/teal background for contrast with warm logo colors
-- ✅ Glassmorphism form card with blur effect
-- ✅ Gradient button matching logo colors (purple → orange)
-- ✅ Smooth entrance animations (fade + slide)
-- ✅ Purple accent on input field borders
-- ✅ Orange glow effect on logo
+## Mejoras Implementadas (27 Ene 2026)
 
-### Auth Verify Screen
-- ✅ Video background using splash-video.mp4
-- ✅ Adapted to phone screen size (ResizeMode.COVER)
-- ✅ Gradient overlay for readability
-- ✅ Animated pulse loading indicator
+### Alta Prioridad - WOW Inmediato ✅
+1. **Overlay de Swipe con Colores**
+   - Indicador visual "GUARDAR" (verde #10B981) al swipear derecha
+   - Indicador visual "PASAR" (rojo #EF4444) al swipear izquierda
+   - Animación scale y opacity progresiva según distancia del swipe
 
-## Key Files Modified
-- `/app/frontend/app/auth.tsx` - Main login UI with interactive background
-- `/app/frontend/app/auth-verify.tsx` - Video loading screen
-- `/app/frontend/src/services/supabase.ts` - Fixed crash when credentials missing
+2. **Haptic Feedback + Animaciones en Botones**
+   - Scale down (0.85) + rotation wiggle en botones like/skip
+   - Haptic feedback diferenciado: success para like, medium para skip
+   - Implementado con React Native Reanimated + expo-haptics
 
-## Next Action Items
-- Configure Supabase credentials for full auth functionality
-- Test on physical devices for animation performance
+3. **Toast Notifications Animados**
+   - Toast flotante con animación spring al guardar/pasar
+   - Iconos y colores contextuales por tipo (like, skip, success, error, info)
+   - Auto-hide después de 1.5-2 segundos
 
-## Backlog / Future Enhancements
-- P1: Add haptic feedback on button press
-- P2: Add particle effects to background
-- P2: Implement dark/light theme toggle
+4. **Skeleton Loaders**
+   - Skeleton animado con shimmer effect para listas de eventos
+   - Skeleton específico para tarjeta de swipe
+   - Reemplaza ActivityIndicator genérico
+
+### Componentes Nuevos Creados
+- `/src/components/SwipeOverlay.tsx` - Overlay direccional
+- `/src/components/AnimatedToast.tsx` - Notificaciones toast
+- `/src/components/SkeletonLoader.tsx` - Loaders skeleton
+- `/src/components/AnimatedButton.tsx` - Botones con haptic
+
+### Componentes Mejorados
+- `EventCard.tsx` - Botones con animaciones
+- `EmojiRating.tsx` - Emojis con bounce animation
+- `index.tsx` - Integración de overlays y toasts
+- `myevents.tsx` - Skeleton loaders + staggered animations
+
+## Paleta de Colores (Mantenida)
+- Background: #0F0F0F, #121212
+- Cards: #1F1F1F, #2A2A2A
+- Primary: #8B5CF6 (violeta)
+- Success: #10B981 (verde)
+- Error: #EF4444 (rojo)
+- Warning: #F59E0B (naranja)
+
+## Backlog - Próximas Mejoras
+
+### Media Prioridad
+- [ ] Floating tab bar con indicador animado
+- [ ] Confetti burst al calificar con emoji
+- [ ] Glassmorphism en badges de categoría
+- [ ] Staggered animations en más listas
+
+### Nice to Have
+- [ ] Custom icons (Lucide en lugar de Ionicons)
+- [ ] Double-tap para super like
+- [ ] Animated avatar ring
+- [ ] Breathing glow en tarjeta digital
+
+## Notas Técnicas
+- App requiere autenticación (Supabase Auth)
+- Metro Bundler corre en puerto 8081
+- Hot reload habilitado
