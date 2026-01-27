@@ -5,7 +5,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
+  Platform,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  FadeIn,
+  FadeInUp,
+  ZoomIn,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 // 4 positive emojis + 4 negative emojis
 const positiveEmojis = ['🔥', '❤️', '🎉', '🤩'];
@@ -17,6 +29,67 @@ interface EmojiRatingProps {
   onSelect: (emoji: string) => void;
   eventTitle?: string;
 }
+
+const AnimatedEmojiButton: React.FC<{
+  emoji: string;
+  variant: 'positive' | 'negative';
+  onSelect: (emoji: string) => void;
+  index: number;
+}> = ({ emoji, variant, onSelect, index }) => {
+  const scale = useSharedValue(1);
+  const rotation = useSharedValue(0);
+
+  const triggerHaptic = async () => {
+    if (Platform.OS === 'web') return;
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) {}
+  };
+
+  const gesture = Gesture.Tap()
+    .onBegin(() => {
+      scale.value = withSequence(
+        withSpring(0.8, { damping: 10, stiffness: 400 }),
+        withSpring(1.3, { damping: 8, stiffness: 300 })
+      );
+      rotation.value = withSequence(
+        withSpring(-15, { damping: 10, stiffness: 400 }),
+        withSpring(15, { damping: 10, stiffness: 400 }),
+        withSpring(0, { damping: 10, stiffness: 300 })
+      );
+    })
+    .onFinalize((_, success) => {
+      if (success) {
+        triggerHaptic();
+        onSelect(emoji);
+      } else {
+        scale.value = withSpring(1);
+        rotation.value = withSpring(0);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        entering={ZoomIn.delay(100 + index * 50).springify()}
+        style={[
+          styles.emojiButton,
+          variant === 'positive' ? styles.positiveEmoji : styles.negativeEmoji,
+          animatedStyle,
+        ]}
+      >
+        <Text style={styles.emoji}>{emoji}</Text>
+      </Animated.View>
+    </GestureDetector>
+  );
+};
 
 export const EmojiRating: React.FC<EmojiRatingProps> = ({
   visible,
@@ -36,41 +109,48 @@ export const EmojiRating: React.FC<EmojiRatingProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={styles.container}>
-          <Text style={styles.title}>¿Cómo estuvo?</Text>
+        <Animated.View 
+          entering={FadeInUp.springify().damping(15)}
+          style={styles.container}
+        >
+          <Animated.Text entering={FadeIn.delay(50)} style={styles.title}>
+            ¿Cómo estuvo?
+          </Animated.Text>
           {eventTitle && (
-            <Text style={styles.eventTitle} numberOfLines={1}>
+            <Animated.Text entering={FadeIn.delay(100)} style={styles.eventTitle} numberOfLines={1}>
               {eventTitle}
-            </Text>
+            </Animated.Text>
           )}
           
           {/* Positive emojis */}
-          <Text style={styles.sectionLabel}>Me gustó</Text>
+          <Animated.Text entering={FadeIn.delay(150)} style={styles.sectionLabel}>
+            Me gustó
+          </Animated.Text>
           <View style={styles.emojiRow}>
-            {positiveEmojis.map((emoji) => (
-              <TouchableOpacity
+            {positiveEmojis.map((emoji, index) => (
+              <AnimatedEmojiButton
                 key={emoji}
-                style={[styles.emojiButton, styles.positiveEmoji]}
-                onPress={() => onSelect(emoji)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
+                emoji={emoji}
+                variant="positive"
+                onSelect={onSelect}
+                index={index}
+              />
             ))}
           </View>
 
           {/* Negative emojis */}
-          <Text style={styles.sectionLabel}>No me gustó</Text>
+          <Animated.Text entering={FadeIn.delay(250)} style={styles.sectionLabel}>
+            No me gustó
+          </Animated.Text>
           <View style={styles.emojiRow}>
-            {negativeEmojis.map((emoji) => (
-              <TouchableOpacity
+            {negativeEmojis.map((emoji, index) => (
+              <AnimatedEmojiButton
                 key={emoji}
-                style={[styles.emojiButton, styles.negativeEmoji]}
-                onPress={() => onSelect(emoji)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
+                emoji={emoji}
+                variant="negative"
+                onSelect={onSelect}
+                index={index + 4}
+              />
             ))}
           </View>
 
@@ -80,7 +160,7 @@ export const EmojiRating: React.FC<EmojiRatingProps> = ({
           >
             <Text style={styles.skipText}>Omitir calificación</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
