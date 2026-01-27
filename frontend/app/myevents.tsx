@@ -12,11 +12,23 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Platform,
 } from 'react-native';
 import { TouchableOpacity as GestureTouchable, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+  useSharedValue,
+  FadeIn,
+  FadeInDown,
+  Layout,
+} from 'react-native-reanimated';
 import { useEventStore, SavedEventData, AttendedEventData } from '../src/store/eventStore';
 import { EmojiRating } from '../src/components/EmojiRating';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +36,8 @@ import { useRouter } from 'expo-router';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
+import { EventListSkeleton } from '../src/components/SkeletonLoader';
+import { AnimatedToast } from '../src/components/AnimatedToast';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
@@ -72,6 +86,12 @@ export default function MyEventsScreen() {
 
   const [activeTab, setActiveTab] = useState<Tab>('saved');
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
   const [ratingModal, setRatingModal] = useState<{
     visible: boolean;
     eventId: string;
@@ -136,9 +156,34 @@ export default function MyEventsScreen() {
   }>({ visible: false, imageUrl: '', userName: '' });
 
   useEffect(() => {
-    fetchSavedEvents();
-    fetchAttendedEvents();
-    fetchHostedEvents();
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchSavedEvents(),
+        fetchAttendedEvents(),
+        fetchHostedEvents()
+      ]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // Haptic feedback helper
+  const triggerHaptic = useCallback(async (type: 'success' | 'warning' | 'light') => {
+    if (Platform.OS === 'web') return;
+    try {
+      if (type === 'success') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (type === 'warning') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (e) {}
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ visible: true, message, type });
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -158,6 +203,8 @@ export default function MyEventsScreen() {
   const handleSelectEmoji = async (emoji: string) => {
     try {
       await markAttended(ratingModal.eventId, emoji || undefined);
+      triggerHaptic('success');
+      showToast(emoji ? `¡Calificado ${emoji}!` : '¡Marcado como asistido!', 'success');
       setRatingModal({ visible: false, eventId: '', eventTitle: '' });
     } catch (error) {
       Alert.alert('Error', 'No se pudo marcar como asistido.');
@@ -165,6 +212,7 @@ export default function MyEventsScreen() {
   };
 
   const handleUnsave = (eventId: string) => {
+    triggerHaptic('warning');
     Alert.alert(
       'Eliminar de guardados',
       '¿Seguro que quieres quitar este evento?',
@@ -176,6 +224,7 @@ export default function MyEventsScreen() {
           onPress: async () => {
             try {
               await unsaveEvent(eventId);
+              showToast('Evento eliminado', 'info');
             } catch (error) {
               console.error('Error unsaving:', error);
               Alert.alert('Error', 'No se pudo eliminar de guardados');
