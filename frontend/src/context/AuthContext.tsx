@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const isInitializing = useRef(false);
+    const pendingFetchPromise = useRef<Promise<any | null> | null>(null);
 
     // Refs to track state inside callbacks without re-subscribing
     const userRef = useRef<User | null>(null);
@@ -64,48 +65,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (event === 'SIGNED_IN' && newSession?.user) {
                     setSession(newSession);
-                    // Check profile
+
+                    // 1. Primero verificar memoria
+                    if (profileRef.current && profileRef.current.id === newSession.user.id) {
+                        console.log('🚀 Using memory profile for SIGNED_IN');
+                        setUser(newSession.user);
+                        setLoading(false);
+                        return;
+                    }
+
+                    // 2. Verificar AsyncStorage cache ANTES de fetch
+                    const cachedStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+                    if (cachedStr) {
+                        try {
+                            const cached = JSON.parse(cachedStr);
+                            if (cached.id === newSession.user.id) {
+                                console.log('📦 Using cached profile for SIGNED_IN');
+                                setUser(newSession.user);
+                                setProfile(cached);
+                                setLoading(false);
+                                return; // NO hacer fetch
+                            }
+                        } catch (e) { /* continue to fetch */ }
+                    }
+
+                    // 3. Solo si no hay cache, hacer fetch
                     const profileData = await fetchProfile(newSession.user.id);
                     if (profileData) {
                         console.log('✅ Profile found in onAuthStateChange');
                         setUser(newSession.user);
                         setProfile(profileData);
                     } else {
-
-                        // FIX: If profile fetch fails (timeout), check detailed fallbacks
-                        // 1. Check in-memory refs
-                        if (userRef.current && profileRef.current && userRef.current.id === newSession.user.id) {
-                            console.warn('⚠️ Profile fetch failed (timeout), but using in-memory state');
-                            // Do nothing, keep existing state
-                        }
-                        // 2. Check AsyncStorage (async check inside sync callback is tricky, but we can try)
-                        else {
-                            // We can't await here easily without making the callback async, which it is.
-                            // But let's check one last time if we really need to logout.
-                            // If we are here, it means we have a session but no profile data from DB.
-
-                            // Let's try to load from cache 'just in case' before giving up
-                            const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-                            if (cachedProfileStr) {
-                                try {
-                                    const cachedProfile = JSON.parse(cachedProfileStr);
-                                    if (cachedProfile.id === newSession.user.id) {
-                                        console.log('📦 cache rescue: using cached profile after fetch failure');
-                                        setUser(newSession.user);
-                                        setProfile(cachedProfile);
-                                        setLoading(false);
-                                        return;
-                                    }
-                                } catch (e) {
-                                    console.error('Failed to parse cached profile in rescue', e);
-                                }
-                            }
-
-                            // If truly nothing...
-                            console.log('❌ No profile in onAuthStateChange (and no cache), user not set');
-                            setUser(null);
-                            setProfile(null);
-                        }
+                        // Si no hay datos en ningún lado
+                        console.log('❌ No profile in onAuthStateChange (and no cache), user not set');
+                        setUser(null);
+                        setProfile(null);
                     }
 
                     setLoading(false);
@@ -146,18 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const handleVisibilityChange = async () => {
             if (document.visibilityState === 'visible' && session) {
-                console.log('👁️ Page visible, re-validating session');
+                console.log('👁️ Page visible, checking session validity');
                 try {
-                    const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-
-                    if (error || !currentSession) {
-                        console.warn('⚠️ Session expired while away, signing out');
+                    const { error } = await supabase.auth.getSession();
+                    if (error) {
+                        console.warn('⚠️ Session invalid, signing out');
                         signOut();
-                    } else if (currentSession.user.id !== session.user.id) {
-                        // Session changed (different user) - reload
-                        console.log('🔄 Session changed, reloading');
-                        window.location.reload();
                     }
+                    // NO re-fetch profile - usar datos existentes en memoria
                 } catch (error) {
                     console.error('Error checking session:', error);
                 }
@@ -189,29 +179,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
 
                 // If we have a cached profile and it matches the current user, use it immediately
+                // and DO NOT fetch - the cache is sufficient for loading the app
                 if (cachedProfile && cachedProfile.id === session.user.id) {
                     console.log('🚀 Using cached profile for instant load');
                     setUser(session.user);
                     setProfile(cachedProfile);
-                    setLoading(false); // Stop loading immediately
+                    setLoading(false);
+                    return; // NO fetch - cache is sufficient
                 }
 
-                // Fetch fresh data in background (or foreground if no cache)
+                // Solo fetch si NO hay cache válido
                 const profileData = await fetchProfile(session.user.id);
                 if (profileData) {
                     setUser(session.user);
                     setProfile(profileData);
-                } else if (!cachedProfile) {
-                    // Only if we don't have a cache AND fetch failed do we treat as no profile
+                } else {
+                    // No cache AND fetch failed - treat as no profile
                     console.log('❌ No profile on init (and no cache)');
                     setUser(null);
                 }
             }
         } catch (error: any) {
             // Ignore abort errors which happen on hot reload or fast navigation
-            if (error.name === 'AbortError' || error?.message?.includes('aborted')) {
-                console.log('⚠️ Auth init aborted (safe to ignore)');
-            } else {
+            if (error.name !== 'AbortError' && !error?.message?.includes('aborted')) {
                 console.error('Init auth error:', error);
             }
         } finally {
@@ -219,59 +209,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Fetch profile, returns profile data or null
-    const fetchProfile = async (userId: string): Promise<any | null> => {
-        // Retry logic with faster timeout for profile fetch
-        for (let i = 0; i < 2; i++) {
-            try {
-                console.log(`🔍 Fetching profile for: ${userId} (attempt ${i + 1})`);
+    // Fetch profile with Promise-based deduplication
+    const fetchProfile = async (userId: string, options?: { skipIfCached?: boolean }): Promise<any | null> => {
+        // Si ya hay un fetch en progreso, esperar ese resultado
+        if (pendingFetchPromise.current) {
+            console.log('⏳ Waiting for existing fetch to complete');
+            return pendingFetchPromise.current;
+        }
 
-                // Set a 20 second timeout for background updates (UI is already interactive via cache)
+        // Opción para skip si hay cache válido
+        if (options?.skipIfCached) {
+            const cachedStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+            if (cachedStr) {
+                try {
+                    const cached = JSON.parse(cachedStr);
+                    if (cached.id === userId) {
+                        console.log('📦 Using cached profile, skipping fetch');
+                        return cached;
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        }
+
+        // Crear la promesa y guardarla
+        const fetchPromise = (async () => {
+            try {
+                console.log(`🔍 Fetching profile for: ${userId}`);
+
+                // Timeout de 10s (tenemos cache como fallback)
                 const timeoutPromise = new Promise<null>((_, reject) =>
-                    setTimeout(() => reject(new Error('Profile fetch timeout')), 20000)
+                    setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
                 );
 
-                const fetchPromise = supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .single();
-
                 const { data, error } = await Promise.race([
-                    fetchPromise,
+                    supabase.from('profiles').select('*').eq('id', userId).single(),
                     timeoutPromise
                 ]) as any;
 
                 if (error) {
-                    // If it's a "not found" error, return null immediately (no retry)
                     if (error.code === 'PGRST116') {
                         console.log('❌ No profile found (user not registered)');
                         return null;
                     }
-
-                    // For other errors, retry
-                    console.warn(`⚠️ Profile fetch error (attempt ${i + 1}):`, error.message);
-                    if (i === 1) return null; // Give up after 2 tries
-                    await new Promise(r => setTimeout(r, 500)); // Wait 500ms
-                    continue;
+                    console.warn('⚠️ Profile fetch error:', error.message);
+                    return null;
                 }
 
                 if (data) {
                     console.log('✅ Profile found:', data.email);
-                    // Update cache on success
                     await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
                     return data;
-                } else {
-                    console.log('❌ No profile found (data is null)');
-                    return null;
                 }
+                return null;
             } catch (error: any) {
-                console.error(`❌ Profile fetch exception (attempt ${i + 1}):`, error.message);
-                if (i === 1) return null;
-                await new Promise(r => setTimeout(r, 500));
+                console.error('❌ Profile fetch exception:', error.message);
+                return null;
+            } finally {
+                pendingFetchPromise.current = null;
             }
-        }
-        return null;
+        })();
+
+        pendingFetchPromise.current = fetchPromise;
+        return fetchPromise;
     };
 
     const refreshProfile = async () => {

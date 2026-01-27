@@ -313,7 +313,7 @@ export default function CreateEventScreen() {
         bank_name: priceNum > 0 && bankName.trim() ? bankName.trim() : null,
         bank_account_number: priceNum > 0 && bankAccountNumber.trim() ? bankAccountNumber.trim() : null,
         // Attendance tracking
-        requires_attendance_check: isHost && requiresAttendance ? true : null,
+        requires_attendance_check: isHost && requiresAttendance,
       });
       // Reset form and navigate to events
       setTitle('');

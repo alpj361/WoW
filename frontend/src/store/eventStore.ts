@@ -95,6 +95,7 @@ interface EventStore {
   approveRegistration: (registrationId: string) => Promise<void>;
   rejectRegistration: (registrationId: string, rejectionReason?: string) => Promise<void>;
   resubmitRegistration: (eventId: string, paymentReceiptUrl?: string) => Promise<void>;
+  deleteEvent: (eventId: string) => Promise<void>;
 }
 
 export const useEventStore = create<EventStore>((set, get) => ({
@@ -522,6 +523,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
         registration_form_url: eventData.registration_form_url || undefined,
         bank_account_number: eventData.bank_account_number || undefined,
         bank_name: eventData.bank_name || undefined,
+        requires_attendance_check: eventData.requires_attendance_check || undefined,
       });
 
       // Refresh events list
@@ -637,6 +639,29 @@ export const useEventStore = create<EventStore>((set, get) => ({
       await get().fetchUserRegistrations();
     } catch (error: any) {
       console.error('Error resubmitting registration:', error);
+      throw error;
+    }
+  },
+
+  deleteEvent: async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      set((state) => ({
+        hostedEvents: state.hostedEvents.filter((e) => e.event.id !== eventId),
+        events: state.events.filter((e) => e.id !== eventId),
+      }));
+    } catch (error: any) {
+      console.error('Error deleting event:', error);
       throw error;
     }
   },

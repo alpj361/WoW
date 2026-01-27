@@ -114,8 +114,10 @@ export default function ExploreScreen() {
 
         if (hasPrice) {
           if (isHostEvent) {
-            console.log('🚪 Host Event HAS price, showing payment alert');
-            // Show payment alert modal IMMEDIATELY (don't wait for save)
+            console.log('🚪 Host Event HAS price, saving then showing payment alert');
+            // IMPORTANT: Save the event FIRST before showing payment alert
+            // This ensures the event is in likes even if user selects "Más Tarde"
+            await saveEvent(currentEvent.id);
             setShowPaymentAlert(true);
           } else {
             console.log('ℹ️ Public Event HAS price, showing info alert');

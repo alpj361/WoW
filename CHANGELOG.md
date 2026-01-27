@@ -2,6 +2,109 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.11] - 2026-01-27
+
+### Added
+- 🎫 **Sistema de Asistencia con QR**: Implementación completa para control de asistencia física en eventos
+  - **Campo en Eventos**: Nuevo campo `requires_attendance_check` (boolean) para activar control de asistencia
+  - **Toggle en Creación**: Opción "Llevar asistencia" disponible cuando el usuario es anfitrión
+  - **QR Personal de Usuario**: 
+    - Tabla `user_qr_codes` con generación automática por trigger al crear usuario
+    - Botón "ESCANEAR" en perfil para mostrar QR personal a pantalla completa
+    - QR contiene el `user_id` del usuario para identificación
+  - **Escáner para Hosts**:
+    - Componente `QRScanner.tsx` con cámara integrada
+    - Botón morado "Escanear" en eventos del host (tab Anfitrión)
+    - Escanea QR personal del usuario y registra asistencia automáticamente
+    - Validación: solo el host puede escanear, no permite duplicados
+  - **Lista de Asistencia Avanzada**:
+    - Modal mejorado con estadísticas (Confirmados vs Asistieron)
+    - Indicadores visuales: ✓ checkmark morado (asistió), ⏳ reloj naranja (pendiente)
+    - Timestamps de escaneo con hora exacta
+    - Diferenciación entre asistencia automática y escaneada por host
+  - **Campos Nuevos en `attended_events`**:
+    - `scanned_by_host` (boolean): Indica si fue escaneado físicamente
+    - `scanned_at` (timestamp): Momento del escaneo
+    - `scanned_by_user_id` (uuid): ID del host que escaneó
+
+- 📡 **Endpoints API de Asistencia** (Backend):
+  - `POST /api/events/:eventId/scan-attendance` - Escanear QR y registrar asistencia
+  - `GET /api/events/:eventId/attendance-list` - Obtener lista completa de asistencia
+  - `PATCH /api/events/:eventId/attendance-requirement` - Activar/desactivar control de asistencia
+
+- 🔐 **Seguridad y Validaciones**:
+  - RLS políticas para `user_qr_codes` (solo el usuario ve su propio QR)
+  - Validación de host: solo el dueño del evento puede escanear
+  - Prevención de escaneos duplicados
+  - Validación de confirmación previa en eventos de pago
+
+- 📚 **Documentación Completa**:
+  - `/docs/PLAN_ATTENDANCE_TRACKING.md` - Arquitectura del sistema
+  - `/docs/API_ATTENDANCE_ENDPOINTS.md` - Documentación de endpoints
+  - `/docs/TESTING_GUIDE_ATTENDANCE.md` - Guía de pruebas
+
+### Changed
+- 🔄 **Lista de Asistentes**: Mejorada para diferenciar entre eventos normales y con control de asistencia
+  - Eventos normales: muestra usuarios interesados (saved_events)
+  - Eventos con asistencia: muestra solo confirmados y escaneados con estadísticas
+- 🎨 **UI/UX en MyEvents**: 
+  - Botones rediseñados para hosts con iconos claros
+  - Colores consistentes: morado (escanear), naranja (lista), rojo (eliminar)
+
+### Technical Details
+```
+Modified:
+- frontend/app/create.tsx (toggle "Llevar asistencia")
+- frontend/app/myevents.tsx (integración QRScanner, lista de asistencia mejorada)
+- frontend/app/profile.tsx (botón "ESCANEAR" y QR personal)
+- frontend/src/services/api.ts (3 funciones: scanAttendance, getAttendanceList, updateAttendanceRequirement)
+- backend/server/routes/events.js (3 endpoints nuevos)
+
+Created:
+- frontend/src/components/QRScanner.tsx (componente escáner con cámara)
+- frontend/src/components/UserQRCode.tsx (generador de QR personal)
+- database/migrations/add_attendance_tracking.sql (migración completa)
+- docs/PLAN_ATTENDANCE_TRACKING.md
+- docs/API_ATTENDANCE_ENDPOINTS.md
+- docs/TESTING_GUIDE_ATTENDANCE.md
+```
+
+### Database Migrations
+```sql
+-- Tabla de códigos QR personales
+CREATE TABLE user_qr_codes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+  qr_data text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Trigger para generar QR automáticamente
+CREATE TRIGGER generate_user_qr_on_profile_insert
+AFTER INSERT ON profiles
+FOR EACH ROW EXECUTE FUNCTION generate_user_qr_code();
+
+-- Campos nuevos en attended_events
+ALTER TABLE attended_events ADD COLUMN scanned_by_host boolean DEFAULT false;
+ALTER TABLE attended_events ADD COLUMN scanned_at timestamptz;
+ALTER TABLE attended_events ADD COLUMN scanned_by_user_id uuid REFERENCES auth.users(id);
+
+-- Campo nuevo en events
+ALTER TABLE events ADD COLUMN requires_attendance_check boolean DEFAULT false;
+```
+
+### Flujo Completo
+```
+1. Host crea evento con "Llevar asistencia" activado ✅
+2. Usuarios guardan evento (confirmación si es de pago) ✅
+3. Día del evento: Usuario muestra QR personal (Perfil > ESCANEAR) ✅
+4. Host escanea QR (Mis Eventos > Anfitrión > Escanear) ✅
+5. Sistema registra asistencia automáticamente ✅
+6. Host ve estadísticas en Lista de Asistencia ✅
+```
+
+---
+
 ## [0.0.10] - 2026-01-24
 
 ### Fixed

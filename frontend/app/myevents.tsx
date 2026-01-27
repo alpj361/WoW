@@ -20,6 +20,9 @@ import { useEventStore, SavedEventData, AttendedEventData } from '../src/store/e
 import { EmojiRating } from '../src/components/EmojiRating';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { QRScanner } from '../src/components/QRScanner';
+import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
+import { useAuth } from '../src/context/AuthContext';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
@@ -63,6 +66,7 @@ export default function MyEventsScreen() {
     markAttended,
     removeAttended,
     resubmitRegistration,
+    deleteEvent,
   } = useEventStore();
 
   const [activeTab, setActiveTab] = useState<Tab>('saved');
@@ -104,6 +108,22 @@ export default function MyEventsScreen() {
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { registerForEvent } = useEventStore();
+  const { user } = useAuth();
+
+  // QR Scanner and Attendance List states
+  const [scannerModal, setScannerModal] = useState<{
+    visible: boolean;
+    eventId: string;
+    eventTitle: string;
+  }>({ visible: false, eventId: '', eventTitle: '' });
+
+  const [attendanceListModal, setAttendanceListModal] = useState<{
+    visible: boolean;
+    eventId: string;
+    eventTitle: string;
+    attendees: AttendanceListItem[];
+    loading: boolean;
+  }>({ visible: false, eventId: '', eventTitle: '', attendees: [], loading: false });
 
   useEffect(() => {
     fetchSavedEvents();
@@ -143,7 +163,14 @@ export default function MyEventsScreen() {
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => unsaveEvent(eventId),
+          onPress: async () => {
+            try {
+              await unsaveEvent(eventId);
+            } catch (error) {
+              console.error('Error unsaving:', error);
+              Alert.alert('Error', 'No se pudo eliminar de guardados');
+            }
+          },
         },
       ]
     );
@@ -159,7 +186,35 @@ export default function MyEventsScreen() {
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => removeAttended(eventId),
+          onPress: async () => {
+            try {
+              await removeAttended(eventId);
+            } catch (error) {
+              console.error('Error removing attended:', error);
+              Alert.alert('Error', 'No se pudo eliminar de asistidos');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteHosted = (eventId: string) => {
+    Alert.alert(
+      'Eliminar evento',
+      '¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEvent(eventId);
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo eliminar el evento.');
+            }
+          },
         },
       ]
     );
@@ -329,6 +384,47 @@ export default function MyEventsScreen() {
     }
   };
 
+  // QR Scanner handlers
+  const handleOpenScanner = (eventId: string, eventTitle: string) => {
+    setScannerModal({ visible: true, eventId, eventTitle });
+  };
+
+  const handleQRScanned = async (scannedData: string) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'No se pudo identificar al host');
+      return;
+    }
+
+    try {
+      // scannedData should be the user_id from the QR code
+      await scanAttendance(scannerModal.eventId, scannedData);
+      Alert.alert('✅ Asistencia Registrada', 'El usuario fue marcado como asistente');
+      // Refresh hosted events
+      await fetchHostedEvents();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'No se pudo registrar la asistencia';
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  const handleShowAttendanceList = async (eventId: string, eventTitle: string) => {
+    setAttendanceListModal({
+      visible: true,
+      eventId,
+      eventTitle,
+      attendees: [],
+      loading: true
+    });
+
+    try {
+      const attendees = await getAttendanceList(eventId);
+      setAttendanceListModal(prev => ({ ...prev, attendees, loading: false }));
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cargar la lista de asistencia');
+      setAttendanceListModal(prev => ({ ...prev, visible: false }));
+    }
+  };
+
   const renderHostedItem = (item: any) => {
     const { event } = item;
     const gradient = getCategoryGradient(event.category);
@@ -375,14 +471,39 @@ export default function MyEventsScreen() {
             </View>
           )}
 
-          <View style={styles.cardActions}>
+          <View style={styles.hostActions}>
+            {event.requires_attendance_check && (
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={() => handleOpenScanner(event.id, event.title)}
+              >
+                <Ionicons name="qr-code-outline" size={16} color="#8B5CF6" />
+                <Text style={styles.scanButtonText}>Escanear</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.viewAttendeesButton}
-              onPress={() => handleShowAttendees(event.id, event.title)}
+              onPress={() => {
+                if (event.requires_attendance_check) {
+                  handleShowAttendanceList(event.id, event.title);
+                } else {
+                  handleShowAttendees(event.id, event.title);
+                }
+              }}
             >
-              <Ionicons name="list" size={18} color="#F59E0B" />
-              <Text style={styles.viewAttendeesText}>Ver Lista</Text>
+              <Ionicons name="list" size={16} color="#F59E0B" />
+              <Text style={styles.viewAttendeesText}>Lista</Text>
             </TouchableOpacity>
+            <Pressable
+              style={({ pressed }) => [
+                styles.removeButton,
+                pressed && { opacity: 0.6 }
+              ]}
+              onPress={() => handleDeleteHosted(event.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -404,49 +525,49 @@ export default function MyEventsScreen() {
     const isRejected = registration?.status === 'rejected';
 
     return (
-      <TouchableOpacity
-        key={event.id}
-        style={styles.eventCard}
-        onPress={() => router.push(`/event/${event.id}`)}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={gradient}
-          style={styles.cardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <View key={event.id} style={styles.eventCard}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push(`/event/${event.id}`)}
         >
-          {event.image ? (
-            <Image source={{ uri: event.image }} style={styles.cardImage} />
-          ) : (
-            <View style={styles.cardIconContainer}>
-              <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
-            </View>
-          )}
-          {hasPrice && !isApproved && !isPending && !isRejected && (
-            <View style={styles.priceBadge}>
-              <Text style={styles.priceBadgeText}>Q{eventPrice.toFixed(2)}</Text>
-            </View>
-          )}
-          {isApproved && (
-            <View style={styles.confirmedBadge}>
-              <Ionicons name="checkmark-circle" size={12} color="#fff" />
-              <Text style={styles.confirmedBadgeText}>Confirmado</Text>
-            </View>
-          )}
-          {isPending && (
-            <View style={styles.pendingBadge}>
-              <Ionicons name="time" size={12} color="#fff" />
-              <Text style={styles.pendingBadgeText}>Pendiente</Text>
-            </View>
-          )}
-          {isRejected && (
-            <View style={styles.rejectedBadge}>
-              <Ionicons name="close-circle" size={12} color="#fff" />
-              <Text style={styles.rejectedBadgeText}>Rechazado</Text>
-            </View>
-          )}
-        </LinearGradient>
+          <LinearGradient
+            colors={gradient}
+            style={styles.cardGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {event.image ? (
+              <Image source={{ uri: event.image }} style={styles.cardImage} />
+            ) : (
+              <View style={styles.cardIconContainer}>
+                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
+              </View>
+            )}
+            {hasPrice && !isApproved && !isPending && !isRejected && (
+              <View style={styles.priceBadge}>
+                <Text style={styles.priceBadgeText}>Q{eventPrice.toFixed(2)}</Text>
+              </View>
+            )}
+            {isApproved && (
+              <View style={styles.confirmedBadge}>
+                <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                <Text style={styles.confirmedBadgeText}>Confirmado</Text>
+              </View>
+            )}
+            {isPending && (
+              <View style={styles.pendingBadge}>
+                <Ionicons name="time" size={12} color="#fff" />
+                <Text style={styles.pendingBadgeText}>Pendiente</Text>
+              </View>
+            )}
+            {isRejected && (
+              <View style={styles.rejectedBadge}>
+                <Ionicons name="close-circle" size={12} color="#fff" />
+                <Text style={styles.rejectedBadgeText}>Rechazado</Text>
+              </View>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
 
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle} numberOfLines={1}>
@@ -481,33 +602,16 @@ export default function MyEventsScreen() {
                 )}
                 <TouchableOpacity
                   style={styles.resubmitButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleResubmit(event.id);
-                  }}
+                  onPress={() => handleResubmit(event.id)}
                 >
                   <Ionicons name="refresh" size={16} color="#8B5CF6" />
                   <Text style={styles.resubmitText}>Reenviar</Text>
                 </TouchableOpacity>
               </View>
-            ) : isApproved ? (
-              <TouchableOpacity
-                style={styles.attendButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleMarkAttended(event.id, event.title);
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.attendButtonText}>Asistí</Text>
-              </TouchableOpacity>
-            ) : hasPrice && event.user_id && !isPending ? (
+            ) : hasPrice && event.user_id && !isPending && !isApproved ? (
               <TouchableOpacity
                 style={styles.reserveButton}
-                onPress={(e) => {
-                  e.stopPropagation(); // Prevent card click
-                  setPaymentModal({ visible: true, event });
-                }}
+                onPress={() => setPaymentModal({ visible: true, event })}
               >
                 <Ionicons name="card" size={18} color="#F59E0B" />
                 <Text style={styles.reserveButtonText}>Reservar</Text>
@@ -517,30 +621,33 @@ export default function MyEventsScreen() {
                 <Ionicons name="time" size={18} color="#F59E0B" />
                 <Text style={styles.pendingButtonText}>En revisión</Text>
               </View>
-            ) : (
+            ) : event.requires_attendance_check ? (
+              <View style={styles.hostManagedAttendance}>
+                <Ionicons name="qr-code" size={18} color="#8B5CF6" />
+                <Text style={styles.hostManagedText}>Asistencia por QR</Text>
+              </View>
+            ) : (isApproved || (!hasPrice && !isPending && !event.user_id)) ? (
               <TouchableOpacity
                 style={styles.attendButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleMarkAttended(event.id, event.title);
-                }}
+                onPress={() => handleMarkAttended(event.id, event.title)}
               >
                 <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                 <Text style={styles.attendButtonText}>Asistí</Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleUnsave(event.id);
-              }}
+            ) : null}
+            <Pressable
+              style={({ pressed }) => [
+                styles.removeButton,
+                pressed && { opacity: 0.6 }
+              ]}
+              onPress={() => handleUnsave(event.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -599,12 +706,16 @@ export default function MyEventsScreen() {
                 {attended.emoji_rating ? 'Cambiar' : 'Calificar'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.removeButton}
+            <Pressable
+              style={({ pressed }) => [
+                styles.removeButton,
+                pressed && { opacity: 0.6 }
+              ]}
               onPress={() => handleRemoveAttended(event.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -681,6 +792,7 @@ export default function MyEventsScreen() {
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -938,6 +1050,101 @@ export default function MyEventsScreen() {
         </View>
       </Modal>
 
+      {/* QR Scanner Modal */}
+      <QRScanner
+        visible={scannerModal.visible}
+        onClose={() => setScannerModal({ visible: false, eventId: '', eventTitle: '' })}
+        onScan={handleQRScanned}
+        eventTitle={scannerModal.eventTitle}
+      />
+
+      {/* Attendance List Modal */}
+      <Modal
+        visible={attendanceListModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Lista de Asistencia</Text>
+              <TouchableOpacity onPress={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>{attendanceListModal.eventTitle}</Text>
+
+            {attendanceListModal.loading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator color="#8B5CF6" size="large" />
+              </View>
+            ) : attendanceListModal.attendees.length === 0 ? (
+              <View style={styles.emptyModal}>
+                <Text style={styles.emptyModalText}>No hay asistentes registrados</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.attendanceStats}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statNumber}>{attendanceListModal.attendees.filter(a => a.confirmed).length}</Text>
+                    <Text style={styles.statLabel}>Confirmados</Text>
+                  </View>
+                  <View style={[styles.statBox, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+                    <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>
+                      {attendanceListModal.attendees.filter(a => a.attended || a.scanned_by_host).length}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: '#A78BFA' }]}>Asistieron</Text>
+                  </View>
+                </View>
+                <ScrollView style={styles.attendeesList}>
+                  {attendanceListModal.attendees.map((attendee, index) => (
+                    <View key={`${attendee.user_id}-${index}`} style={styles.attendeeItem}>
+                      {attendee.user_avatar ? (
+                        <Image source={{ uri: attendee.user_avatar }} style={styles.attendeeAvatar} />
+                      ) : (
+                        <View style={styles.attendeeAvatarPlaceholder}>
+                          <Ionicons name="person" size={20} color="#9CA3AF" />
+                        </View>
+                      )}
+                      <View style={styles.attendeeInfo}>
+                        <Text style={styles.attendeeName}>
+                          {attendee.user_name || 'Usuario'}
+                        </Text>
+                        <Text style={styles.attendeeEmail}>
+                          {attendee.user_email || 'Sin email'}
+                        </Text>
+                        {attendee.scanned_by_host && attendee.scanned_at && (
+                          <Text style={styles.scannedTime}>
+                            ✓ Escaneado {new Date(attendee.scanned_at).toLocaleTimeString('es-MX', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        )}
+                      </View>
+                      {attendee.scanned_by_host || attendee.attended ? (
+                        <View style={styles.attendedBadge}>
+                          <Ionicons name="checkmark-circle" size={20} color="#8B5CF6" />
+                        </View>
+                      ) : attendee.confirmed ? (
+                        <View style={styles.pendingAttendanceBadge}>
+                          <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                        </View>
+                      ) : null}
+                    </View>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Payment Modal */}
       <Modal
         visible={paymentModal.visible}
@@ -1186,6 +1393,10 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 8,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   reserveButton: {
     flexDirection: 'row',
@@ -1640,6 +1851,73 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   resubmitText: {
+    color: '#8B5CF6',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  hostActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  scanButtonText: {
+    color: '#8B5CF6',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  attendanceStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#FDB022',
+    marginTop: 4,
+  },
+  scannedTime: {
+    fontSize: 11,
+    color: '#8B5CF6',
+    marginTop: 4,
+  },
+  attendedBadge: {
+    padding: 4,
+  },
+  pendingAttendanceBadge: {
+    padding: 4,
+  },
+  hostManagedAttendance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  hostManagedText: {
     color: '#8B5CF6',
     fontSize: 12,
     fontWeight: '600',
