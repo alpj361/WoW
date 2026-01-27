@@ -10,9 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.wow.events",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Take photos of event flyers",
-        "NSPhotoLibraryUsageDescription": "Select event images from gallery"
+        "NSCameraUsageDescription": "WOW necesita acceso a tu cámara para escanear códigos QR y tomar fotos de eventos",
+        "NSPhotoLibraryUsageDescription": "WOW necesita acceso a tu galería para seleccionar imágenes de eventos",
+        "NSMicrophoneUsageDescription": "WOW necesita acceso al micrófono para grabar videos de eventos"
       }
     },
     "android": {
@@ -36,6 +39,18 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "WOW necesita acceso a tu cámara para escanear códigos QR y tomar fotos de eventos"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "WOW necesita acceso a tu galería para seleccionar imágenes de eventos"
         }
       ]
     ],

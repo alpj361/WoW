@@ -2,6 +2,89 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.14] - 2026-01-27
+
+### Added
+- 🖼️ **Visor de Comprobantes de Pago**: Los hosts ahora pueden ver los comprobantes de pago subidos
+  - **Modal de Imagen**: Nuevo modal a pantalla completa para visualizar comprobantes
+  - **Integración**: Botón "Ver comprobante" en solicitudes de registro
+  - **Backend**: El endpoint `/api/events/:eventId/attendance-list` ahora incluye `payment_receipt_url`
+  - **Diseño**: Modal oscuro con imagen a tamaño completo y botón de cierre
+
+### Changed
+- 📊 **Lista de Asistencia Mejorada**: Ahora incluye información de comprobantes de pago
+  - Actualizado `AttendanceListItem` interface con campo `payment_receipt_url` opcional
+  - Backend devuelve comprobantes de pago en la lista de asistencia
+
+### Technical Details
+```
+Modified:
+- ../WoWBack/event-analyzer/server/routes/events.js (added payment_receipt_url to query)
+- frontend/src/services/api.ts (updated AttendanceListItem interface)
+- frontend/app/myevents.tsx (added receipt viewer modal, state, handlers)
+
+New Components:
+- Receipt Viewer Modal (receiptModal state)
+- Full-screen image display with close button
+
+Styles Added:
+- receiptModalOverlay
+- receiptModalContent  
+- receiptImageContainer
+- fullReceiptImage
+- closeReceiptButton
+- closeReceiptText
+```
+
+### User Experience
+```
+Flow:
+1. Host abre solicitudes de registro ✅
+2. Ve botón "Ver comprobante" en usuarios con pago ✅
+3. Click abre modal a pantalla completa ✅
+4. Imagen del comprobante visible en alta resolución ✅
+5. Botón "Cerrar" para regresar ✅
+```
+
+---
+
+## [0.0.13] - 2026-01-27
+
+### Improved
+- 🎯 **Mensajes de Error Específicos en Escaneo QR**: Mejorada la validación de asistencia con mensajes más claros
+  - **"Usuario no existe"**: Cuando el usuario no guardó el evento ni tiene registro
+  - **"No pagado"**: Cuando el usuario tiene registro pendiente/rechazado pero no aprobado
+  - **"Usuario no confirmado"**: Cuando el usuario existe pero no cumple los requisitos
+  - **Lógica Mejorada**: Ahora diferencia entre 3 casos específicos en vez de mensaje genérico
+
+### Technical Details
+```
+Modified:
+- ../WoWBack/event-analyzer/server/routes/events.js (scan-attendance validation logic)
+
+Validation Flow:
+1. Check if user exists in saved_events or event_registrations
+   → If NO: "Usuario no existe"
+2. Check if user has registration but status != 'approved' and no saved_event
+   → If YES: "No pagado"
+3. Check if user is confirmed (saved OR approved)
+   → If NO: "Usuario no confirmado"
+   → If YES: Record attendance ✅
+```
+
+### Error Messages
+```javascript
+// Before (generic)
+"User is not confirmed for this event"
+
+// After (specific)
+Case 1: "Usuario no existe"        // Not in database for this event
+Case 2: "No pagado"                 // Has registration but not approved
+Case 3: "Usuario no confirmado"     // Edge case fallback
+```
+
+---
+
 ## [0.0.12] - 2026-01-27
 
 ### Fixed

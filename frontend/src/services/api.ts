@@ -87,15 +87,16 @@ export interface Attendee {
 }
 
 export interface AttendanceListItem {
-    user_id: string;
-    user_name: string | null;
-    user_email: string | null;
-    user_avatar: string | null;
-    confirmed: boolean; // Saved event or approved registration
-    attended: boolean; // Marked as attended
-    scanned_by_host: boolean; // QR scanned by host
-    scanned_at: string | null;
-    registration_status?: 'pending' | 'approved' | 'rejected' | null;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_avatar: string | null;
+  confirmed: boolean;
+  attended: boolean;
+  scanned_by_host: boolean;
+  scanned_at: string | null;
+  registration_status: string | null;
+  payment_receipt_url?: string | null;
 }
 
 /**
