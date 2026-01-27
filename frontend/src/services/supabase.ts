@@ -47,16 +47,24 @@ if (!isConfigured) {
     console.warn('⚠️ Supabase credentials not configured - using placeholder values for UI preview');
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        storage: ExpoStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-    },
-});
+// Singleton pattern to prevent multiple instances during hot reload
+let supabaseInstance: SupabaseClient | null = null;
 
-export { supabase };
+const getSupabaseClient = (): SupabaseClient => {
+    if (!supabaseInstance) {
+        supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+                storage: ExpoStorage,
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: false,
+            },
+        });
+    }
+    return supabaseInstance;
+};
+
+export const supabase = getSupabaseClient();
 
 export const isSupabaseConfigured = () => {
     return isConfigured;
