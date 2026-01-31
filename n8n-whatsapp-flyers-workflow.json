@@ -1,0 +1,255 @@
+{
+  "name": "WhatsApp Flyers → Supabase (v2 - Nodos Nativos)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["messages"]
+      },
+      "id": "whatsapp-trigger",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsappTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Account"
+        }
+      },
+      "notes": "Recibe mensajes de WhatsApp. Configura las credenciales con tu App ID, Business Account ID y Access Token de Meta."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "filter-image-type",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "image",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-images",
+      "name": "Solo Imágenes",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Filtra solo mensajes tipo 'image'. Ignora texto, audio, video, etc."
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "download",
+        "mediaId": "={{ $json.image.id }}"
+      },
+      "id": "whatsapp-download",
+      "name": "WhatsApp Download Media",
+      "type": "n8n-nodes-base.whatsapp",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-api",
+          "name": "WhatsApp Business Cloud"
+        }
+      },
+      "notes": "Usa el nodo nativo de WhatsApp para obtener la URL del media. Requiere credenciales OAuth de WhatsApp."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-binary",
+      "name": "Descargar Binario",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token",
+          "name": "WhatsApp Bearer Token"
+        }
+      },
+      "notes": "Descarga el archivo binario de la imagen. La URL del paso anterior expira en 5 minutos."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/whatsapp-flyers/{{ $now.toFormat('yyyy-MM-dd') }}/{{ $('WhatsApp Trigger').item.json.message_id }}.jpg",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{ $('WhatsApp Trigger').item.json.image.mime_type || 'image/jpeg' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "upload-storage",
+      "name": "Subir a Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "supabase-auth",
+          "name": "Supabase Service Role"
+        }
+      },
+      "notes": "Sube al bucket 'whatsapp-flyers'. El nodo nativo de Supabase no soporta Storage, por eso usamos HTTP Request."
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "whatsapp_flyers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "sender_phone",
+              "fieldValue": "={{ $('WhatsApp Trigger').item.json.from }}"
+            },
+            {
+              "fieldId": "sender_name",
+              "fieldValue": "={{ $('WhatsApp Trigger').item.json.senderName || 'Unknown' }}"
+            },
+            {
+              "fieldId": "image_url",
+              "fieldValue": "={{ $env.SUPABASE_URL }}/storage/v1/object/public/whatsapp-flyers/{{ $now.toFormat('yyyy-MM-dd') }}/{{ $('WhatsApp Trigger').item.json.message_id }}.jpg"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "=whatsapp-flyers/{{ $now.toFormat('yyyy-MM-dd') }}/{{ $('WhatsApp Trigger').item.json.message_id }}.jpg"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "whatsapp_message_id",
+              "fieldValue": "={{ $('WhatsApp Trigger').item.json.message_id }}"
+            },
+            {
+              "fieldId": "mime_type",
+              "fieldValue": "={{ $('WhatsApp Trigger').item.json.image.mime_type }}"
+            },
+            {
+              "fieldId": "processing_attempts",
+              "fieldValue": "=0"
+            }
+          ]
+        }
+      },
+      "id": "supabase-insert",
+      "name": "Guardar en Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-api",
+          "name": "Supabase API"
+        }
+      },
+      "notes": "Inserta el registro en la tabla whatsapp_flyers usando el nodo nativo de Supabase."
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Solo Imágenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo Imágenes": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Download Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Download Media": {
+      "main": [
+        [
+          {
+            "node": "Descargar Binario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Binario": {
+      "main": [
+        [
+          {
+            "node": "Subir a Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["whatsapp", "flyers", "supabase"],
+  "meta": {
+    "notes": "## Workflow v2 - Usando Nodos Nativos\n\n### Credenciales Requeridas:\n\n1. **WhatsApp Trigger API** (whatsAppTriggerApi)\n   - Tipo: WhatsApp Trigger API\n   - App ID, Business Account ID, Access Token\n\n2. **WhatsApp Business Cloud** (whatsAppApi)\n   - Tipo: WhatsApp OAuth\n   - Conectar vía OAuth con cuenta de Facebook admin\n\n3. **WhatsApp Bearer Token** (httpHeaderAuth)\n   - Header: Authorization\n   - Value: Bearer {ACCESS_TOKEN}\n\n4. **Supabase Service Role** (httpHeaderAuth)\n   - Header: Authorization\n   - Value: Bearer {SERVICE_ROLE_KEY}\n\n5. **Supabase API** (supabaseApi)\n   - Tipo: Supabase API\n   - Host: https://tu-proyecto.supabase.co\n   - Service Role Key\n\n### Variables de Entorno:\n- SUPABASE_URL\n- SUPABASE_ANON_KEY\n\n### Flujo:\n1. WhatsApp Trigger → Recibe mensaje\n2. Filter → Solo imágenes\n3. WhatsApp Download Media → Obtiene URL temporal\n4. HTTP Request → Descarga binario\n5. HTTP Request → Sube a Supabase Storage\n6. Supabase Node → Inserta en DB\n\n### Nota sobre Storage:\nEl nodo nativo de Supabase NO soporta Storage (solo DB).\nPor eso usamos HTTP Request para subir archivos."
+  }
+}

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { Platform } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { authState } from '../utils/authState';
@@ -134,9 +135,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    // Auto-recovery: Re-validate session when user returns to the page
+    // Auto-recovery: Re-validate session when user returns to the page (web only)
     useEffect(() => {
-        if (typeof window === 'undefined') return; // Only on web
+        // Only run on web platform
+        if (Platform.OS !== 'web') return;
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
         const handleVisibilityChange = async () => {
             if (document.visibilityState === 'visible' && session) {

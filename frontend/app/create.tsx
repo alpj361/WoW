@@ -13,6 +13,7 @@ import {
   Platform,
   Modal,
   Pressable,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -380,26 +381,59 @@ export default function CreateEventScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.uploadOptions}>
-              <TouchableOpacity style={styles.uploadButton} onPress={takePhoto}>
-                <Ionicons name="camera" size={32} color="#8B5CF6" />
-                <Text style={styles.uploadText}>Tomar Foto</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-                <Ionicons name="images" size={32} color="#8B5CF6" />
-                <Text style={styles.uploadText}>Galería</Text>
-              </TouchableOpacity>
-
-              {showUrlOption && (
-                <TouchableOpacity style={styles.uploadButton} onPress={() => setShowUrlModal(true)}>
-                  <View style={styles.experimentalBadge}>
-                    <Ionicons name="flask" size={12} color="#fff" />
-                  </View>
-                  <Ionicons name="link" size={32} color="#8B5CF6" />
-                  <Text style={styles.uploadText}>Desde URL</Text>
+            <>
+              <View style={styles.uploadOptions}>
+                <TouchableOpacity style={styles.uploadButton} onPress={takePhoto}>
+                  <Ionicons name="camera" size={32} color="#8B5CF6" />
+                  <Text style={styles.uploadText}>Tomar Foto</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+                <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+                  <Ionicons name="images" size={32} color="#8B5CF6" />
+                  <Text style={styles.uploadText}>Galería</Text>
+                </TouchableOpacity>
+
+                {showUrlOption && (
+                  <TouchableOpacity style={styles.uploadButton} onPress={() => setShowUrlModal(true)}>
+                    <View style={styles.experimentalBadge}>
+                      <Ionicons name="flask" size={12} color="#fff" />
+                    </View>
+                    <Ionicons name="link" size={32} color="#8B5CF6" />
+                    <Text style={styles.uploadText}>Desde URL</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* WhatsApp Button */}
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={() => {
+                    Alert.alert(
+                      '📱 Envía tu Flyer por WhatsApp',
+                      'Puedes enviar tus imágenes de eventos por este número.\n\nAsegúrate de enviar imágenes con los detalles del evento y que sean legibles. De lo contrario, no serán aceptados.\n\n⚠️ Por ahora solo acepta imágenes.',
+                      [
+                        {
+                          text: 'Cancelar',
+                          style: 'cancel'
+                        },
+                        {
+                          text: 'Abrir WhatsApp',
+                          onPress: () => {
+                            const phoneNumber = '50252725024';
+                            const message = encodeURIComponent('Hola! Quiero enviar un flyer de evento 📸');
+                            const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${message}`;
+                            Linking.openURL(whatsappUrl).catch(() => {
+                              Alert.alert('Error', 'No se pudo abrir WhatsApp. Asegúrate de tenerlo instalado.');
+                            });
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="logo-whatsapp" size={32} color="#25D366" />
+                  <Text style={styles.uploadText}>WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
         </View>
 

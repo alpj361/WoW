@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from 'react';
 import { Tabs, Slot, useSegments, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
