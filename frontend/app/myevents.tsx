@@ -956,7 +956,13 @@ export default function MyEventsScreen() {
 
       <GestureScrollView
         style={styles.content}
-        contentContainerStyle={activeTab === 'attended' && attendedEvents.length > 0 ? styles.galleryGrid : styles.listContent}
+        contentContainerStyle={
+          activeTab === 'attended' && attendedEvents.length > 0
+            ? styles.posterGrid
+            : activeTab === 'saved' && savedEvents.length > 0
+              ? styles.galleryGrid
+              : styles.listContent
+        }
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -985,15 +991,7 @@ export default function MyEventsScreen() {
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            savedEvents.map((item, index) => (
-              <Animated.View 
-                key={item.event.id} 
-                entering={FadeInDown.delay(index * 80).duration(400)}
-                layout={Layout.springify()}
-              >
-                {renderSavedItem(item)}
-              </Animated.View>
-            ))
+            savedEvents.map((item, index) => renderSavedItem(item, index))
           )
         ) : activeTab === 'attended' ? (
           attendedEvents.length === 0 ? (
@@ -1006,15 +1004,7 @@ export default function MyEventsScreen() {
             </Animated.View>
           ) : (
             <>
-              {attendedEvents.map((item, index) => (
-                <Animated.View
-                  key={item.event.id}
-                  entering={FadeInDown.delay(index * 80).duration(400)}
-                  layout={Layout.springify()}
-                >
-                  {renderAttendedItem(item)}
-                </Animated.View>
-              ))}
+              {attendedEvents.map((item, index) => renderAttendedItem(item, index))}
               <View style={{ width: '100%', height: insets.bottom + 20 }} />
             </>
           )
@@ -1649,6 +1639,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
   },
+  posterGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    padding: 16,
+    gap: 10,
+  },
   eventCard: {
     flexDirection: 'row',
     backgroundColor: '#1F1F1F',
@@ -1657,12 +1654,14 @@ const styles = StyleSheet.create({
   },
   cardGradient: {
     width: 100,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardImage: {
-    width: 100,
-    height: 100,
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
     resizeMode: 'cover',
   },
   cardIconContainer: {
@@ -2380,9 +2379,8 @@ const styles = StyleSheet.create({
   },
   // Letterboxd poster style - 3 columns for attended events
   posterCard: {
-    width: (Dimensions.get('window').width - 68) / 3, // 3 columns
-    aspectRatio: 1, // Square
-    marginBottom: 12,
+    width: (Dimensions.get('window').width - 52) / 3, // 3 columns: padding 16*2 + gap 10*2 = 52
+    aspectRatio: 2/3, // Poster aspect ratio like Letterboxd
     backgroundColor: '#1F1F1F',
     borderRadius: 12,
     overflow: 'hidden',

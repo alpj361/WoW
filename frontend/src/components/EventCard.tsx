@@ -153,76 +153,78 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   return (
     <View style={styles.cardWrapper}>
-      <TouchableOpacity
-        style={[styles.card, { width: cardWidth }]}
-        activeOpacity={0.9}
-        onPress={handlePress}
-      >
-        <LinearGradient
-          colors={gradient}
-          style={styles.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <View style={[styles.card, { width: cardWidth }]}>
+        <TouchableOpacity
+          style={styles.cardTouchable}
+          activeOpacity={0.9}
+          onPress={handlePress}
         >
-          {event.image ? (
-            <Image
-              source={{ uri: event.image }}
-              style={styles.eventImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.3)" />
-            </View>
-          )}
-
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
-            style={styles.contentGradient}
-          />
+            colors={gradient}
+            style={styles.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {event.image ? (
+              <Image
+                source={{ uri: event.image }}
+                style={styles.eventImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.3)" />
+              </View>
+            )}
 
-          <View style={styles.overlay}>
-            <View style={styles.categoryBadge}>
-              <Ionicons name={icon as any} size={10} color="#fff" />
-              <Text style={styles.categoryText}>{categoryLabel}</Text>
-            </View>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={styles.contentGradient}
+            />
 
-            <View style={styles.bottomContent}>
-              <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
+            <View style={styles.overlay}>
+              <View style={styles.categoryBadge}>
+                <Ionicons name={icon as any} size={10} color="#fff" />
+                <Text style={styles.categoryText}>{categoryLabel}</Text>
+              </View>
 
-              {event.description && (
-                <Text style={styles.description} numberOfLines={2}>
-                  {event.description}
-                </Text>
-              )}
+              <View style={styles.bottomContent}>
+                <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
 
-              <View style={styles.metaRow}>
-                {event.date && (
-                  <View style={styles.metaItem}>
-                    <Ionicons name="calendar-outline" size={10} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.metaText}>{event.date}</Text>
-                  </View>
+                {event.description && (
+                  <Text style={styles.description} numberOfLines={2}>
+                    {event.description}
+                  </Text>
                 )}
-                {event.time && (
-                  <View style={styles.metaItem}>
-                    <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.metaText}>{event.time}</Text>
-                  </View>
-                )}
-                {event.location && (
-                  <View style={styles.metaItem}>
-                    <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
-                  </View>
-                )}
+
+                <View style={styles.metaRow}>
+                  {event.date && (
+                    <View style={styles.metaItem}>
+                      <Ionicons name="calendar-outline" size={10} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.metaText}>{event.date}</Text>
+                    </View>
+                  )}
+                  {event.time && (
+                    <View style={styles.metaItem}>
+                      <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.metaText}>{event.time}</Text>
+                    </View>
+                  )}
+                  {event.location && (
+                    <View style={styles.metaItem}>
+                      <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </TouchableOpacity>
 
-        {/* Botones superpuestos sobre la tarjeta */}
+        {/* Action buttons outside TouchableOpacity to prevent gesture conflicts */}
         {showActions && (
-          <View style={styles.actionsContainer}>
+          <View style={styles.actionsContainer} pointerEvents="box-none">
             <GestureDetector gesture={skipGesture}>
               <Animated.View style={[styles.actionButton, styles.skipButton, skipAnimatedStyle]}>
                 <Ionicons name="close" size={32} color="#EF4444" />
@@ -236,7 +238,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             </GestureDetector>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -254,6 +256,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
     maxHeight: 480,
+  },
+  cardTouchable: {
+    flex: 1,
   },
   gradient: {
     flex: 1,
