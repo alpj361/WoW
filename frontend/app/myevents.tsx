@@ -156,13 +156,9 @@ export default function MyEventsScreen() {
     userName: string;
   }>({ visible: false, imageUrl: '', userName: '' });
 
-  // Animation refs for both galleries
+  // Track previous counts for detecting new items (for haptic feedback)
   const [previousSavedCount, setPreviousSavedCount] = useState(0);
   const [previousAttendedCount, setPreviousAttendedCount] = useState(0);
-  const savedGalleryAnimations = useRef<Map<string, Animated.Value>>(new Map());
-  const attendedGalleryAnimations = useRef<Map<string, Animated.Value>>(new Map());
-  const initializedSavedAnimations = useRef<Set<string>>(new Set());
-  const initializedAttendedAnimations = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const loadData = async () => {
@@ -195,85 +191,20 @@ export default function MyEventsScreen() {
     setToast({ visible: true, message, type });
   }, []);
 
-  // Initialize attended events animations
+  // Track count changes for haptic feedback on new items
   useEffect(() => {
-    attendedEvents.forEach((item) => {
-      if (!initializedAttendedAnimations.current.has(item.event.id)) {
-        const animation = getOrCreateAttendedAnimation(item.event.id);
-        animation.setValue(1);
-        initializedAttendedAnimations.current.add(item.event.id);
-      }
-    });
-
     if (attendedEvents.length > previousAttendedCount && previousAttendedCount > 0) {
-      const newestEvent = attendedEvents[0];
-      if (newestEvent && !initializedAttendedAnimations.current.has(newestEvent.event.id)) {
-        initializedAttendedAnimations.current.delete(newestEvent.event.id);
-        triggerAttendedInsertAnimation(newestEvent.event.id);
-        initializedAttendedAnimations.current.add(newestEvent.event.id);
-      }
+      triggerHaptic('success');
     }
     setPreviousAttendedCount(attendedEvents.length);
-  }, [attendedEvents]);
+  }, [attendedEvents.length]);
 
-  // Initialize saved events animations
   useEffect(() => {
-    savedEvents.forEach((item) => {
-      if (!initializedSavedAnimations.current.has(item.event.id)) {
-        const animation = getOrCreateSavedAnimation(item.event.id);
-        animation.setValue(1);
-        initializedSavedAnimations.current.add(item.event.id);
-      }
-    });
-
     if (savedEvents.length > previousSavedCount && previousSavedCount > 0) {
-      const newestEvent = savedEvents[0];
-      if (newestEvent && !initializedSavedAnimations.current.has(newestEvent.event.id)) {
-        initializedSavedAnimations.current.delete(newestEvent.event.id);
-        triggerSavedInsertAnimation(newestEvent.event.id);
-        initializedSavedAnimations.current.add(newestEvent.event.id);
-      }
+      triggerHaptic('light');
     }
     setPreviousSavedCount(savedEvents.length);
-  }, [savedEvents]);
-
-  const getOrCreateSavedAnimation = (eventId: string) => {
-    if (!savedGalleryAnimations.current.has(eventId)) {
-      savedGalleryAnimations.current.set(eventId, new Animated.Value(0));
-    }
-    return savedGalleryAnimations.current.get(eventId)!;
-  };
-
-  const getOrCreateAttendedAnimation = (eventId: string) => {
-    if (!attendedGalleryAnimations.current.has(eventId)) {
-      attendedGalleryAnimations.current.set(eventId, new Animated.Value(0));
-    }
-    return attendedGalleryAnimations.current.get(eventId)!;
-  };
-
-  const triggerSavedInsertAnimation = (eventId: string) => {
-    const animation = getOrCreateSavedAnimation(eventId);
-    animation.setValue(0);
-    
-    Animated.spring(animation, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const triggerAttendedInsertAnimation = (eventId: string) => {
-    const animation = getOrCreateAttendedAnimation(eventId);
-    animation.setValue(0);
-    
-    Animated.spring(animation, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  };
+  }, [savedEvents.length]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -771,28 +702,13 @@ export default function MyEventsScreen() {
     const isPending = registration?.status === 'pending';
     const isRejected = registration?.status === 'rejected';
 
-    const animation = getOrCreateSavedAnimation(event.id);
-
-    const animatedStyle = {
-      opacity: animation,
-      transform: [
-        {
-          scale: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.3, 1],
-          }),
-        },
-        {
-          translateY: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [50, 0],
-          }),
-        },
-      ],
-    };
-
     return (
-      <Animated.View key={event.id} style={[styles.galleryCard, animatedStyle]}>
+      <Animated.View
+        key={event.id}
+        style={styles.galleryCard}
+        entering={FadeInDown.delay(index * 50).springify()}
+        layout={Layout.springify()}
+      >
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => router.push(`/event/${event.id}`)}
@@ -925,28 +841,13 @@ export default function MyEventsScreen() {
     const gradient = getCategoryGradient(event.category);
     const icon = getCategoryIcon(event.category);
     
-    const animation = getOrCreateAttendedAnimation(event.id);
-
-    const animatedStyle = {
-      opacity: animation,
-      transform: [
-        {
-          scale: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.3, 1],
-          }),
-        },
-        {
-          translateY: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [30, 0],
-          }),
-        },
-      ],
-    };
-
     return (
-      <Animated.View key={event.id} style={[styles.posterCard, animatedStyle]}>
+      <Animated.View
+        key={event.id}
+        style={styles.posterCard}
+        entering={FadeInDown.delay(index * 50).springify()}
+        layout={Layout.springify()}
+      >
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => router.push(`/event/${event.id}`)}

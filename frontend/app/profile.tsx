@@ -8,9 +8,13 @@ import {
   Alert,
   Modal,
   Image,
-  Animated,
   LayoutChangeEvent,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -91,7 +95,7 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<'ecard' | 'escanear'>('ecard');
   const [cardWidth, setCardWidth] = useState(0);
   const cardRef = useRef<DigitalCardRef>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useSharedValue(0);
 
   // Get container width on layout
   const handleContainerLayout = (event: LayoutChangeEvent) => {
@@ -103,15 +107,18 @@ export default function ProfileScreen() {
   const handleTabSwitch = (tab: 'ecard' | 'escanear') => {
     if (tab === activeTab) return;
 
-    Animated.spring(slideAnim, {
-      toValue: tab === 'escanear' ? -cardWidth : 0,
-      friction: 10,
-      tension: 50,
-      useNativeDriver: true,
-    }).start();
+    slideAnim.value = withSpring(tab === 'escanear' ? -cardWidth : 0, {
+      damping: 20,
+      stiffness: 90,
+    });
 
     setActiveTab(tab);
   };
+
+  // Animated style for the slider
+  const sliderAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideAnim.value }],
+  }));
 
   // Get user display name
   const userName = profile?.full_name || user?.user_metadata?.full_name || 'Usuario';
@@ -239,7 +246,7 @@ export default function ProfileScreen() {
             <Animated.View
               style={[
                 styles.cardsSlider,
-                { transform: [{ translateX: slideAnim }] },
+                sliderAnimatedStyle,
               ]}
             >
               {/* Original Digital Card */}
