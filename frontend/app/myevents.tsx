@@ -98,7 +98,17 @@ export default function MyEventsScreen() {
     visible: boolean;
     eventId: string;
     eventTitle: string;
-  }>({ visible: false, eventId: '', eventTitle: '' });
+    eventImage?: string;
+    eventCategory: string;
+  }>({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' });
+
+  const [collectibleAnimation, setCollectibleAnimation] = useState<{
+    visible: boolean;
+    eventTitle: string;
+    eventImage?: string;
+    eventCategory: string;
+    emoji?: string;
+  }>({ visible: false, eventTitle: '', eventCategory: 'food' });
 
   const [attendeesModal, setAttendeesModal] = useState<{
     visible: boolean;
