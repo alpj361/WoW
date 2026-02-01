@@ -1678,8 +1678,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
-    padding: 16,
-    gap: 10,
+    padding: 12,
+    paddingHorizontal: 16,
+    gap: 8,
   },
   eventCard: {
     flexDirection: 'row',
