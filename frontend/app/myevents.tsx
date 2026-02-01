@@ -838,7 +838,7 @@ export default function MyEventsScreen() {
             ) : (isApproved || (!hasPrice && !isPending && !event.user_id)) ? (
               <TouchableOpacity
                 style={styles.attendButton}
-                onPress={() => handleMarkAttended(event.id, event.title)}
+                onPress={() => handleMarkAttended(event.id, event.title, event.image, event.category)}
               >
                 <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                 <Text style={styles.attendButtonText}>Asistí</Text>
