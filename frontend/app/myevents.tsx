@@ -746,7 +746,7 @@ export default function MyEventsScreen() {
             end={{ x: 1, y: 1 }}
           >
             {event.image ? (
-              <Image source={{ uri: event.image }} style={styles.cardImage} />
+              <Image source={{ uri: event.image }} style={styles.savedPosterImage} />
             ) : (
               <View style={styles.cardIconContainer}>
                 <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
