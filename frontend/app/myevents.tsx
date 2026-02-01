@@ -39,6 +39,7 @@ import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/se
 import { useAuth } from '../src/context/AuthContext';
 import { EventListSkeleton } from '../src/components/SkeletonLoader';
 import { AnimatedToast } from '../src/components/AnimatedToast';
+import { CollectibleAnimation } from '../src/components/CollectibleAnimation';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
