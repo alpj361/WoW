@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -21,7 +22,11 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  withSequence,
   runOnJS,
+  interpolate,
+  interpolateColor,
+  Extrapolation,
 } from 'react-native-reanimated';
 import {
   GestureHandlerRootView,
@@ -32,6 +37,9 @@ import { useEventStore, Event } from '../src/store/eventStore';
 import { EventCard } from '../src/components/EventCard';
 import { CategoryFilter } from '../src/components/CategoryFilter';
 import { WowLogo } from '../src/components/WowLogo';
+import { SwipeOverlay } from '../src/components/SwipeOverlay';
+import { AnimatedToast } from '../src/components/AnimatedToast';
+import { SwipeCardSkeleton } from '../src/components/SkeletonLoader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
@@ -52,6 +60,13 @@ export default function ExploreScreen() {
   } = useEventStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Toast state
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'like' | 'skip' | 'success' | 'error' | 'info' }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -94,8 +109,29 @@ export default function ExploreScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { registerForEvent } = useEventStore();
 
+  // Haptic feedback helper
+  const triggerHaptic = useCallback(async (type: 'success' | 'light' | 'medium') => {
+    if (Platform.OS === 'web') return;
+    try {
+      if (type === 'success') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (type === 'medium') {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Show toast helper
+  const showToast = useCallback((message: string, type: 'like' | 'skip' | 'success' | 'error' | 'info') => {
+    setToast({ visible: true, message, type });
+  }, []);
+
   const handleSwipeRight = useCallback(async () => {
     console.log('🎯 handleSwipeRight called');
+    triggerHaptic('success');
+    
     if (currentEvent) {
       console.log('📋 Current event:', {
         id: currentEvent.id,
@@ -115,15 +151,13 @@ export default function ExploreScreen() {
         if (hasPrice) {
           if (isHostEvent) {
             console.log('🚪 Host Event HAS price, saving then showing payment alert');
-            // IMPORTANT: Save the event FIRST before showing payment alert
-            // This ensures the event is in likes even if user selects "Más Tarde"
             await saveEvent(currentEvent.id);
+            showToast('¡Guardado! 💜', 'like');
             setShowPaymentAlert(true);
           } else {
             console.log('ℹ️ Public Event HAS price, showing info alert');
-            // For public events with price, just show info but don't ask for payment
-            // Save immediately
             await saveEvent(currentEvent.id);
+            showToast('¡Guardado! 💜', 'like');
 
             Alert.alert(
               'Evento con Costo',
@@ -133,27 +167,30 @@ export default function ExploreScreen() {
           }
         } else {
           console.log('🆓 Event is FREE, just saving');
-          // Free event, just save
           await saveEvent(currentEvent.id);
+          showToast('¡Guardado! 💜', 'like');
           goToNextCard();
         }
       } catch (error) {
         console.error('❌ Error saving event:', error);
+        showToast('Error al guardar', 'error');
         goToNextCard();
       }
     } else {
       console.log('⚠️ No current event');
       goToNextCard();
     }
-  }, [currentEvent, saveEvent, goToNextCard]);
+  }, [currentEvent, saveEvent, goToNextCard, triggerHaptic, showToast]);
 
   const handleSwipeLeft = useCallback(async () => {
+    triggerHaptic('medium');
     if (currentEvent) {
       console.log('🚫 Denying event:', currentEvent.id);
-      denyEvent(currentEvent.id); // Fire and forget
+      denyEvent(currentEvent.id);
+      showToast('Pasado', 'skip');
     }
     goToNextCard();
-  }, [goToNextCard, currentEvent, denyEvent]);
+  }, [goToNextCard, currentEvent, denyEvent, triggerHaptic, showToast]);
 
   const animateSwipe = useCallback(
     (direction: 'left' | 'right') => {
@@ -201,14 +238,36 @@ export default function ExploreScreen() {
     };
   });
 
+  // Swipe overlay styles
+  const likeOverlayStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      translateX.value,
+      [0, SWIPE_THRESHOLD],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity: progress,
+      transform: [{ scale: interpolate(progress, [0, 1], [0.5, 1]) }],
+    };
+  });
+
+  const skipOverlayStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      translateX.value,
+      [0, -SWIPE_THRESHOLD],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity: progress,
+      transform: [{ scale: interpolate(progress, [0, 1], [0.5, 1]) }],
+    };
+  });
+
   const renderCardContent = () => {
     if (isLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando eventos...</Text>
-        </View>
-      );
+      return <SwipeCardSkeleton />;
     }
 
     if (events.length === 0) {
@@ -258,6 +317,19 @@ export default function ExploreScreen() {
         {currentEvent && (
           IS_WEB ? (
             <Animated.View style={[styles.currentCard, cardStyle]}>
+              {/* Swipe overlays */}
+              <Animated.View style={[styles.swipeOverlay, styles.likeOverlay, likeOverlayStyle]}>
+                <View style={styles.overlayIconCircle}>
+                  <Ionicons name="heart" size={28} color="#10B981" />
+                </View>
+                <Text style={[styles.overlayText, { color: '#10B981' }]}>GUARDAR</Text>
+              </Animated.View>
+              <Animated.View style={[styles.swipeOverlay, styles.skipOverlay, skipOverlayStyle]}>
+                <View style={[styles.overlayIconCircle, styles.skipIconCircle]}>
+                  <Ionicons name="close" size={28} color="#EF4444" />
+                </View>
+                <Text style={[styles.overlayText, { color: '#EF4444' }]}>PASAR</Text>
+              </Animated.View>
               <EventCard
                 event={currentEvent}
                 onSave={() => animateSwipe('right')}
@@ -268,6 +340,19 @@ export default function ExploreScreen() {
           ) : (
             <GestureDetector gesture={gesture}>
               <Animated.View style={[styles.currentCard, cardStyle]}>
+                {/* Swipe overlays */}
+                <Animated.View style={[styles.swipeOverlay, styles.likeOverlay, likeOverlayStyle]}>
+                  <View style={styles.overlayIconCircle}>
+                    <Ionicons name="heart" size={28} color="#10B981" />
+                  </View>
+                  <Text style={[styles.overlayText, { color: '#10B981' }]}>GUARDAR</Text>
+                </Animated.View>
+                <Animated.View style={[styles.swipeOverlay, styles.skipOverlay, skipOverlayStyle]}>
+                  <View style={[styles.overlayIconCircle, styles.skipIconCircle]}>
+                    <Ionicons name="close" size={28} color="#EF4444" />
+                  </View>
+                  <Text style={[styles.overlayText, { color: '#EF4444' }]}>PASAR</Text>
+                </Animated.View>
                 <EventCard
                   event={currentEvent}
                   onSave={() => animateSwipe('right')}
@@ -332,6 +417,15 @@ export default function ExploreScreen() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Toast notification */}
+      <AnimatedToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        duration={1500}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
+
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
         <WowLogo width={100} height={32} />
         <Text style={styles.tagline}>Descubre y Vive Eventos</Text>
@@ -542,6 +636,39 @@ const styles = StyleSheet.create({
     height: '100%',
     opacity: 0.5,
     transform: [{ scale: 0.92 }, { translateY: 8 }],
+  },
+  // Swipe overlay styles
+  swipeOverlay: {
+    position: 'absolute',
+    top: 20,
+    zIndex: 10,
+    alignItems: 'center',
+    gap: 6,
+  },
+  likeOverlay: {
+    left: 20,
+  },
+  skipOverlay: {
+    right: 20,
+  },
+  overlayIconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 2,
+    borderColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skipIconCircle: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#EF4444',
+  },
+  overlayText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
   loadingContainer: {
     flex: 1,

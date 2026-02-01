@@ -14,11 +14,23 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { TouchableOpacity as GestureTouchable, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+  useSharedValue,
+  FadeIn,
+  FadeInDown,
+  Layout,
+} from 'react-native-reanimated';
 import { useEventStore, SavedEventData, AttendedEventData } from '../src/store/eventStore';
 import { EmojiRating } from '../src/components/EmojiRating';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,10 +38,12 @@ import { useRouter } from 'expo-router';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
+import { EventListSkeleton } from '../src/components/SkeletonLoader';
+import { AnimatedToast } from '../src/components/AnimatedToast';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
-const getCategoryGradient = (category: string): [string, string, ...string[]] => {
+const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
     case 'music':
       return ['#8B5CF6', '#6D28D9'];
@@ -74,6 +88,12 @@ export default function MyEventsScreen() {
 
   const [activeTab, setActiveTab] = useState<Tab>('saved');
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
   const [ratingModal, setRatingModal] = useState<{
     visible: boolean;
     eventId: string;
@@ -146,9 +166,34 @@ export default function MyEventsScreen() {
   const initializedAttendedAnimations = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchSavedEvents();
-    fetchAttendedEvents();
-    fetchHostedEvents();
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchSavedEvents(),
+        fetchAttendedEvents(),
+        fetchHostedEvents()
+      ]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // Haptic feedback helper
+  const triggerHaptic = useCallback(async (type: 'success' | 'warning' | 'light') => {
+    if (Platform.OS === 'web') return;
+    try {
+      if (type === 'success') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (type === 'warning') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (e) {}
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ visible: true, message, type });
   }, []);
 
   // Initialize attended events animations
@@ -248,6 +293,8 @@ export default function MyEventsScreen() {
   const handleSelectEmoji = async (emoji: string) => {
     try {
       await markAttended(ratingModal.eventId, emoji || undefined);
+      triggerHaptic('success');
+      showToast(emoji ? `¡Calificado ${emoji}!` : '¡Marcado como asistido!', 'success');
       setRatingModal({ visible: false, eventId: '', eventTitle: '' });
     } catch (error) {
       Alert.alert('Error', 'No se pudo marcar como asistido.');
@@ -255,6 +302,7 @@ export default function MyEventsScreen() {
   };
 
   const handleUnsave = (eventId: string) => {
+    triggerHaptic('warning');
     Alert.alert(
       'Eliminar de guardados',
       '¿Seguro que quieres quitar este evento?',
@@ -266,6 +314,7 @@ export default function MyEventsScreen() {
           onPress: async () => {
             try {
               await unsaveEvent(eventId);
+              showToast('Evento eliminado', 'info');
             } catch (error) {
               console.error('Error unsaving:', error);
               Alert.alert('Error', 'No se pudo eliminar de guardados');
@@ -931,6 +980,15 @@ export default function MyEventsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Toast notification */}
+      <AnimatedToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        duration={2000}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
+
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.title}>Mis Eventos</Text>
         <Text style={styles.subtitle}>Tu historial personal</Text>
@@ -1008,45 +1066,78 @@ export default function MyEventsScreen() {
           />
         }
       >
-        {activeTab === 'saved' ? (
+        {isLoading ? (
+          <EventListSkeleton count={3} />
+        ) : activeTab === 'saved' ? (
           savedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="bookmark-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos guardados</Text>
               <Text style={styles.emptyText}>
                 Los eventos que guardes aparecerán aquí
               </Text>
-            </View>
+              <TouchableOpacity 
+                style={styles.exploreButton}
+                onPress={() => router.push('/')}
+              >
+                <Ionicons name="compass" size={18} color="#fff" />
+                <Text style={styles.exploreButtonText}>Explorar eventos</Text>
+              </TouchableOpacity>
+            </Animated.View>
           ) : (
-            savedEvents.map(renderSavedItem)
+            savedEvents.map((item, index) => (
+              <Animated.View 
+                key={item.event.id} 
+                entering={FadeInDown.delay(index * 80).duration(400)}
+                layout={Layout.springify()}
+              >
+                {renderSavedItem(item)}
+              </Animated.View>
+            ))
           )
         ) : activeTab === 'attended' ? (
           attendedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="checkmark-done-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos asistidos</Text>
               <Text style={styles.emptyText}>
                 Marca los eventos a los que has asistido
               </Text>
-            </View>
+            </Animated.View>
           ) : (
             <>
-              {attendedEvents.map(renderAttendedItem)}
+              {attendedEvents.map((item, index) => (
+                <Animated.View
+                  key={item.event.id}
+                  entering={FadeInDown.delay(index * 80).duration(400)}
+                  layout={Layout.springify()}
+                >
+                  {renderAttendedItem(item)}
+                </Animated.View>
+              ))}
               <View style={{ width: '100%', height: insets.bottom + 20 }} />
             </>
           )
         ) : (
           hostedEvents.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
               <Ionicons name="person-circle-outline" size={64} color="#4B5563" />
               <Text style={styles.emptyTitle}>Sin eventos organizados</Text>
               <Text style={styles.emptyText}>
                 Tus eventos creados aparecerán aquí
               </Text>
-            </View>
+            </Animated.View>
           ) : (
             <>
-              {hostedEvents.map(renderHostedItem)}
+              {hostedEvents.map((item, index) => (
+                <Animated.View
+                  key={item.event.id}
+                  entering={FadeInDown.delay(index * 80).duration(400)}
+                  layout={Layout.springify()}
+                >
+                  {renderHostedItem(item)}
+                </Animated.View>
+              ))}
               <View style={{ height: insets.bottom + 20 }} />
             </>
           )
@@ -1877,6 +1968,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  exploreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  exploreButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   viewAttendeesButton: {
     flexDirection: 'row',

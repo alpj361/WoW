@@ -11,6 +11,15 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Event } from '../store/eventStore';
 
 interface EventCardProps {
@@ -69,11 +78,78 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const router = useRouter();
 
+  // Animation values for buttons
+  const skipScale = useSharedValue(1);
+  const saveScale = useSharedValue(1);
+  const skipRotation = useSharedValue(0);
+  const saveRotation = useSharedValue(0);
+
   const handlePress = () => {
     if (event.id) {
       router.push(`/event/${event.id}`);
     }
   };
+
+  const triggerHaptic = async (type: 'success' | 'medium') => {
+    if (Platform.OS === 'web') return;
+    try {
+      if (type === 'success') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (e) {}
+  };
+
+  // Skip button gesture
+  const skipGesture = Gesture.Tap()
+    .onBegin(() => {
+      skipScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
+      skipRotation.value = withSequence(
+        withTiming(-8, { duration: 50 }),
+        withTiming(8, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+    })
+    .onFinalize((_, success) => {
+      skipScale.value = withSpring(1, { damping: 10, stiffness: 300 });
+      if (success && onSkip) {
+        triggerHaptic('medium');
+        onSkip();
+      }
+    });
+
+  // Save button gesture
+  const saveGesture = Gesture.Tap()
+    .onBegin(() => {
+      saveScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
+      saveRotation.value = withSequence(
+        withTiming(-8, { duration: 50 }),
+        withTiming(8, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+    })
+    .onFinalize((_, success) => {
+      saveScale.value = withSpring(1, { damping: 10, stiffness: 300 });
+      if (success && onSave) {
+        triggerHaptic('success');
+        onSave();
+      }
+    });
+
+  const skipAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: skipScale.value },
+      { rotate: `${skipRotation.value}deg` },
+    ],
+  }));
+
+  const saveAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: saveScale.value },
+      { rotate: `${saveRotation.value}deg` },
+    ],
+  }));
 
   return (
     <View style={styles.cardWrapper}>
@@ -147,21 +223,17 @@ export const EventCard: React.FC<EventCardProps> = ({
         {/* Botones superpuestos sobre la tarjeta */}
         {showActions && (
           <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.skipButton]}
-              onPress={onSkip}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={32} color="#EF4444" />
-            </TouchableOpacity>
+            <GestureDetector gesture={skipGesture}>
+              <Animated.View style={[styles.actionButton, styles.skipButton, skipAnimatedStyle]}>
+                <Ionicons name="close" size={32} color="#EF4444" />
+              </Animated.View>
+            </GestureDetector>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.saveButton]}
-              onPress={onSave}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="heart" size={32} color="#10B981" />
-            </TouchableOpacity>
+            <GestureDetector gesture={saveGesture}>
+              <Animated.View style={[styles.actionButton, styles.saveButton, saveAnimatedStyle]}>
+                <Ionicons name="heart" size={32} color="#10B981" />
+              </Animated.View>
+            </GestureDetector>
           </View>
         )}
       </TouchableOpacity>
