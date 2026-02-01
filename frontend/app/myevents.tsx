@@ -12,7 +12,6 @@ import {
   Modal,
   TextInput,
   Pressable,
-  Animated,
   Dimensions,
   Platform,
 } from 'react-native';
