@@ -1065,9 +1065,19 @@ export default function MyEventsScreen() {
 
       <EmojiRating
         visible={ratingModal.visible}
-        onClose={() => setRatingModal({ visible: false, eventId: '', eventTitle: '' })}
+        onClose={() => setRatingModal({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' })}
         onSelect={handleSelectEmoji}
         eventTitle={ratingModal.eventTitle}
+      />
+
+      {/* Collectible Animation */}
+      <CollectibleAnimation
+        visible={collectibleAnimation.visible}
+        eventTitle={collectibleAnimation.eventTitle}
+        eventImage={collectibleAnimation.eventImage}
+        eventCategory={collectibleAnimation.eventCategory}
+        emoji={collectibleAnimation.emoji}
+        onComplete={handleCollectibleAnimationComplete}
       />
 
       {/* Attendees Modal */}
