@@ -227,8 +227,8 @@ export default function MyEventsScreen() {
     setRefreshing(false);
   }, []);
 
-  const handleMarkAttended = (eventId: string, eventTitle: string) => {
-    setRatingModal({ visible: true, eventId, eventTitle });
+  const handleMarkAttended = (eventId: string, eventTitle: string, eventImage?: string, eventCategory: string = 'food') => {
+    setRatingModal({ visible: true, eventId, eventTitle, eventImage, eventCategory });
   };
 
   const handleSelectEmoji = async (emoji: string) => {
