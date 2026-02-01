@@ -232,14 +232,28 @@ export default function MyEventsScreen() {
   };
 
   const handleSelectEmoji = async (emoji: string) => {
+    const currentModal = { ...ratingModal };
     try {
       await markAttended(ratingModal.eventId, emoji || undefined);
       triggerHaptic('success');
-      showToast(emoji ? `¡Calificado ${emoji}!` : '¡Marcado como asistido!', 'success');
-      setRatingModal({ visible: false, eventId: '', eventTitle: '' });
+      setRatingModal({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' });
+      
+      // Show collectible animation
+      setCollectibleAnimation({
+        visible: true,
+        eventTitle: currentModal.eventTitle,
+        eventImage: currentModal.eventImage,
+        eventCategory: currentModal.eventCategory,
+        emoji: emoji || undefined,
+      });
     } catch (error) {
       Alert.alert('Error', 'No se pudo marcar como asistido.');
     }
+  };
+
+  const handleCollectibleAnimationComplete = () => {
+    setCollectibleAnimation({ visible: false, eventTitle: '', eventCategory: 'food' });
+    showToast('¡Evento coleccionado!', 'success');
   };
 
   const handleUnsave = (eventId: string) => {
