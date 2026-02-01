@@ -2423,7 +2423,7 @@ const styles = StyleSheet.create({
   },
   // Letterboxd poster style - 3 columns for attended events
   posterCard: {
-    width: (Dimensions.get('window').width - 52) / 3, // 3 columns: padding 16*2 + gap 10*2 = 52
+    width: (Dimensions.get('window').width - 48) / 3, // 3 columns: padding 16*2 + gap 8*2 = 48
     aspectRatio: 2/3, // Poster aspect ratio like Letterboxd
     backgroundColor: '#1A1A1A',
     borderRadius: 8,
