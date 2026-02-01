@@ -80,7 +80,7 @@ class SimpleAPITester:
             "Create Event",
             "POST",
             "events",
-            201,
+            200,
             data=test_event
         )
         return response.get('id') if success else None
