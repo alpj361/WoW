@@ -1,13 +1,18 @@
-import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import {
     View,
     Text,
     Image,
     StyleSheet,
     Pressable,
-    Animated,
-    Platform,
 } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    interpolate,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AttachedPin } from './pins/AttachedPin';
 
@@ -52,30 +57,20 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
     ref
 ) => {
     const [isFlipped, setIsFlipped] = useState(false);
-    const flipAnimation = useRef(new Animated.Value(0)).current;
-    const [glowOpacity] = useState(new Animated.Value(0.15));
+    const flipAnimation = useSharedValue(0);
+    const glowOpacity = useSharedValue(0.15);
 
     // Expose flip methods to parent via ref
     useImperativeHandle(ref, () => ({
         flipToBack: () => {
             if (!isFlipped) {
-                Animated.spring(flipAnimation, {
-                    toValue: 1,
-                    friction: 8,
-                    tension: 10,
-                    useNativeDriver: Platform.OS !== 'web',
-                }).start();
+                flipAnimation.value = withSpring(1, { damping: 15, stiffness: 80 });
                 setIsFlipped(true);
             }
         },
         flipToFront: () => {
             if (isFlipped) {
-                Animated.spring(flipAnimation, {
-                    toValue: 0,
-                    friction: 8,
-                    tension: 10,
-                    useNativeDriver: Platform.OS !== 'web',
-                }).start();
+                flipAnimation.value = withSpring(0, { damping: 15, stiffness: 80 });
                 setIsFlipped(false);
             }
         },
@@ -83,55 +78,57 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
 
     const flipCard = () => {
         const toValue = isFlipped ? 0 : 1;
-
-        Animated.spring(flipAnimation, {
-            toValue,
-            friction: 8,
-            tension: 10,
-            useNativeDriver: Platform.OS !== 'web',
-        }).start();
-
+        flipAnimation.value = withSpring(toValue, { damping: 15, stiffness: 80 });
         setIsFlipped(!isFlipped);
     };
 
     const handlePressIn = () => {
-        Animated.timing(glowOpacity, {
-            toValue: 0.35,
-            duration: 200,
-            useNativeDriver: Platform.OS !== 'web',
-        }).start();
+        glowOpacity.value = withTiming(0.35, { duration: 200 });
     };
 
     const handlePressOut = () => {
-        Animated.timing(glowOpacity, {
-            toValue: 0.15,
-            duration: 200,
-            useNativeDriver: Platform.OS !== 'web',
-        }).start();
+        glowOpacity.value = withTiming(0.15, { duration: 200 });
     };
 
-    // Front side rotation (0 to 90 degrees, then hidden)
-    const frontRotation = flipAnimation.interpolate({
-        inputRange: [0, 0.5, 1],
-        outputRange: ['0deg', '90deg', '90deg'],
+    // Animated styles for glow
+    const glowAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: glowOpacity.value,
+    }));
+
+    // Front side animated style
+    const frontAnimatedStyle = useAnimatedStyle(() => {
+        const rotateY = interpolate(
+            flipAnimation.value,
+            [0, 0.5, 1],
+            [0, 90, 90]
+        );
+        const opacity = interpolate(
+            flipAnimation.value,
+            [0, 0.5, 0.51, 1],
+            [1, 1, 0, 0]
+        );
+        return {
+            transform: [{ rotateY: `${rotateY}deg` }],
+            opacity,
+        };
     });
 
-    // Back side rotation (hidden at -90, then -90 to 0)
-    const backRotation = flipAnimation.interpolate({
-        inputRange: [0, 0.5, 1],
-        outputRange: ['-90deg', '-90deg', '0deg'],
-    });
-
-    // Front opacity (visible then hidden at midpoint)
-    const frontOpacity = flipAnimation.interpolate({
-        inputRange: [0, 0.5, 0.51, 1],
-        outputRange: [1, 1, 0, 0],
-    });
-
-    // Back opacity (hidden then visible at midpoint)
-    const backOpacity = flipAnimation.interpolate({
-        inputRange: [0, 0.49, 0.5, 1],
-        outputRange: [0, 0, 1, 1],
+    // Back side animated style
+    const backAnimatedStyle = useAnimatedStyle(() => {
+        const rotateY = interpolate(
+            flipAnimation.value,
+            [0, 0.5, 1],
+            [-90, -90, 0]
+        );
+        const opacity = interpolate(
+            flipAnimation.value,
+            [0, 0.49, 0.5, 1],
+            [0, 0, 1, 1]
+        );
+        return {
+            transform: [{ rotateY: `${rotateY}deg` }],
+            opacity,
+        };
     });
 
     // Different gradient colors based on design
@@ -142,7 +139,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
     return (
         <View style={styles.container}>
             {/* Subtle glow effect */}
-            <Animated.View style={[styles.glowWrapper, { opacity: glowOpacity }]}>
+            <Animated.View style={[styles.glowWrapper, glowAnimatedStyle]}>
                 <LinearGradient
                     colors={glowColors}
                     start={{ x: 0, y: 0 }}
@@ -164,10 +161,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
                         style={[
                             styles.cardContainer,
                             styles.cardFront,
-                            {
-                                transform: [{ rotateY: frontRotation }],
-                                opacity: frontOpacity,
-                            },
+                            frontAnimatedStyle,
                         ]}
                     >
                         {/* Card Image */}
@@ -218,10 +212,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
                         style={[
                             styles.cardContainer,
                             styles.cardBack,
-                            {
-                                transform: [{ rotateY: backRotation }],
-                                opacity: backOpacity,
-                            },
+                            backAnimatedStyle,
                         ]}
                     >
                         {/* Back Image */}
@@ -251,7 +242,7 @@ export const DigitalCard = forwardRef<DigitalCardRef, DigitalCardProps>((
             </Pressable>
 
             {/* Reflection effect */}
-            <Animated.View style={[styles.reflection, { opacity: glowOpacity }]}>
+            <Animated.View style={[styles.reflection, glowAnimatedStyle]}>
                 <LinearGradient
                     colors={glowColors}
                     start={{ x: 0, y: 0 }}

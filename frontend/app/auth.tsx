@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useId } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import {
     View,
     Text,
@@ -10,8 +10,16 @@ import {
     Platform,
     Image,
     Dimensions,
-    Animated as RNAnimated,
 } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    withRepeat,
+    withSequence,
+    interpolate,
+    Easing,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { WowLogo } from '../src/components/WowLogo';
@@ -70,70 +78,44 @@ function ElegantShape({
     style: any;
     delay?: number;
 }) {
-    const floatAnim = useRef(new RNAnimated.Value(0)).current;
-    const entryAnim = useRef(new RNAnimated.Value(0)).current;
-    const entryRotate = useRef(new RNAnimated.Value(rotate - 15)).current;
+    const entryProgress = useSharedValue(0);
+    const floatProgress = useSharedValue(0);
 
     useEffect(() => {
-        // Entry animation
-        RNAnimated.parallel([
-            RNAnimated.timing(entryAnim, {
-                toValue: 1,
-                duration: 2400,
-                delay: delay,
-                useNativeDriver: true,
-            }),
-            RNAnimated.timing(entryRotate, {
-                toValue: rotate,
-                duration: 2400,
-                delay: delay,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        // Entry animation with delay
+        const timeout = setTimeout(() => {
+            entryProgress.value = withTiming(1, { duration: 2400 });
+        }, delay);
 
-        // Floating animation
-        RNAnimated.loop(
-            RNAnimated.sequence([
-                RNAnimated.timing(floatAnim, {
-                    toValue: 1,
-                    duration: 6000,
-                    useNativeDriver: true,
-                }),
-                RNAnimated.timing(floatAnim, {
-                    toValue: 0,
-                    duration: 6000,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
+        // Floating animation - continuous loop
+        floatProgress.value = withRepeat(
+            withSequence(
+                withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
+                withTiming(0, { duration: 6000, easing: Easing.inOut(Easing.ease) })
+            ),
+            -1, // infinite
+            false
+        );
+
+        return () => clearTimeout(timeout);
     }, []);
 
-    const animatedStyle = {
-        opacity: entryAnim,
-        transform: [
-            {
-                translateY: RNAnimated.add(
-                    entryAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-150, 0],
-                    }),
-                    floatAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 15],
-                    })
-                ),
-            },
-            {
-                rotate: entryRotate.interpolate({
-                    inputRange: [rotate - 15, rotate],
-                    outputRange: [`${rotate - 15}deg`, `${rotate}deg`],
-                }),
-            },
-        ],
-    };
+    const animatedStyle = useAnimatedStyle(() => {
+        const entryTranslateY = interpolate(entryProgress.value, [0, 1], [-150, 0]);
+        const floatTranslateY = interpolate(floatProgress.value, [0, 1], [0, 15]);
+        const rotateValue = interpolate(entryProgress.value, [0, 1], [rotate - 15, rotate]);
+
+        return {
+            opacity: entryProgress.value,
+            transform: [
+                { translateY: entryTranslateY + floatTranslateY },
+                { rotate: `${rotateValue}deg` },
+            ],
+        };
+    });
 
     return (
-        <RNAnimated.View style={[style, animatedStyle]}>
+        <Animated.View style={[style, animatedStyle]}>
             <View
                 style={{
                     width,
@@ -162,7 +144,7 @@ function ElegantShape({
                     }}
                 />
             </View>
-        </RNAnimated.View>
+        </Animated.View>
     );
 }
 
@@ -253,40 +235,40 @@ export default function AuthScreen() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Animation refs
-    const fadeAnim = useRef(new RNAnimated.Value(0)).current;
-    const slideAnim = useRef(new RNAnimated.Value(50)).current;
-    const formFadeAnim = useRef(new RNAnimated.Value(0)).current;
-    const formSlideAnim = useRef(new RNAnimated.Value(30)).current;
+    // Animation shared values
+    const fadeAnim = useSharedValue(0);
+    const slideAnim = useSharedValue(50);
+    const formFadeAnim = useSharedValue(0);
+    const formSlideAnim = useSharedValue(30);
 
     useEffect(() => {
-        // Entrance animations
-        RNAnimated.parallel([
-            RNAnimated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-            RNAnimated.timing(slideAnim, {
-                toValue: 0,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            RNAnimated.parallel([
-                RNAnimated.timing(formFadeAnim, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true,
-                }),
-                RNAnimated.timing(formSlideAnim, {
-                    toValue: 0,
-                    duration: 600,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        });
+        // Entrance animations - logo first
+        fadeAnim.value = withTiming(1, { duration: 800 });
+        slideAnim.value = withTiming(0, { duration: 800 });
+
+        // Form animations after a delay
+        const timeout = setTimeout(() => {
+            formFadeAnim.value = withTiming(1, { duration: 600 });
+            formSlideAnim.value = withTiming(0, { duration: 600 });
+        }, 800);
+
+        return () => clearTimeout(timeout);
     }, []);
+
+    // Animated styles
+    const logoAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: fadeAnim.value,
+        transform: [{ translateY: slideAnim.value }],
+    }));
+
+    const formAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: formFadeAnim.value,
+        transform: [{ translateY: formSlideAnim.value }],
+    }));
+
+    const footerAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: formFadeAnim.value,
+    }));
 
     // Set error from URL params on mount
     useEffect(() => {
@@ -442,29 +424,23 @@ export default function AuthScreen() {
                 >
                     <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
                         {/* Logo Section */}
-                        <RNAnimated.View
+                        <Animated.View
                             style={[
                                 styles.logoContainer,
-                                {
-                                    opacity: fadeAnim,
-                                    transform: [{ translateY: slideAnim }],
-                                }
+                                logoAnimatedStyle,
                             ]}
                         >
                             <View style={styles.logoGlow}>
                                 <WowLogo width={280} height={100} />
                             </View>
                             <Text style={styles.tagline}>Descubre eventos increíbles</Text>
-                        </RNAnimated.View>
+                        </Animated.View>
 
                         {/* Form Section */}
-                        <RNAnimated.View
+                        <Animated.View
                             style={[
                                 styles.formWrapper,
-                                {
-                                    opacity: formFadeAnim,
-                                    transform: [{ translateY: formSlideAnim }],
-                                }
+                                formAnimatedStyle,
                             ]}
                         >
                             <BlurView intensity={20} tint="dark" style={styles.formBlur}>
@@ -552,17 +528,17 @@ export default function AuthScreen() {
                                     </View>
                                 </LinearGradient>
                             </BlurView>
-                        </RNAnimated.View>
+                        </Animated.View>
 
                         {/* Footer */}
-                        <RNAnimated.Text
+                        <Animated.Text
                             style={[
                                 styles.footerText,
-                                { opacity: formFadeAnim }
+                                footerAnimatedStyle,
                             ]}
                         >
                             Solicita tu código de invitación al administrador
-                        </RNAnimated.Text>
+                        </Animated.Text>
                     </View>
                 </KeyboardAvoidingView>
             </View>
@@ -575,29 +551,23 @@ export default function AuthScreen() {
             <InteractiveBackground />
             <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
                 {/* Logo Section */}
-                <RNAnimated.View
+                <Animated.View
                     style={[
                         styles.logoContainer,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }],
-                        }
+                        logoAnimatedStyle,
                     ]}
                 >
                     <View style={styles.logoGlow}>
                         <WowLogo width={200} height={70} />
                     </View>
                     <Text style={styles.tagline}>Descubre eventos increíbles</Text>
-                </RNAnimated.View>
+                </Animated.View>
 
                 {/* Form Section */}
-                <RNAnimated.View
+                <Animated.View
                     style={[
                         styles.formWrapper,
-                        {
-                            opacity: formFadeAnim,
-                            transform: [{ translateY: formSlideAnim }],
-                        }
+                        formAnimatedStyle,
                     ]}
                 >
                     <BlurView intensity={20} tint="dark" style={styles.formBlur}>
@@ -657,7 +627,7 @@ export default function AuthScreen() {
                             </View>
                         </LinearGradient>
                     </BlurView>
-                </RNAnimated.View>
+                </Animated.View>
 
                 {/* Footer */}
                 <Text style={styles.footerText}>
