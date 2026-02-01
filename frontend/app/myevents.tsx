@@ -2409,16 +2409,26 @@ const styles = StyleSheet.create({
   },
   galleryGradient: {
     width: '100%',
-    height: 200,
+    aspectRatio: 3/4, // Better poster ratio for saved events
     justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  // Image style for saved events - fits properly without excessive zoom
+  savedPosterImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   // Letterboxd poster style - 3 columns for attended events
   posterCard: {
     width: (Dimensions.get('window').width - 52) / 3, // 3 columns: padding 16*2 + gap 10*2 = 52
     aspectRatio: 2/3, // Poster aspect ratio like Letterboxd
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   posterCardTouch: {
     width: '100%',
@@ -2436,17 +2446,19 @@ const styles = StyleSheet.create({
   },
   posterEmojiOverlay: {
     position: 'absolute',
-    top: 6,
+    bottom: 6,
     right: 6,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 12,
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   posterEmojiText: {
-    fontSize: 18,
+    fontSize: 14,
   },
   galleryImage: {
     position: 'absolute',
