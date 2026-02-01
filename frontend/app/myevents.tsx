@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { TouchableOpacity as GestureTouchable, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,7 +29,7 @@ import { useAuth } from '../src/context/AuthContext';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
-const getCategoryGradient = (category: string): string[] => {
+const getCategoryGradient = (category: string): [string, string, ...string[]] => {
   switch (category) {
     case 'music':
       return ['#8B5CF6', '#6D28D9'];
@@ -135,11 +137,99 @@ export default function MyEventsScreen() {
     userName: string;
   }>({ visible: false, imageUrl: '', userName: '' });
 
+  // Animation refs for both galleries
+  const [previousSavedCount, setPreviousSavedCount] = useState(0);
+  const [previousAttendedCount, setPreviousAttendedCount] = useState(0);
+  const savedGalleryAnimations = useRef<Map<string, Animated.Value>>(new Map());
+  const attendedGalleryAnimations = useRef<Map<string, Animated.Value>>(new Map());
+  const initializedSavedAnimations = useRef<Set<string>>(new Set());
+  const initializedAttendedAnimations = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     fetchSavedEvents();
     fetchAttendedEvents();
     fetchHostedEvents();
   }, []);
+
+  // Initialize attended events animations
+  useEffect(() => {
+    attendedEvents.forEach((item) => {
+      if (!initializedAttendedAnimations.current.has(item.event.id)) {
+        const animation = getOrCreateAttendedAnimation(item.event.id);
+        animation.setValue(1);
+        initializedAttendedAnimations.current.add(item.event.id);
+      }
+    });
+
+    if (attendedEvents.length > previousAttendedCount && previousAttendedCount > 0) {
+      const newestEvent = attendedEvents[0];
+      if (newestEvent && !initializedAttendedAnimations.current.has(newestEvent.event.id)) {
+        initializedAttendedAnimations.current.delete(newestEvent.event.id);
+        triggerAttendedInsertAnimation(newestEvent.event.id);
+        initializedAttendedAnimations.current.add(newestEvent.event.id);
+      }
+    }
+    setPreviousAttendedCount(attendedEvents.length);
+  }, [attendedEvents]);
+
+  // Initialize saved events animations
+  useEffect(() => {
+    savedEvents.forEach((item) => {
+      if (!initializedSavedAnimations.current.has(item.event.id)) {
+        const animation = getOrCreateSavedAnimation(item.event.id);
+        animation.setValue(1);
+        initializedSavedAnimations.current.add(item.event.id);
+      }
+    });
+
+    if (savedEvents.length > previousSavedCount && previousSavedCount > 0) {
+      const newestEvent = savedEvents[0];
+      if (newestEvent && !initializedSavedAnimations.current.has(newestEvent.event.id)) {
+        initializedSavedAnimations.current.delete(newestEvent.event.id);
+        triggerSavedInsertAnimation(newestEvent.event.id);
+        initializedSavedAnimations.current.add(newestEvent.event.id);
+      }
+    }
+    setPreviousSavedCount(savedEvents.length);
+  }, [savedEvents]);
+
+  const getOrCreateSavedAnimation = (eventId: string) => {
+    if (!savedGalleryAnimations.current.has(eventId)) {
+      savedGalleryAnimations.current.set(eventId, new Animated.Value(0));
+    }
+    return savedGalleryAnimations.current.get(eventId)!;
+  };
+
+  const getOrCreateAttendedAnimation = (eventId: string) => {
+    if (!attendedGalleryAnimations.current.has(eventId)) {
+      attendedGalleryAnimations.current.set(eventId, new Animated.Value(0));
+    }
+    return attendedGalleryAnimations.current.get(eventId)!;
+  };
+
+  const triggerSavedInsertAnimation = (eventId: string) => {
+    const animation = getOrCreateSavedAnimation(eventId);
+    animation.setValue(0);
+    
+    Animated.spring(animation, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const triggerAttendedInsertAnimation = (eventId: string) => {
+    const animation = getOrCreateAttendedAnimation(eventId);
+    animation.setValue(0);
+    
+    Animated.spring(animation, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -619,7 +709,7 @@ export default function MyEventsScreen() {
     );
   };
 
-  const renderSavedItem = (item: SavedEventData) => {
+  const renderSavedItem = (item: SavedEventData, index: number) => {
     const { event, registration } = item;
     const gradient = getCategoryGradient(event.category);
     const icon = getCategoryIcon(event.category);
@@ -633,15 +723,36 @@ export default function MyEventsScreen() {
     const isPending = registration?.status === 'pending';
     const isRejected = registration?.status === 'rejected';
 
+    const animation = getOrCreateSavedAnimation(event.id);
+
+    const animatedStyle = {
+      opacity: animation,
+      transform: [
+        {
+          scale: animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 1],
+          }),
+        },
+        {
+          translateY: animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [50, 0],
+          }),
+        },
+      ],
+    };
+
     return (
-      <View key={event.id} style={styles.eventCard}>
+      <Animated.View key={event.id} style={[styles.galleryCard, animatedStyle]}>
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => router.push(`/event/${event.id}`)}
+          style={styles.galleryCardTouch}
         >
           <LinearGradient
             colors={gradient}
-            style={styles.cardGradient}
+            style={styles.galleryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
@@ -757,79 +868,64 @@ export default function MyEventsScreen() {
             </GestureTouchable>
           </View>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
-  const renderAttendedItem = (item: AttendedEventData) => {
+  const renderAttendedItem = (item: AttendedEventData, index: number) => {
     const { event, attended } = item;
     const gradient = getCategoryGradient(event.category);
     const icon = getCategoryIcon(event.category);
+    
+    const animation = getOrCreateAttendedAnimation(event.id);
+
+    const animatedStyle = {
+      opacity: animation,
+      transform: [
+        {
+          scale: animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 1],
+          }),
+        },
+        {
+          translateY: animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [30, 0],
+          }),
+        },
+      ],
+    };
 
     return (
-      <View key={event.id} style={styles.eventCard}>
-        <LinearGradient
-          colors={gradient}
-          style={styles.cardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <Animated.View key={event.id} style={[styles.posterCard, animatedStyle]}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push(`/event/${event.id}`)}
+          style={styles.posterCardTouch}
         >
-          {event.image ? (
-            <Image source={{ uri: event.image }} style={styles.cardImage} />
-          ) : (
-            <View style={styles.cardIconContainer}>
-              <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
-            </View>
-          )}
-          {attended.emoji_rating && (
-            <View style={styles.emojiOverlay}>
-              <Text style={styles.emojiText}>{attended.emoji_rating}</Text>
-            </View>
-          )}
-        </LinearGradient>
-
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {event.title}
-          </Text>
-          {event.date && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText}>{event.date}</Text>
-            </View>
-          )}
-          {event.location && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText} numberOfLines={1}>
-                {event.location}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.rateButton}
-              onPress={() => handleMarkAttended(event.id, event.title)}
-            >
-              <Text style={styles.rateButtonText}>
-                {attended.emoji_rating ? 'Cambiar' : 'Calificar'}
-              </Text>
-            </TouchableOpacity>
-            <GestureTouchable
-              style={styles.removeButton}
-              onPress={() => {
-                console.log('Delete attended pressed:', event.id);
-                handleRemoveAttended(event.id);
-              }}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </GestureTouchable>
-          </View>
-        </View>
-      </View>
+          <LinearGradient
+            colors={gradient}
+            style={styles.posterGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {event.image ? (
+              <Image source={{ uri: event.image }} style={styles.posterImage} />
+            ) : (
+              <View style={styles.galleryIconContainer}>
+                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
+              </View>
+            )}
+            
+            {attended.emoji_rating && (
+              <View style={styles.posterEmojiOverlay}>
+                <Text style={styles.posterEmojiText}>{attended.emoji_rating}</Text>
+              </View>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -902,7 +998,7 @@ export default function MyEventsScreen() {
 
       <GestureScrollView
         style={styles.content}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={activeTab === 'attended' && attendedEvents.length > 0 ? styles.galleryGrid : styles.listContent}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -934,7 +1030,10 @@ export default function MyEventsScreen() {
               </Text>
             </View>
           ) : (
-            attendedEvents.map(renderAttendedItem)
+            <>
+              {attendedEvents.map(renderAttendedItem)}
+              <View style={{ width: '100%', height: insets.bottom + 20 }} />
+            </>
           )
         ) : (
           hostedEvents.length === 0 ? (
@@ -946,11 +1045,16 @@ export default function MyEventsScreen() {
               </Text>
             </View>
           ) : (
-            hostedEvents.map(renderHostedItem)
+            <>
+              {hostedEvents.map(renderHostedItem)}
+              <View style={{ height: insets.bottom + 20 }} />
+            </>
           )
         )}
-
-        <View style={{ height: insets.bottom + 20 }} />
+        
+        {(activeTab === 'saved' && savedEvents.length > 0) && (
+          <View style={{ height: insets.bottom + 20 }} />
+        )}
       </GestureScrollView>
 
       <EmojiRating
@@ -1548,6 +1652,12 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
   },
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
   eventCard: {
     flexDirection: 'row',
     backgroundColor: '#1F1F1F',
@@ -1560,8 +1670,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardImage: {
-    width: '100%',
-    height: '100%',
+    width: 100,
+    height: 100,
+    resizeMode: 'cover',
   },
   cardIconContainer: {
     width: '100%',
@@ -2244,5 +2355,131 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  // Gallery styles - 2 columns for saved events
+  galleryCard: {
+    width: (Dimensions.get('window').width - 52) / 2, // 2 columns with padding
+    marginBottom: 16,
+    backgroundColor: '#1F1F1F',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  galleryCardTouch: {
+    width: '100%',
+  },
+  galleryGradient: {
+    width: '100%',
+    height: 200,
+    justifyContent: 'flex-end',
+  },
+  // Letterboxd poster style - 3 columns for attended events
+  posterCard: {
+    width: (Dimensions.get('window').width - 68) / 3, // 3 columns
+    aspectRatio: 1, // Square
+    marginBottom: 12,
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  posterCardTouch: {
+    width: '100%',
+    height: '100%',
+  },
+  posterGradient: {
+    width: '100%',
+    height: '100%',
+  },
+  posterImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  posterEmojiOverlay: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  posterEmojiText: {
+    fontSize: 18,
+  },
+  galleryImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  galleryIconContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryEmojiOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  galleryEmojiText: {
+    fontSize: 24,
+  },
+  galleryBottomGradient: {
+    padding: 12,
+    paddingTop: 30,
+  },
+  galleryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  galleryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  galleryInfoText: {
+    fontSize: 11,
+    color: '#D1D5DB',
+  },
+  galleryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 8,
+    paddingHorizontal: 12,
+  },
+  galleryRateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 8,
+    justifyContent: 'center',
+  },
+  galleryRateText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  galleryDeleteButton: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

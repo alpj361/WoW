@@ -182,6 +182,9 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
       if (error) throw error;
 
+      // DEBUG: Log raw data from Supabase
+      console.log('[FETCH SAVED] Raw data from Supabase:', JSON.stringify(data?.slice(0, 2), null, 2));
+
       // Fetch registrations for these events
       const eventIds = (data || []).map((item: any) => item.event_id);
       const { data: registrations } = await supabase
@@ -203,6 +206,12 @@ export const useEventStore = create<EventStore>((set, get) => ({
         event: item.events,
         registration: registrationMap.get(item.event_id) || null,
       }));
+
+      // DEBUG: Check which events have images
+      console.log('[SAVED EVENTS] Summary:');
+      savedEvents.forEach((se, idx) => {
+        console.log(`  [${idx}] ${se.event.title}: image=${se.event.image ? 'YES (' + se.event.image.substring(0, 30) + '...)' : 'NO'}`);
+      });
 
       set({ savedEvents, isLoading: false });
     } catch (error: any) {
@@ -259,6 +268,12 @@ export const useEventStore = create<EventStore>((set, get) => ({
         event: item.events,
       }));
 
+      // DEBUG: Check attended events images
+      console.log('[ATTENDED EVENTS] Summary:');
+      attendedEvents.forEach((ae, idx) => {
+        console.log(`  [${idx}] ${ae.event.title}: image=${ae.event.image ? 'YES (' + ae.event.image.substring(0, 30) + '...)' : 'NO'}`);
+      });
+
       set({ attendedEvents, isLoading: false });
     } catch (error: any) {
       console.error('Error fetching attended events:', error);
@@ -276,6 +291,13 @@ export const useEventStore = create<EventStore>((set, get) => ({
       }
 
       const events = await api.fetchHostedEvents(user.id);
+      
+      // DEBUG: Check hosted events images
+      console.log('[HOSTED EVENTS] Summary:');
+      events.forEach((event, idx) => {
+        console.log(`  [${idx}] ${event.title}: image=${event.image ? 'YES (' + event.image.substring(0, 30) + '...)' : 'NO'}`);
+      });
+      
       set({
         hostedEvents: events.map(event => ({ event })),
         isLoading: false
