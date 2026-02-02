@@ -1677,10 +1677,9 @@ const styles = StyleSheet.create({
   posterGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
     padding: 12,
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: 12,
+    gap: 6,
   },
   eventCard: {
     flexDirection: 'row',
