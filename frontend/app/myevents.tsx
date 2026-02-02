@@ -2398,7 +2398,7 @@ const styles = StyleSheet.create({
   },
   // Gallery styles - 2 columns for saved events
   galleryCard: {
-    width: (Dimensions.get('window').width - 52) / 2, // 2 columns with padding
+    width: '47%', // 2 columns with gap
     marginBottom: 16,
     backgroundColor: '#1F1F1F',
     borderRadius: 16,
