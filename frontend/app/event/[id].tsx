@@ -282,9 +282,6 @@ export default function EventDetails() {
 
             {/* Action Bar */}
             <View style={styles.actionBar}>
-                <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="heart-outline" size={24} color="#FFF" />
-                </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.primaryButton}
                     onPress={handleAttendClick}

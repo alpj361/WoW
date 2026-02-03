@@ -42,6 +42,9 @@ export interface AttendedEventData {
     id: string;
     event_id: string;
     emoji_rating: string | null;
+    reaction_sticker: string | null;
+    reaction_gif: string | null;
+    reaction_comment: string | null;
     attended_at: string;
   };
   event: Event;
@@ -57,6 +60,18 @@ export interface HostedEventData {
   event: Event & {
     attendee_count?: number;
   };
+}
+
+export interface PublicReaction {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_avatar: string | null;
+  emoji_rating: string | null;
+  reaction_sticker: string | null;
+  reaction_gif: string | null;
+  reaction_comment: string | null;
+  attended_at: string;
 }
 
 interface EventStore {
@@ -84,6 +99,8 @@ interface EventStore {
   unsaveEvent: (eventId: string) => Promise<void>;
   denyEvent: (eventId: string) => Promise<void>;
   markAttended: (eventId: string, emoji?: string) => Promise<void>;
+  updateEventReaction: (eventId: string, reaction: { emoji_rating?: string | null; reaction_sticker?: string | null; reaction_gif?: string | null; reaction_comment?: string | null }) => Promise<void>;
+  fetchPublicReactions: (eventId: string) => Promise<PublicReaction[]>;
   removeAttended: (eventId: string) => Promise<void>;
   createEvent: (eventData: Partial<Event> & { user_id?: string | null }) => Promise<Event>;
   setCategory: (category: string) => void;
@@ -263,6 +280,9 @@ export const useEventStore = create<EventStore>((set, get) => ({
           id: item.id,
           event_id: item.event_id,
           emoji_rating: item.emoji_rating,
+          reaction_sticker: item.reaction_sticker || null,
+          reaction_gif: item.reaction_gif || null,
+          reaction_comment: item.reaction_comment || null,
           attended_at: item.attended_at,
         },
         event: item.events,
@@ -291,13 +311,13 @@ export const useEventStore = create<EventStore>((set, get) => ({
       }
 
       const events = await api.fetchHostedEvents(user.id);
-      
+
       // DEBUG: Check hosted events images
       console.log('[HOSTED EVENTS] Summary:');
       events.forEach((event, idx) => {
         console.log(`  [${idx}] ${event.title}: image=${event.image ? 'YES (' + event.image.substring(0, 30) + '...)' : 'NO'}`);
       });
-      
+
       set({
         hostedEvents: events.map(event => ({ event })),
         isLoading: false
@@ -485,6 +505,9 @@ export const useEventStore = create<EventStore>((set, get) => ({
             id: data.id,
             event_id: data.event_id,
             emoji_rating: data.emoji_rating,
+            reaction_sticker: data.reaction_sticker || null,
+            reaction_gif: data.reaction_gif || null,
+            reaction_comment: data.reaction_comment || null,
             attended_at: data.attended_at,
           },
           event,
@@ -505,6 +528,84 @@ export const useEventStore = create<EventStore>((set, get) => ({
     } catch (error: any) {
       console.error('Error marking attended:', error);
       throw error;
+    }
+  },
+
+  updateEventReaction: async (eventId: string, reaction: { emoji_rating?: string | null; reaction_sticker?: string | null; reaction_gif?: string | null; reaction_comment?: string | null }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const updateData: Record<string, any> = {};
+      if (reaction.emoji_rating !== undefined) updateData.emoji_rating = reaction.emoji_rating;
+      if (reaction.reaction_sticker !== undefined) updateData.reaction_sticker = reaction.reaction_sticker;
+      if (reaction.reaction_gif !== undefined) updateData.reaction_gif = reaction.reaction_gif;
+      if (reaction.reaction_comment !== undefined) updateData.reaction_comment = reaction.reaction_comment;
+
+      const { error } = await supabase
+        .from('attended_events')
+        .update(updateData)
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
+      // Update local state
+      set(state => ({
+        attendedEvents: state.attendedEvents.map(ae =>
+          ae.attended.event_id === eventId
+            ? {
+              ...ae,
+              attended: {
+                ...ae.attended,
+                ...updateData,
+              },
+            }
+            : ae
+        ),
+      }));
+    } catch (error: any) {
+      console.error('Error updating reaction:', error);
+      throw error;
+    }
+  },
+
+  fetchPublicReactions: async (eventId: string): Promise<PublicReaction[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('attended_events')
+        .select(`
+          id,
+          user_id,
+          emoji_rating,
+          reaction_sticker,
+          reaction_gif,
+          reaction_comment,
+          attended_at,
+          profiles:user_id (
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('event_id', eventId)
+        .order('attended_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        user_name: item.profiles?.full_name || 'Usuario',
+        user_avatar: item.profiles?.avatar_url || null,
+        emoji_rating: item.emoji_rating,
+        reaction_sticker: item.reaction_sticker,
+        reaction_gif: item.reaction_gif,
+        reaction_comment: item.reaction_comment,
+        attended_at: item.attended_at,
+      }));
+    } catch (error: any) {
+      console.error('Error fetching public reactions:', error);
+      return [];
     }
   },
 

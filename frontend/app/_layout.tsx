@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from 'react';
-import { Tabs, Slot, useSegments, useRouter } from 'expo-router';
+import { Tabs, Slot, useSegments, useRouter, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,20 +17,24 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const [isProcessingAuth, setIsProcessingAuth] = useState(false);
+  const [isVerifiedAuth, setIsVerifiedAuth] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
   const navigationRef = useRef(false);
 
   // Check if we're on an auth route
   const isAuthRoute = segments[0] === 'auth' || segments[0] === 'auth-callback' || segments[0] === 'auth-verify';
 
-  // Check if auth callback is processing
+  // Check if auth callback is processing or verified
   useEffect(() => {
     // Initial check
-    setIsProcessingAuth(authState.getState().isProcessing);
+    const initialState = authState.getState();
+    setIsProcessingAuth(initialState.isProcessing);
+    setIsVerifiedAuth(initialState.isVerified);
 
     // Subscribe to changes
     const unsubscribe = authState.subscribe((state) => {
       setIsProcessingAuth(state.isProcessing);
+      setIsVerifiedAuth(state.isVerified);
     });
 
     return () => unsubscribe();
@@ -52,6 +56,8 @@ function RootLayoutNav() {
   }, [loading]);
 
   // Handle navigation based on auth state
+  // CRITICAL: We do NOT redirect to /auth when no user - that causes infinite loop.
+  // Instead, we conditionally render auth screen below.
   useEffect(() => {
     // Don't navigate while loading or processing auth (unless timed out)
     if ((loading && !hasTimedOut) || isProcessingAuth) {
@@ -60,6 +66,7 @@ function RootLayoutNav() {
 
     // Prevent multiple navigations
     if (navigationRef.current) {
+      console.log('🔍 _layout: Navigation already pending, skipping');
       return;
     }
 
@@ -69,17 +76,7 @@ function RootLayoutNav() {
       return;
     }
 
-    // Case 2: Not authenticated (no user) and not on auth route - go to auth
-    // Also redirect if session exists but no user (incomplete auth state)
-    if (!user && !isAuthRoute) {
-      console.log('🔍 _layout: No user, not on auth route, redirecting to /auth');
-      navigationRef.current = true;
-      router.replace('/auth');
-      setTimeout(() => { navigationRef.current = false; }, 1000);
-      return;
-    }
-
-    // Case 3: Authenticated user on auth screen (not callback) - go to home
+    // Case 2: Authenticated user on auth screen - go to home
     // Only do this if on /auth specifically, not auth-callback
     if (user && segments[0] === 'auth' && segments.length === 1) {
       console.log('🔍 _layout: User authenticated on /auth, redirecting to /');
@@ -88,7 +85,9 @@ function RootLayoutNav() {
       setTimeout(() => { navigationRef.current = false; }, 1000);
       return;
     }
-  }, [user, loading, hasTimedOut, isAuthRoute, isProcessingAuth, segments, router]);
+
+    // NOTE: We do NOT redirect to /auth here - that's handled by conditional rendering below
+  }, [user, loading, hasTimedOut, isAuthRoute, isProcessingAuth, isVerifiedAuth, segments, router]);
 
   // If on auth route, render just that screen (let it handle its flow)
   // CRITICAL: Check this BEFORE loading state, otherwise auth-callback is blocked
@@ -112,13 +111,20 @@ function RootLayoutNav() {
     );
   }
 
-  // If not authenticated and not on auth route, show loading briefly while redirecting
-  if (!user) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-      </View>
-    );
+  // If not authenticated and not on auth route, redirect to auth
+  // Using Redirect component instead of router.replace() to avoid infinite loop
+  if (!user && !isAuthRoute) {
+    // If auth-callback marked user as verified, wait for state update
+    if (isVerifiedAuth) {
+      console.log('🔍 _layout: Waiting for user state after verification');
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+        </View>
+      );
+    }
+    console.log('🔍 _layout: No user, using Redirect to /auth');
+    return <Redirect href="/auth" />;
   }
 
   // Authenticated - show tabs

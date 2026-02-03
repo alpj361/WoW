@@ -18,6 +18,8 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Module-level flag removed - using authState.isInitialized instead (survives module reloads)
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
@@ -40,7 +42,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Prevent race condition with double initialization
+        // Prevent re-initialization on component remount (critical for expo-router)
+        // Using authState.isInitialized which persists across module reloads
+        if (authState.getState().isInitialized) {
+            console.log('⚠️ Already initialized once, skipping (authState check)');
+            return;
+        }
+        authState.setInitialized(true);
+
+        // Also set the ref for within-render safety
         if (isInitializing.current) {
             console.log('⚠️ Already initializing, skipping duplicate call');
             return;
@@ -54,6 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, newSession) => {
                 console.log('🔍 Auth state change:', event, newSession?.user?.email);
+
+                // INITIAL_SESSION is handled by initializeAuth() - skip to avoid duplicated work
+                if (event === 'INITIAL_SESSION') {
+                    console.log('⏭️ Skipping INITIAL_SESSION (handled by initializeAuth)');
+                    return;
+                }
 
                 // Check if auth-callback is processing - don't interfere
                 const isProcessing = authState.getState().isProcessing;
@@ -96,16 +112,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         console.log('✅ Profile found in onAuthStateChange');
                         setUser(newSession.user);
                         setProfile(profileData);
+                        // Reset authState now that user is fully authenticated
+                        authState.reset();
                     } else {
                         // Si no hay datos en ningún lado
                         console.log('❌ No profile in onAuthStateChange (and no cache), user not set');
                         setUser(null);
                         setProfile(null);
+                        authState.reset();
                     }
 
                     setLoading(false);
                 } else if (event === 'SIGNED_OUT') {
                     console.log('🚪 SIGNED_OUT event received');
+                    authState.reset();
                     setSession(null);
                     setUser(null);
                     setProfile(null);
@@ -187,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.log('🚀 Using cached profile for instant load');
                     setUser(session.user);
                     setProfile(cachedProfile);
+                    authState.reset(); // Clean state after successful load
                     setLoading(false);
                     return; // NO fetch - cache is sufficient
                 }
@@ -196,10 +217,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (profileData) {
                     setUser(session.user);
                     setProfile(profileData);
+                    authState.reset(); // Clean state after successful load
                 } else {
                     // No cache AND fetch failed - treat as no profile
                     console.log('❌ No profile on init (and no cache)');
                     setUser(null);
+                    authState.reset();
                 }
             }
         } catch (error: any) {

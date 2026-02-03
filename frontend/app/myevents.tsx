@@ -40,6 +40,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { EventListSkeleton } from '../src/components/SkeletonLoader';
 import { AnimatedToast } from '../src/components/AnimatedToast';
 import { CollectibleAnimation } from '../src/components/CollectibleAnimation';
+import EventReactionsModal, { EventReaction } from '../src/components/EventReactionsModal';
 
 type Tab = 'saved' | 'attended' | 'hosted';
 
@@ -81,6 +82,7 @@ export default function MyEventsScreen() {
     rejectRegistration,
     unsaveEvent,
     markAttended,
+    updateEventReaction,
     removeAttended,
     resubmitRegistration,
     deleteEvent,
@@ -167,6 +169,11 @@ export default function MyEventsScreen() {
     userName: string;
   }>({ visible: false, imageUrl: '', userName: '' });
 
+  const [reactionsModal, setReactionsModal] = useState<{
+    visible: boolean;
+    attendedEvent: AttendedEventData | null;
+  }>({ visible: false, attendedEvent: null });
+
   // Track previous counts for detecting new items (for haptic feedback)
   const [previousSavedCount, setPreviousSavedCount] = useState(0);
   const [previousAttendedCount, setPreviousAttendedCount] = useState(0);
@@ -195,7 +202,7 @@ export default function MyEventsScreen() {
       } else {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
@@ -237,7 +244,7 @@ export default function MyEventsScreen() {
       await markAttended(ratingModal.eventId, emoji || undefined);
       triggerHaptic('success');
       setRatingModal({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' });
-      
+
       // Show collectible animation
       setCollectibleAnimation({
         visible: true,
@@ -256,72 +263,103 @@ export default function MyEventsScreen() {
     showToast('¡Evento coleccionado!', 'success');
   };
 
-  const handleUnsave = (eventId: string) => {
+  const handleUnsave = async (eventId: string) => {
     triggerHaptic('warning');
-    Alert.alert(
-      'Eliminar de guardados',
-      '¿Seguro que quieres quitar este evento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await unsaveEvent(eventId);
-              showToast('Evento eliminado', 'info');
-            } catch (error) {
-              console.error('Error unsaving:', error);
-              Alert.alert('Error', 'No se pudo eliminar de guardados');
-            }
+
+    const doUnsave = async () => {
+      try {
+        await unsaveEvent(eventId);
+        showToast('Evento eliminado', 'info');
+      } catch (error) {
+        console.error('Error unsaving:', error);
+        if (Platform.OS === 'web') {
+          alert('No se pudo eliminar de guardados');
+        } else {
+          Alert.alert('Error', 'No se pudo eliminar de guardados');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // Use window.confirm for web
+      if (window.confirm('¿Seguro que quieres quitar este evento de guardados?')) {
+        await doUnsave();
+      }
+    } else {
+      // Use Alert.alert for native
+      Alert.alert(
+        'Eliminar de guardados',
+        '¿Seguro que quieres quitar este evento?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Eliminar',
+            style: 'destructive',
+            onPress: doUnsave,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
 
-  const handleRemoveAttended = (eventId: string) => {
-    Alert.alert(
-      'Eliminar de asistidos',
-      '¿Seguro que quieres quitar este evento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeAttended(eventId);
-            } catch (error) {
-              console.error('Error removing attended:', error);
-              Alert.alert('Error', 'No se pudo eliminar de asistidos');
-            }
-          },
-        },
-      ]
-    );
+  const handleRemoveAttended = async (eventId: string) => {
+    const doRemove = async () => {
+      try {
+        await removeAttended(eventId);
+      } catch (error) {
+        console.error('Error removing attended:', error);
+        if (Platform.OS === 'web') {
+          alert('No se pudo eliminar de asistidos');
+        } else {
+          Alert.alert('Error', 'No se pudo eliminar de asistidos');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Seguro que quieres quitar este evento de asistidos?')) {
+        await doRemove();
+      }
+    } else {
+      Alert.alert(
+        'Eliminar de asistidos',
+        '¿Seguro que quieres quitar este evento?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar', style: 'destructive', onPress: doRemove },
+        ]
+      );
+    }
   };
 
-  const handleDeleteHosted = (eventId: string) => {
-    Alert.alert(
-      'Eliminar evento',
-      '¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteEvent(eventId);
-            } catch (error) {
-              Alert.alert('Error', 'No se pudo eliminar el evento.');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteHosted = async (eventId: string) => {
+    const doDelete = async () => {
+      try {
+        await deleteEvent(eventId);
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          alert('No se pudo eliminar el evento.');
+        } else {
+          Alert.alert('Error', 'No se pudo eliminar el evento.');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.')) {
+        await doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Eliminar evento',
+        '¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
   const handleShowAttendees = async (eventId: string, eventTitle: string) => {
     // Check if event has price/registration - show registrations modal instead
@@ -379,13 +417,13 @@ export default function MyEventsScreen() {
 
   const loadAttendanceListInModal = async () => {
     if (!registrationsModal.eventId) return;
-    
+
     setAttendanceListModal(prev => ({ ...prev, loading: true }));
     try {
       const attendees = await getAttendanceList(registrationsModal.eventId);
-      setAttendanceListModal(prev => ({ 
-        ...prev, 
-        attendees, 
+      setAttendanceListModal(prev => ({
+        ...prev,
+        attendees,
         loading: false,
         eventId: registrationsModal.eventId,
         eventTitle: registrationsModal.eventTitle
@@ -398,7 +436,7 @@ export default function MyEventsScreen() {
 
   const handleTabChange = async (tab: 'payments' | 'attendance') => {
     setRegistrationsModal(prev => ({ ...prev, activeTab: tab }));
-    
+
     // Load attendance list if switching to attendance tab
     if (tab === 'attendance' && registrationsModal.hasAttendance) {
       await loadAttendanceListInModal();
@@ -538,47 +576,47 @@ export default function MyEventsScreen() {
     try {
       // scannedData should be the user_id from the QR code
       await scanAttendance(scannerModal.eventId, scannedData, user.id);
-      
+
       // Refresh the attendance list to show updated status
       if (attendanceListModal.eventId === scannerModal.eventId) {
         const attendees = await getAttendanceList(scannerModal.eventId);
         setAttendanceListModal(prev => ({ ...prev, attendees }));
       }
-      
+
       // Refresh hosted events
       await fetchHostedEvents();
     } catch (error: any) {
       console.error('Error scanning attendance:', error);
-      
+
       // Extract error message from response
       let errorMessage = 'No se pudo registrar la asistencia';
-      
+
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       // Show user-friendly error messages
       if (errorMessage.includes('not confirmed')) {
         Alert.alert(
-          'Usuario No Confirmado', 
+          'Usuario No Confirmado',
           'Este usuario no está confirmado para el evento. Debe estar registrado y aprobado primero.'
         );
       } else if (errorMessage.includes('not require attendance')) {
         Alert.alert(
-          'Asistencia No Requerida', 
+          'Asistencia No Requerida',
           'Este evento no tiene habilitada la opción de llevar asistencia.'
         );
       } else if (errorMessage.includes('Only the event host')) {
         Alert.alert(
-          'Sin Permiso', 
+          'Sin Permiso',
           'Solo el organizador del evento puede escanear asistencias.'
         );
       } else {
         Alert.alert('Error al Escanear', errorMessage);
       }
-      
+
       throw error; // Re-throw to let QRScanner handle it
     }
   };
@@ -657,7 +695,7 @@ export default function MyEventsScreen() {
                 <Text style={styles.scanButtonText}>Escanear</Text>
               </TouchableOpacity>
             )}
-            
+
             {/* Si tiene AMBOS (pagos Y asistencia) - mostrar UN SOLO botón que abre el modal con tabs */}
             {((event.price && parseFloat(String(event.price)) > 0) || event.registration_form_url) && event.requires_attendance_check ? (
               <TouchableOpacity
@@ -695,18 +733,20 @@ export default function MyEventsScreen() {
                 <Text style={styles.viewAttendeesText}>Lista</Text>
               </TouchableOpacity>
             )}
-            
-            <GestureTouchable
-              style={styles.removeButton}
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.removeButton,
+                pressed && { opacity: 0.6 }
+              ]}
               onPress={() => {
                 console.log('Delete hosted pressed:', event.id);
                 handleDeleteHosted(event.id);
               }}
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              activeOpacity={0.6}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </GestureTouchable>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -844,17 +884,19 @@ export default function MyEventsScreen() {
                 <Text style={styles.attendButtonText}>Asistí</Text>
               </TouchableOpacity>
             ) : null}
-            <GestureTouchable
-              style={styles.removeButton}
+            <Pressable
+              style={({ pressed }) => [
+                styles.removeButton,
+                pressed && { opacity: 0.6 }
+              ]}
               onPress={() => {
                 console.log('Delete saved pressed:', event.id);
                 handleUnsave(event.id);
               }}
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              activeOpacity={0.6}
             >
               <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </GestureTouchable>
+            </Pressable>
           </View>
         </View>
       </Animated.View>
@@ -865,7 +907,7 @@ export default function MyEventsScreen() {
     const { event, attended } = item;
     const gradient = getCategoryGradient(event.category);
     const icon = getCategoryIcon(event.category);
-    
+
     return (
       <Animated.View
         key={event.id}
@@ -875,7 +917,8 @@ export default function MyEventsScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => router.push(`/event/${event.id}`)}
+          onPress={() => setReactionsModal({ visible: true, attendedEvent: item })}
+          onLongPress={() => router.push(`/event/${event.id}`)}
           style={styles.posterCardTouch}
         >
           <LinearGradient
@@ -891,7 +934,7 @@ export default function MyEventsScreen() {
                 <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
               </View>
             )}
-            
+
             {attended.emoji_rating && (
               <View style={styles.posterEmojiOverlay}>
                 <Text style={styles.posterEmojiText}>{attended.emoji_rating}</Text>
@@ -1007,7 +1050,7 @@ export default function MyEventsScreen() {
               <Text style={styles.emptyText}>
                 Los eventos que guardes aparecerán aquí
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.exploreButton}
                 onPress={() => router.push('/')}
               >
@@ -1057,7 +1100,7 @@ export default function MyEventsScreen() {
             </>
           )
         )}
-        
+
         {(activeTab === 'saved' && savedEvents.length > 0) && (
           <View style={{ height: insets.bottom + 20 }} />
         )}
@@ -1079,6 +1122,31 @@ export default function MyEventsScreen() {
         emoji={collectibleAnimation.emoji}
         onComplete={handleCollectibleAnimationComplete}
       />
+
+      {/* Event Reactions Modal */}
+      {reactionsModal.attendedEvent && (
+        <EventReactionsModal
+          visible={reactionsModal.visible}
+          onClose={() => setReactionsModal({ visible: false, attendedEvent: null })}
+          event={{
+            id: reactionsModal.attendedEvent.event.id,
+            title: reactionsModal.attendedEvent.event.title,
+            image: reactionsModal.attendedEvent.event.image,
+            category: reactionsModal.attendedEvent.event.category,
+            date: reactionsModal.attendedEvent.event.date ?? undefined,
+          }}
+          currentReaction={{
+            emoji_rating: reactionsModal.attendedEvent.attended.emoji_rating,
+            reaction_sticker: reactionsModal.attendedEvent.attended.reaction_sticker,
+            reaction_gif: reactionsModal.attendedEvent.attended.reaction_gif,
+            reaction_comment: reactionsModal.attendedEvent.attended.reaction_comment,
+          }}
+          onSave={async (reaction) => {
+            await updateEventReaction(reactionsModal.attendedEvent!.event.id, reaction);
+            // Modal now manages its own state and reloads reactions
+          }}
+        />
+      )}
 
       {/* Attendees Modal */}
       {attendeesModal.visible && (
@@ -1198,72 +1266,72 @@ export default function MyEventsScreen() {
                 </View>
               ) : (
                 <ScrollView style={styles.attendeesList}>
-                {registrationsModal.registrations.map((registration) => (
-                  <View key={registration.id} style={styles.registrationItem}>
-                    {registration.user?.avatar_url ? (
-                      <Image source={{ uri: registration.user.avatar_url }} style={styles.attendeeAvatar} />
-                    ) : (
-                      <View style={styles.attendeeAvatarPlaceholder}>
-                        <Ionicons name="person" size={20} color="#9CA3AF" />
+                  {registrationsModal.registrations.map((registration) => (
+                    <View key={registration.id} style={styles.registrationItem}>
+                      {registration.user?.avatar_url ? (
+                        <Image source={{ uri: registration.user.avatar_url }} style={styles.attendeeAvatar} />
+                      ) : (
+                        <View style={styles.attendeeAvatarPlaceholder}>
+                          <Ionicons name="person" size={20} color="#9CA3AF" />
+                        </View>
+                      )}
+                      <View style={styles.registrationInfo}>
+                        <Text style={styles.attendeeName}>
+                          {registration.user?.full_name || 'Usuario'}
+                        </Text>
+                        <Text style={styles.attendeeEmail}>
+                          {registration.user?.email || 'Sin email'}
+                        </Text>
+                        <View style={styles.statusBadgeContainer}>
+                          {registration.status === 'pending' && (
+                            <View style={[styles.statusBadge, { backgroundColor: '#F59E0B' }]}>
+                              <Text style={styles.statusBadgeText}>Pendiente</Text>
+                            </View>
+                          )}
+                          {registration.status === 'approved' && (
+                            <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
+                              <Text style={styles.statusBadgeText}>Aprobado</Text>
+                            </View>
+                          )}
+                          {registration.status === 'rejected' && (
+                            <View style={[styles.statusBadge, { backgroundColor: '#EF4444' }]}>
+                              <Text style={styles.statusBadgeText}>Rechazado</Text>
+                            </View>
+                          )}
+                        </View>
+                        {registration.payment_receipt_url && (
+                          <TouchableOpacity
+                            style={styles.viewReceiptButton}
+                            onPress={() => setReceiptModal({
+                              visible: true,
+                              imageUrl: registration.payment_receipt_url!,
+                              userName: registration.user?.full_name || 'Usuario'
+                            })}
+                          >
+                            <Ionicons name="image" size={14} color="#8B5CF6" />
+                            <Text style={styles.viewReceiptText}>Ver comprobante</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
-                    )}
-                    <View style={styles.registrationInfo}>
-                      <Text style={styles.attendeeName}>
-                        {registration.user?.full_name || 'Usuario'}
-                      </Text>
-                      <Text style={styles.attendeeEmail}>
-                        {registration.user?.email || 'Sin email'}
-                      </Text>
-                      <View style={styles.statusBadgeContainer}>
-                        {registration.status === 'pending' && (
-                          <View style={[styles.statusBadge, { backgroundColor: '#F59E0B' }]}>
-                            <Text style={styles.statusBadgeText}>Pendiente</Text>
-                          </View>
-                        )}
-                        {registration.status === 'approved' && (
-                          <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
-                            <Text style={styles.statusBadgeText}>Aprobado</Text>
-                          </View>
-                        )}
-                        {registration.status === 'rejected' && (
-                          <View style={[styles.statusBadge, { backgroundColor: '#EF4444' }]}>
-                            <Text style={styles.statusBadgeText}>Rechazado</Text>
-                          </View>
-                        )}
-                      </View>
-                      {registration.payment_receipt_url && (
-                        <TouchableOpacity
-                          style={styles.viewReceiptButton}
-                          onPress={() => setReceiptModal({ 
-                            visible: true, 
-                            imageUrl: registration.payment_receipt_url!,
-                            userName: registration.user?.full_name || 'Usuario'
-                          })}
-                        >
-                          <Ionicons name="image" size={14} color="#8B5CF6" />
-                          <Text style={styles.viewReceiptText}>Ver comprobante</Text>
-                        </TouchableOpacity>
+                      {registration.status === 'pending' && (
+                        <View style={styles.registrationActions}>
+                          <TouchableOpacity
+                            style={styles.approveButton}
+                            onPress={() => handleApprove(registration.id)}
+                          >
+                            <Ionicons name="checkmark" size={18} color="#10B981" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.rejectButton}
+                            onPress={() => handleRejectClick(registration.id, registration.user?.full_name || 'Usuario')}
+                          >
+                            <Ionicons name="close" size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
-                    {registration.status === 'pending' && (
-                      <View style={styles.registrationActions}>
-                        <TouchableOpacity
-                          style={styles.approveButton}
-                          onPress={() => handleApprove(registration.id)}
-                        >
-                          <Ionicons name="checkmark" size={18} color="#10B981" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.rejectButton}
-                          onPress={() => handleRejectClick(registration.id, registration.user?.full_name || 'Usuario')}
-                        >
-                          <Ionicons name="close" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </ScrollView>
+                  ))}
+                </ScrollView>
               )
             ) : (
               // Tab de Asistencia
@@ -1502,8 +1570,8 @@ export default function MyEventsScreen() {
 
             <View style={styles.receiptImageContainer}>
               {receiptModal.imageUrl ? (
-                <Image 
-                  source={{ uri: receiptModal.imageUrl }} 
+                <Image
+                  source={{ uri: receiptModal.imageUrl }}
                   style={styles.fullReceiptImage}
                   resizeMode="contain"
                 />
@@ -2409,7 +2477,7 @@ const styles = StyleSheet.create({
   },
   galleryGradient: {
     width: '100%',
-    aspectRatio: 3/4, // Better poster ratio for saved events
+    aspectRatio: 3 / 4, // Better poster ratio for saved events
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
@@ -2423,7 +2491,7 @@ const styles = StyleSheet.create({
   // Letterboxd poster style - 3 columns for attended events
   posterCard: {
     width: '31.5%', // ~3 columns with gaps
-    aspectRatio: 2/3, // Poster aspect ratio like Letterboxd
+    aspectRatio: 2 / 3, // Poster aspect ratio like Letterboxd
     backgroundColor: '#1A1A1A',
     borderRadius: 6,
     overflow: 'hidden',

@@ -8,12 +8,14 @@ type AuthStateListener = (state: AuthState) => void;
 interface AuthState {
     isProcessing: boolean;
     isVerified: boolean;
+    isInitialized: boolean;  // Track if auth has been initialized (survives remounts)
 }
 
 class AuthStateManager {
     private state: AuthState = {
         isProcessing: false,
         isVerified: false,
+        isInitialized: false,
     };
     private listeners: Set<AuthStateListener> = new Set();
 
@@ -31,12 +33,22 @@ class AuthStateManager {
         this.notify();
     }
 
+    setInitialized(value: boolean): void {
+        this.state.isInitialized = value;
+        // Don't notify - this is for internal tracking only
+    }
+
     reset(): void {
-        this.state = {
-            isProcessing: false,
-            isVerified: false,
-        };
-        this.notify();
+        // Only notify if state actually changed
+        // Note: we do NOT reset isInitialized - that should persist
+        if (this.state.isProcessing || this.state.isVerified) {
+            this.state = {
+                isProcessing: false,
+                isVerified: false,
+                isInitialized: this.state.isInitialized,  // Preserve initialization flag
+            };
+            this.notify();
+        }
     }
 
     subscribe(listener: AuthStateListener): () => void {
