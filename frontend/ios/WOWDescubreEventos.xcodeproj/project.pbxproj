@@ -22,7 +22,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = WOWDescubreEventos/Info.plist; sourceTree = "<group>"; };
 		8CB1BCB3DA5C4E7A7A65453E /* Pods-WOWDescubreEventos.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WOWDescubreEventos.release.xcconfig"; path = "Target Support Files/Pods-WOWDescubreEventos/Pods-WOWDescubreEventos.release.xcconfig"; sourceTree = "<group>"; };
 		9DB5C8E947075796FDF522D2 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-WOWDescubreEventos/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		9FF92E3DCC3FF235B65AB077 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = WOWDescubreEventos/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9FF92E3DCC3FF235B65AB077 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = WOWDescubreEventos/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = WOWDescubreEventos/SplashScreen.storyboard; sourceTree = "<group>"; };
 		ABF37BC4D7436419985C2787 /* libPods-WOWDescubreEventos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-WOWDescubreEventos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -128,7 +128,6 @@
 				F1B151882F4FD01CE4EA8550 /* Pods-WOWDescubreEventos.debug.xcconfig */,
 				8CB1BCB3DA5C4E7A7A65453E /* Pods-WOWDescubreEventos.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -351,6 +350,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = WOWDescubreEventos/WOWDescubreEventos.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4THD987397;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -387,6 +387,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = WOWDescubreEventos/WOWDescubreEventos.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4THD987397;
 				INFOPLIST_FILE = WOWDescubreEventos/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -13,9 +14,21 @@
     "preview": {
       "distribution": "internal"
     },
-    "production": {}
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.standatpd.com/api",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dyvchjqtwhadgybwmbjl.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5dmNoanF0d2hhZGd5YndtYmpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MDIwMjIsImV4cCI6MjA4NDQ3ODAyMn0.UzMGs8gizJGQZP-22cSxJ8rpfzhY8fTt_adVTZ7vMrI"
+      }
+    }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "admin@standtatpd.com",
+        "appleTeamId": "4THD987397"
+      }
+    }
   }
 }

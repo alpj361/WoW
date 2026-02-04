@@ -2,7 +2,105 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
-## [0.0.14] - 2026-01-27
+## [0.0.16] - 2026-02-03
+
+### Added
+- 💬 **Event Reactions System**: New thread-style reactions for attended events
+  - **Public Reactions Thread**: All attendees can see reactions from other users
+  - **User Profiles**: Each reaction displays user's avatar and name
+  - **Emoji Reactions**: Quick-select from 10 predefined emojis (😍, 🔥, 👏, 🎉, etc.)
+  - **Comments**: Text comments up to 280 characters
+  - **One Reaction Per User**: Each user can add/edit one reaction per event
+  - **Real-time Updates**: Thread reloads after posting a reaction
+
+### Removed
+- ❌ **Like Button**: Removed heart/like button from event details screen
+  - Replaced by the new reactions system which is more engaging
+
+### Technical Details
+```
+Database Migration:
+- attended_events.reaction_sticker (TEXT) - For future stickers
+- attended_events.reaction_gif (TEXT) - For future GIPHY integration
+- attended_events.reaction_comment (TEXT) - User comments
+
+Modified:
+- frontend/app/event/[id].tsx (removed like button)
+- frontend/app/myevents.tsx (modal integration)
+- frontend/src/store/eventStore.ts (new interfaces and functions)
+- frontend/src/components/EventReactionsModal.tsx (complete redesign)
+
+New Store Functions:
+- fetchPublicReactions(eventId) - Get all reactions for an event
+- updateEventReaction(eventId, reaction) - Save/update user reaction
+```
+
+### Pending Features
+- 🎭 Sticker packs (predefined stickers)
+- 🎬 GIPHY integration (requires API key)
+
+---
+
+## [0.0.15] - 2026-02-02
+
+### Fixed
+- 🗑️ **Delete Buttons Not Responding**: Fixed event deletion buttons in "Mis Eventos"
+  - **Root Cause 1**: `GestureTouchable` inside `Animated.View` caused gesture conflicts → Changed to `Pressable`
+  - **Root Cause 2**: `Alert.alert` doesn't work on web platform → Added `window.confirm` fallback for web
+  - **Affected Areas**: Saved events, Attended events, and Hosted events deletion
+  - **Impact**: Delete icons now work on both native (iOS/Android) and web platforms
+
+---
+
+## [0.0.14] - 2026-01-31
+
+### Added
+- 📱 **WhatsApp Integration**: New upload option to send event flyers via WhatsApp
+  - Button in event creation screen alongside Camera, Gallery, and URL options
+  - Opens WhatsApp with pre-filled message to send flyers
+  - Phone number: 50252725024
+  - Alert with instructions about image requirements
+
+### Fixed
+- 🎨 **UI Gesture Conflicts**: Resolved multiple UI interaction issues
+  - **EventCard**: Moved action buttons outside `TouchableOpacity` to prevent gesture conflicts
+  - **Skip/Save Animations**: Buttons now properly trigger animations instead of navigating to event details
+  - **Image Sizing**: Fixed saved events card images using `position: absolute` with 100% width/height
+  - **Gallery Layout**: Attended events now use proper 3-column Letterboxd-style grid with 2:3 aspect ratio
+  - **Double Wrapping**: Removed redundant `Animated.View` wrapping from event rendering
+- ⚛️ **React Hydration Error #418**: Migrated from old Animated API to react-native-reanimated hooks
+  - **Root Cause**: Class-based `Animated.Value` causing "T.default.Value is not a constructor" on web
+  - **Solution**: Converted to `useSharedValue`, `useAnimatedStyle`, `withTiming`, and `withRepeat`
+  - **Components Updated**: `DigitalCard.tsx`, `profile.tsx`, `auth.tsx`, `myevents.tsx`
+
+### Changed
+- 📊 **MyEvents Enhancements**: Improved event management and display
+  - Enhanced event store with better state management
+  - Improved UI/UX for saved, attended, and hosted events
+  - Better error handling and loading states
+
+### Technical Details
+```
+Modified:
+- frontend/app/create.tsx (WhatsApp button integration)
+- frontend/app/myevents.tsx (image styles, grid layout, animations)
+- frontend/src/components/EventCard.tsx (button positioning, gesture handling)
+- frontend/src/components/DigitalCard.tsx (animation migration)
+- frontend/app/profile.tsx (animation migration)
+- frontend/app/auth.tsx (animation migration)
+- frontend/src/store/eventStore.ts (state management improvements)
+```
+
+---
+
+## [0.0.13] - 2026-01-27
+
+### Fixed
+- 🗑️ **Delete Buttons Not Responding**: Fixed event deletion buttons in "Mis Eventos"
+  - **Root Cause**: `GestureTouchable` inside `Animated.View` and `GestureScrollView` caused gesture conflicts
+  - **Solution**: Changed to React Native's `Pressable` component with opacity feedback
+  - **Affected Areas**: Saved events "Guardados" tab and Hosted events "Anfitrión" tab
+  - **Impact**: Delete icons now properly respond to taps and show confirmation dialogs
 
 ### Added
 - 🖼️ **Visor de Comprobantes de Pago**: Los hosts ahora pueden ver los comprobantes de pago subidos

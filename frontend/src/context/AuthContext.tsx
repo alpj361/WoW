@@ -71,12 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                // Check if auth-callback is processing - don't interfere
+                // Check if auth-callback is processing - set session+user but skip profile fetch
                 const isProcessing = authState.getState().isProcessing;
                 if (isProcessing && event === 'SIGNED_IN') {
-                    console.log('⏳ Auth callback is processing, skipping profile check');
+                    console.log('⏳ Auth callback is processing, setting session+user (skip profile fetch)');
                     setSession(newSession);
-                    // Don't set user yet - let auth-callback handle it
+                    setUser(newSession?.user ?? null);
+                    setLoading(false);
                     return;
                 }
 

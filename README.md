@@ -1,6 +1,6 @@
 # WOW - Descubre y Vive Eventos
 
-![Version](https://img.shields.io/badge/version-0.0.5-blue)
+![Version](https://img.shields.io/badge/version-0.0.16-blue)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20Web-lightgrey)
 ![React Native](https://img.shields.io/badge/React%20Native-0.81.5-61DAFB)
 ![Expo](https://img.shields.io/badge/Expo-54.0-000020)
@@ -17,6 +17,7 @@ La aplicación está optimizada para funcionar en:
 ## ✨ Características
 
 - 🎯 **Swipe Interface**: Desliza hacia la derecha para guardar eventos, izquierda para pasar
+- 💬 **Event Reactions**: Comparte reacciones y comentarios en eventos asistidos (thread público)
 - 🎨 **Categorías**: Filtra eventos por Música, Voluntariado o General
 - 📱 **Responsive**: Se adapta perfectamente a móvil y web
 - 🌙 **Dark Mode**: Diseño oscuro moderno
@@ -42,7 +43,8 @@ WOW/
 │   │   │   ├── WebViewport.tsx     # Wrapper para viewport móvil en web
 │   │   │   ├── SplashScreen.tsx    # Video splash de carga
 │   │   │   ├── DigitalCard.tsx     # Tarjeta digital de perfil
-│   │   │   └── EmojiRating.tsx     # Selector de emojis para calificación
+│   │   │   ├── EmojiRating.tsx     # Selector de emojis para calificación
+│   │   │   └── EventReactionsModal.tsx # Modal de reacciones públicas
 │   │   │
 │   │   ├── context/            # React contexts
 │   │   │   └── AuthContext.tsx # Estado de autenticación

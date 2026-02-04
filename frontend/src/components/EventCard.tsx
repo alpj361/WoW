@@ -18,6 +18,7 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Event } from '../store/eventStore';
@@ -114,8 +115,8 @@ export const EventCard: React.FC<EventCardProps> = ({
     .onFinalize((_, success) => {
       skipScale.value = withSpring(1, { damping: 10, stiffness: 300 });
       if (success && onSkip) {
-        triggerHaptic('medium');
-        onSkip();
+        runOnJS(triggerHaptic)('medium');
+        runOnJS(onSkip)();
       }
     });
 
@@ -132,8 +133,8 @@ export const EventCard: React.FC<EventCardProps> = ({
     .onFinalize((_, success) => {
       saveScale.value = withSpring(1, { damping: 10, stiffness: 300 });
       if (success && onSave) {
-        triggerHaptic('success');
-        onSave();
+        runOnJS(triggerHaptic)('success');
+        runOnJS(onSave)();
       }
     });
 
