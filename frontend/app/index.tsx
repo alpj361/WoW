@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
   TouchableOpacity,
   Platform,
   Modal,
@@ -17,33 +16,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withSequence,
-  runOnJS,
-  interpolate,
-  interpolateColor,
-  Extrapolation,
-} from 'react-native-reanimated';
 import {
   GestureHandlerRootView,
-  GestureDetector,
-  Gesture,
 } from 'react-native-gesture-handler';
 import { useEventStore, Event } from '../src/store/eventStore';
-import { EventCard } from '../src/components/EventCard';
 import { CategoryFilter } from '../src/components/CategoryFilter';
 import { WowLogo } from '../src/components/WowLogo';
-import { SwipeOverlay } from '../src/components/SwipeOverlay';
 import { AnimatedToast } from '../src/components/AnimatedToast';
 import { SwipeCardSkeleton } from '../src/components/SkeletonLoader';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
-const IS_WEB = Platform.OS === 'web';
+import { VerticalEventStack } from '../src/components/VerticalEventStack';
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -60,18 +41,13 @@ export default function ExploreScreen() {
   } = useEventStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  
+
   // Toast state
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'like' | 'skip' | 'success' | 'error' | 'info' }>({
     visible: false,
     message: '',
     type: 'info',
   });
-
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const rotation = useSharedValue(0);
-  const scale = useSharedValue(1);
 
   useEffect(() => {
     // Load saved/denied FIRST, then fetch events to ensure filtering works
@@ -87,21 +63,12 @@ export default function ExploreScreen() {
   }, [events]);
 
   const currentEvent = events[currentIndex];
-  const nextEvent = events[currentIndex + 1];
-
-  const resetPosition = useCallback(() => {
-    translateX.value = withSpring(0);
-    translateY.value = withSpring(0);
-    rotation.value = withSpring(0);
-    scale.value = withSpring(1);
-  }, []);
 
   const goToNextCard = useCallback(() => {
     if (currentIndex < events.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     }
-    resetPosition();
-  }, [currentIndex, events.length, resetPosition]);
+  }, [currentIndex, events.length]);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
@@ -192,78 +159,13 @@ export default function ExploreScreen() {
     goToNextCard();
   }, [goToNextCard, currentEvent, denyEvent, triggerHaptic, showToast]);
 
-  const animateSwipe = useCallback(
-    (direction: 'left' | 'right') => {
-      const targetX = direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-      translateX.value = withTiming(targetX, { duration: 300 }, () => {
-        runOnJS(direction === 'right' ? handleSwipeRight : handleSwipeLeft)();
-      });
-      rotation.value = withTiming(direction === 'right' ? 15 : -15, { duration: 300 });
-    },
-    [handleSwipeRight, handleSwipeLeft]
-  );
+  const handleSaveEvent = useCallback(async (event: Event) => {
+    handleSwipeRight();
+  }, [handleSwipeRight]);
 
-  const gesture = Gesture.Pan()
-    .onUpdate((e) => {
-      translateX.value = e.translationX;
-      translateY.value = e.translationY * 0.5;
-      rotation.value = (e.translationX / SCREEN_WIDTH) * 20;
-    })
-    .onEnd((e) => {
-      if (e.translationX > SWIPE_THRESHOLD) {
-        runOnJS(animateSwipe)('right');
-      } else if (e.translationX < -SWIPE_THRESHOLD) {
-        runOnJS(animateSwipe)('left');
-      } else {
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        rotation.value = withSpring(0);
-      }
-    });
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { rotate: `${rotation.value}deg` },
-    ],
-  }));
-
-  const nextCardStyle = useAnimatedStyle(() => {
-    const progress = Math.abs(translateX.value) / SWIPE_THRESHOLD;
-    const newScale = 0.95 + Math.min(progress, 1) * 0.05;
-    return {
-      transform: [{ scale: newScale }],
-      opacity: 0.5 + Math.min(progress, 1) * 0.5,
-    };
-  });
-
-  // Swipe overlay styles
-  const likeOverlayStyle = useAnimatedStyle(() => {
-    const progress = interpolate(
-      translateX.value,
-      [0, SWIPE_THRESHOLD],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    return {
-      opacity: progress,
-      transform: [{ scale: interpolate(progress, [0, 1], [0.5, 1]) }],
-    };
-  });
-
-  const skipOverlayStyle = useAnimatedStyle(() => {
-    const progress = interpolate(
-      translateX.value,
-      [0, -SWIPE_THRESHOLD],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    return {
-      opacity: progress,
-      transform: [{ scale: interpolate(progress, [0, 1], [0.5, 1]) }],
-    };
-  });
+  const handleSkipEvent = useCallback(async (event: Event) => {
+    handleSwipeLeft();
+  }, [handleSwipeLeft]);
 
   const renderCardContent = () => {
     if (isLoading) {
@@ -305,65 +207,13 @@ export default function ExploreScreen() {
     }
 
     return (
-      <View style={styles.cardStackContainer}>
-        {/* Next card (behind) */}
-        {nextEvent && (
-          <Animated.View style={[styles.nextCard, nextCardStyle]}>
-            <EventCard event={nextEvent} showActions={false} />
-          </Animated.View>
-        )}
-
-        {/* Current card */}
-        {currentEvent && (
-          IS_WEB ? (
-            <Animated.View style={[styles.currentCard, cardStyle]}>
-              {/* Swipe overlays */}
-              <Animated.View style={[styles.swipeOverlay, styles.likeOverlay, likeOverlayStyle]}>
-                <View style={styles.overlayIconCircle}>
-                  <Ionicons name="heart" size={28} color="#10B981" />
-                </View>
-                <Text style={[styles.overlayText, { color: '#10B981' }]}>GUARDAR</Text>
-              </Animated.View>
-              <Animated.View style={[styles.swipeOverlay, styles.skipOverlay, skipOverlayStyle]}>
-                <View style={[styles.overlayIconCircle, styles.skipIconCircle]}>
-                  <Ionicons name="close" size={28} color="#EF4444" />
-                </View>
-                <Text style={[styles.overlayText, { color: '#EF4444' }]}>PASAR</Text>
-              </Animated.View>
-              <EventCard
-                event={currentEvent}
-                onSave={() => animateSwipe('right')}
-                onSkip={() => animateSwipe('left')}
-                showActions={true}
-              />
-            </Animated.View>
-          ) : (
-            <GestureDetector gesture={gesture}>
-              <Animated.View style={[styles.currentCard, cardStyle]}>
-                {/* Swipe overlays */}
-                <Animated.View style={[styles.swipeOverlay, styles.likeOverlay, likeOverlayStyle]}>
-                  <View style={styles.overlayIconCircle}>
-                    <Ionicons name="heart" size={28} color="#10B981" />
-                  </View>
-                  <Text style={[styles.overlayText, { color: '#10B981' }]}>GUARDAR</Text>
-                </Animated.View>
-                <Animated.View style={[styles.swipeOverlay, styles.skipOverlay, skipOverlayStyle]}>
-                  <View style={[styles.overlayIconCircle, styles.skipIconCircle]}>
-                    <Ionicons name="close" size={28} color="#EF4444" />
-                  </View>
-                  <Text style={[styles.overlayText, { color: '#EF4444' }]}>PASAR</Text>
-                </Animated.View>
-                <EventCard
-                  event={currentEvent}
-                  onSave={() => animateSwipe('right')}
-                  onSkip={() => animateSwipe('left')}
-                  showActions={true}
-                />
-              </Animated.View>
-            </GestureDetector>
-          )
-        )}
-      </View>
+      <VerticalEventStack
+        events={events}
+        currentIndex={currentIndex}
+        onIndexChange={setCurrentIndex}
+        onSave={handleSaveEvent}
+        onSkip={handleSkipEvent}
+      />
     );
   };
 
@@ -615,60 +465,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
     overflow: 'hidden',
-  },
-  cardStackContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currentCard: {
-    position: 'relative',
-    zIndex: 2,
-    width: '100%',
-    height: '100%',
-  },
-  nextCard: {
-    position: 'absolute',
-    zIndex: 1,
-    width: '100%',
-    height: '100%',
-    opacity: 0.5,
-    transform: [{ scale: 0.92 }, { translateY: 8 }],
-  },
-  // Swipe overlay styles
-  swipeOverlay: {
-    position: 'absolute',
-    top: 20,
-    zIndex: 10,
-    alignItems: 'center',
-    gap: 6,
-  },
-  likeOverlay: {
-    left: 20,
-  },
-  skipOverlay: {
-    right: 20,
-  },
-  overlayIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 2,
-    borderColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipIconCircle: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderColor: '#EF4444',
-  },
-  overlayText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.5,
   },
   loadingContainer: {
     flex: 1,
