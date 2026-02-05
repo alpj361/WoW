@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,13 @@ import {
   Pressable,
   Image,
   Alert,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   GestureHandlerRootView,
@@ -25,12 +28,14 @@ import { WowLogo } from '../src/components/WowLogo';
 import { AnimatedToast } from '../src/components/AnimatedToast';
 import { SwipeCardSkeleton } from '../src/components/SkeletonLoader';
 import { VerticalEventStack } from '../src/components/VerticalEventStack';
+import { FreshDataBanner } from '../src/components/FreshDataBanner';
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const {
     events,
     isLoading,
+    isLoadingFeed,
     currentCategory,
     setCategory,
     fetchEvents,
@@ -38,9 +43,14 @@ export default function ExploreScreen() {
     denyEvent,
     fetchSavedEvents,
     fetchDeniedEvents,
+    silentRefreshFeed,
+    hasNewFeedData,
+    clearNewDataFlags,
   } = useEventStore();
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const isFirstLoad = useRef(true);
 
   // Toast state
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'like' | 'skip' | 'success' | 'error' | 'info' }>({
@@ -49,14 +59,25 @@ export default function ExploreScreen() {
     type: 'info',
   });
 
+  // Initial load
   useEffect(() => {
-    // Load saved/denied FIRST, then fetch events to ensure filtering works
     const init = async () => {
       await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
       fetchEvents();
+      isFirstLoad.current = false;
     };
     init();
   }, []);
+
+  // Silent refresh when tab is focused (after first load)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isFirstLoad.current) {
+        // Silently check for new data in background
+        silentRefreshFeed();
+      }
+    }, [silentRefreshFeed])
+  );
 
   useEffect(() => {
     setCurrentIndex(0);
@@ -69,6 +90,21 @@ export default function ExploreScreen() {
       setCurrentIndex((prev) => prev + 1);
     }
   }, [currentIndex, events.length]);
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+    await fetchEvents();
+    setCurrentIndex(0);
+    clearNewDataFlags();
+    setRefreshing(false);
+  }, [fetchEvents, fetchSavedEvents, fetchDeniedEvents, clearNewDataFlags]);
+
+  // Handler for "new data available" banner
+  const handleRefreshFromBanner = useCallback(async () => {
+    await onRefresh();
+  }, [onRefresh]);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
@@ -168,7 +204,7 @@ export default function ExploreScreen() {
   }, [handleSwipeLeft]);
 
   const renderCardContent = () => {
-    if (isLoading) {
+    if (isLoadingFeed && events.length === 0) {
       return <SwipeCardSkeleton />;
     }
 
@@ -276,6 +312,14 @@ export default function ExploreScreen() {
         onHide={() => setToast(prev => ({ ...prev, visible: false }))}
       />
 
+      {/* New data banner */}
+      <FreshDataBanner
+        visible={hasNewFeedData}
+        message="Hay nuevos eventos"
+        onPress={handleRefreshFromBanner}
+        onDismiss={clearNewDataFlags}
+      />
+
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
         <WowLogo width={100} height={32} />
         <Text style={styles.tagline}>Descubre y Vive Eventos</Text>
@@ -286,9 +330,23 @@ export default function ExploreScreen() {
         onSelectCategory={setCategory}
       />
 
-      <View style={styles.cardsContainer}>
-        {renderCardContent()}
-      </View>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8B5CF6"
+            colors={['#8B5CF6']}
+          />
+        }
+        scrollEnabled={events.length === 0 || currentIndex >= events.length}
+      >
+        <View style={styles.cardsContainer}>
+          {renderCardContent()}
+        </View>
+      </ScrollView>
 
       {/* Payment Alert Modal */}
       <Modal
@@ -457,6 +515,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   cardsContainer: {
     flex: 1,
     flexDirection: 'column',
@@ -465,6 +529,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
     overflow: 'hidden',
+    minHeight: '100%',
   },
   loadingContainer: {
     flex: 1,
