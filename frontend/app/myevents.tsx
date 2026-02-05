@@ -33,12 +33,13 @@ import Animated, {
 import { useEventStore, SavedEventData, AttendedEventData } from '../src/store/eventStore';
 import { EmojiRating } from '../src/components/EmojiRating';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { EventListSkeleton } from '../src/components/SkeletonLoader';
 import { AnimatedToast } from '../src/components/AnimatedToast';
+import { FreshDataBanner } from '../src/components/FreshDataBanner';
 import { CollectibleAnimation } from '../src/components/CollectibleAnimation';
 import EventReactionsModal, { EventReaction } from '../src/components/EventReactionsModal';
 
@@ -86,6 +87,12 @@ export default function MyEventsScreen() {
     removeAttended,
     resubmitRegistration,
     deleteEvent,
+    silentRefreshSaved,
+    hasNewSavedData,
+    clearNewDataFlags,
+    isLoadingSaved,
+    isLoadingAttended,
+    isLoadingHosted,
   } = useEventStore();
 
   const [activeTab, setActiveTab] = useState<Tab>('saved');
@@ -177,7 +184,9 @@ export default function MyEventsScreen() {
   // Track previous counts for detecting new items (for haptic feedback)
   const [previousSavedCount, setPreviousSavedCount] = useState(0);
   const [previousAttendedCount, setPreviousAttendedCount] = useState(0);
+  const isFirstLoad = useRef(true);
 
+  // Initial data load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -187,9 +196,32 @@ export default function MyEventsScreen() {
         fetchHostedEvents()
       ]);
       setIsLoading(false);
+      isFirstLoad.current = false;
     };
     loadData();
   }, []);
+
+  // Silent refresh when tab is focused (after first load)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isFirstLoad.current) {
+        // Silently check for new data in background
+        silentRefreshSaved();
+      }
+    }, [silentRefreshSaved])
+  );
+
+  // Handler for banner press
+  const handleRefreshFromBanner = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchSavedEvents(),
+      fetchAttendedEvents(),
+      fetchHostedEvents()
+    ]);
+    clearNewDataFlags();
+    setRefreshing(false);
+  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents, clearNewDataFlags]);
 
   // Haptic feedback helper
   const triggerHaptic = useCallback(async (type: 'success' | 'warning' | 'light') => {
@@ -955,6 +987,14 @@ export default function MyEventsScreen() {
         type={toast.type}
         duration={2000}
         onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
+
+      {/* New data banner */}
+      <FreshDataBanner
+        visible={hasNewSavedData}
+        message="Hay actualizaciones"
+        onPress={handleRefreshFromBanner}
+        onDismiss={clearNewDataFlags}
       />
 
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>

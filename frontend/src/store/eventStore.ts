@@ -84,6 +84,18 @@ interface EventStore {
   isLoading: boolean;
   error: string | null;
 
+  // Granular loading states
+  isLoadingFeed: boolean;
+  isLoadingSaved: boolean;
+  isLoadingAttended: boolean;
+  isLoadingHosted: boolean;
+
+  // Data freshness tracking
+  feedLastUpdated: number;
+  savedLastUpdated: number;
+  hasNewFeedData: boolean;
+  hasNewSavedData: boolean;
+
   // Registration management
   pendingRegistrations: EventRegistration[];
   userRegistrations: EventRegistration[];
@@ -113,6 +125,11 @@ interface EventStore {
   rejectRegistration: (registrationId: string, rejectionReason?: string) => Promise<void>;
   resubmitRegistration: (eventId: string, paymentReceiptUrl?: string) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
+
+  // Silent refresh (background, no loading indicator)
+  silentRefreshFeed: () => Promise<boolean>;
+  silentRefreshSaved: () => Promise<boolean>;
+  clearNewDataFlags: () => void;
 }
 
 export const useEventStore = create<EventStore>((set, get) => ({
@@ -124,11 +141,24 @@ export const useEventStore = create<EventStore>((set, get) => ({
   currentCategory: 'all',
   isLoading: false,
   error: null,
+
+  // Granular loading states
+  isLoadingFeed: false,
+  isLoadingSaved: false,
+  isLoadingAttended: false,
+  isLoadingHosted: false,
+
+  // Data freshness
+  feedLastUpdated: 0,
+  savedLastUpdated: 0,
+  hasNewFeedData: false,
+  hasNewSavedData: false,
+
   pendingRegistrations: [],
   userRegistrations: [],
 
   fetchEvents: async (category?: string) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isLoadingFeed: true, error: null });
 
     try {
       const cat = category || get().currentCategory;
@@ -155,19 +185,25 @@ export const useEventStore = create<EventStore>((set, get) => ({
         !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)
       );
 
-      set({ events: filteredEvents, isLoading: false });
+      set({
+        events: filteredEvents,
+        isLoading: false,
+        isLoadingFeed: false,
+        feedLastUpdated: Date.now(),
+        hasNewFeedData: false,
+      });
     } catch (error: any) {
       console.error('Error fetching events:', error.message);
-      set({ error: error.message, isLoading: false, events: [] });
+      set({ error: error.message, isLoading: false, isLoadingFeed: false, events: [] });
     }
   },
 
   fetchSavedEvents: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoadingSaved: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        set({ isLoading: false, savedEvents: [] });
+        set({ isLoadingSaved: false, savedEvents: [] });
         return;
       }
 
@@ -230,19 +266,19 @@ export const useEventStore = create<EventStore>((set, get) => ({
         console.log(`  [${idx}] ${se.event.title}: image=${se.event.image ? 'YES (' + se.event.image.substring(0, 30) + '...)' : 'NO'}`);
       });
 
-      set({ savedEvents, isLoading: false });
+      set({ savedEvents, isLoadingSaved: false, savedLastUpdated: Date.now(), hasNewSavedData: false });
     } catch (error: any) {
       console.error('Error fetching saved events:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: error.message, isLoadingSaved: false });
     }
   },
 
   fetchAttendedEvents: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoadingAttended: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        set({ isLoading: false, attendedEvents: [] });
+        set({ isLoadingAttended: false, attendedEvents: [] });
         return;
       }
 
@@ -294,19 +330,19 @@ export const useEventStore = create<EventStore>((set, get) => ({
         console.log(`  [${idx}] ${ae.event.title}: image=${ae.event.image ? 'YES (' + ae.event.image.substring(0, 30) + '...)' : 'NO'}`);
       });
 
-      set({ attendedEvents, isLoading: false });
+      set({ attendedEvents, isLoadingAttended: false });
     } catch (error: any) {
       console.error('Error fetching attended events:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: error.message, isLoadingAttended: false });
     }
   },
 
   fetchHostedEvents: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoadingHosted: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        set({ isLoading: false, hostedEvents: [] });
+        set({ isLoadingHosted: false, hostedEvents: [] });
         return;
       }
 
@@ -320,11 +356,11 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
       set({
         hostedEvents: events.map(event => ({ event })),
-        isLoading: false
+        isLoadingHosted: false
       });
     } catch (error: any) {
       console.error('Error fetching hosted events:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: error.message, isLoadingHosted: false });
     }
   },
 
@@ -787,5 +823,81 @@ export const useEventStore = create<EventStore>((set, get) => ({
       console.error('Error deleting event:', error);
       throw error;
     }
+  },
+
+  // Silent refresh - fetches in background without showing loading indicators
+  // Returns true if new data was found
+  silentRefreshFeed: async () => {
+    try {
+      const cat = get().currentCategory;
+      const newEvents = await api.fetchEvents(cat);
+
+      const { savedEvents, deniedEvents, events: currentEvents } = get();
+      const savedEventIds = new Set(savedEvents.map(s => s.event.id));
+
+      const now = new Date();
+      const deniedEventIds = new Set(
+        deniedEvents
+          .filter(d => {
+            const deniedDate = new Date(d.denied_at);
+            const hoursDiff = (now.getTime() - deniedDate.getTime()) / (1000 * 60 * 60);
+            return hoursDiff < 48;
+          })
+          .map(d => d.event_id)
+      );
+
+      const filteredEvents = newEvents.filter(event =>
+        !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)
+      );
+
+      // Check if there's new data by comparing IDs
+      const currentIds = new Set(currentEvents.map(e => e.id));
+      const newIds = new Set(filteredEvents.map(e => e.id));
+      const hasNew = filteredEvents.some(e => !currentIds.has(e.id)) ||
+                     currentEvents.some(e => !newIds.has(e.id));
+
+      if (hasNew) {
+        set({ hasNewFeedData: true });
+      }
+
+      return hasNew;
+    } catch (error) {
+      console.error('Silent refresh feed error:', error);
+      return false;
+    }
+  },
+
+  silentRefreshSaved: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data, error } = await supabase
+        .from('saved_events')
+        .select('id, event_id')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const { savedEvents: currentSaved } = get();
+      const currentIds = new Set(currentSaved.map(s => s.saved.event_id));
+      const newIds = new Set((data || []).map((d: any) => d.event_id));
+
+      const hasNew = (data || []).some((d: any) => !currentIds.has(d.event_id)) ||
+                     currentSaved.some(s => !newIds.has(s.saved.event_id));
+
+      if (hasNew) {
+        set({ hasNewSavedData: true });
+      }
+
+      return hasNew;
+    } catch (error) {
+      console.error('Silent refresh saved error:', error);
+      return false;
+    }
+  },
+
+  clearNewDataFlags: () => {
+    set({ hasNewFeedData: false, hasNewSavedData: false });
   },
 }));
