@@ -330,4 +330,24 @@ export async function updateAttendanceRequirement(
     return response.data;
 }
 
+/**
+ * Trigger extraction processing (fire-and-forget)
+ * Backend will update Supabase directly
+ */
+export const triggerExtraction = (jobId: string): void => {
+  api.post(`/extraction-jobs/process/${jobId}`).catch((error) => {
+    console.error('[API] Failed to trigger extraction:', error.message);
+  });
+};
+
+/**
+ * Trigger analysis for selected image (fire-and-forget)
+ * Backend will update Supabase directly
+ */
+export const triggerAnalysis = (jobId: string, imageUrl: string): void => {
+  api.post(`/extraction-jobs/analyze/${jobId}`, { image_url: imageUrl }).catch((error) => {
+    console.error('[API] Failed to trigger analysis:', error.message);
+  });
+};
+
 export default api;

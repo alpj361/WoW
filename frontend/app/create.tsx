@@ -287,9 +287,19 @@ export default function CreateEventScreen() {
   const handleAnalyzeUrl = async () => {
     if (!postUrl.trim()) return;
 
+    if (!user?.id) {
+      Alert.alert('Error', 'Debes iniciar sesión para usar esta función.');
+      return;
+    }
+
     try {
-      // Add to extraction queue
-      queueExtraction(postUrl.trim());
+      // Add to extraction queue (now uses Supabase)
+      const jobId = await queueExtraction(postUrl.trim(), user.id);
+
+      if (!jobId) {
+        Alert.alert('Error', 'No pudimos agregar la URL a la cola. Intenta de nuevo.');
+        return;
+      }
 
       // Close modal and navigate directly to extractions
       setShowUrlModal(false);
@@ -950,45 +960,50 @@ export default function CreateEventScreen() {
         animationType="slide"
         onRequestClose={() => setShowUrlModal(false)}
       >
-        <View style={styles.pickerModalOverlay}>
-          <Pressable
-            style={styles.pickerModalDismiss}
-            onPress={() => setShowUrlModal(false)}
-          />
-          <View style={styles.pickerModalContent}>
-            <View style={styles.pickerModalHeader}>
-              <Text style={styles.pickerModalTitle}>Agregar desde Instagram</Text>
-              <TouchableOpacity onPress={() => setShowUrlModal(false)}>
-                <Text style={styles.pickerModalDone}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ padding: 16 }}>
-              <Text style={styles.inputLabel}>URL del Post de Instagram</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://instagram.com/p/ABC123..."
-                placeholderTextColor="#6B7280"
-                value={postUrl}
-                onChangeText={setPostUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  { marginTop: 16 },
-                  (!postUrl.trim()) && styles.submitButtonDisabled
-                ]}
-                onPress={handleAnalyzeUrl}
-                disabled={!postUrl.trim()}
-              >
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-                <Text style={styles.submitButtonText}>Agregar a la cola</Text>
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.pickerModalOverlay}>
+            <Pressable
+              style={styles.pickerModalDismiss}
+              onPress={() => setShowUrlModal(false)}
+            />
+            <View style={[styles.pickerModalContent, { paddingBottom: 40 }]}>
+              <View style={styles.pickerModalHeader}>
+                <Text style={styles.pickerModalTitle}>Agregar desde Instagram</Text>
+                <TouchableOpacity onPress={() => setShowUrlModal(false)}>
+                  <Text style={styles.pickerModalDone}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ padding: 16 }}>
+                <Text style={styles.inputLabel}>URL del Post de Instagram</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://instagram.com/p/ABC123..."
+                  placeholderTextColor="#6B7280"
+                  value={postUrl}
+                  onChangeText={setPostUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    { marginTop: 16 },
+                    (!postUrl.trim()) && styles.submitButtonDisabled
+                  ]}
+                  onPress={handleAnalyzeUrl}
+                  disabled={!postUrl.trim()}
+                >
+                  <Ionicons name="cloud-upload" size={20} color="#fff" />
+                  <Text style={styles.submitButtonText}>Agregar a la cola</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Image Selector Modal (for carousels) */}

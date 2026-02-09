@@ -18,16 +18,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useExtractionStore, Extraction, ExtractionStatus } from '../src/store/extractionStore';
 import { AnimatedLoader, InlineLoader, MiniSphereLoader } from '../src/components/AnimatedLoader';
+import { useAuth } from '../src/context/AuthContext';
 
 export default function ExtractionsScreen() {
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
+
     const {
         extractions,
-        isProcessing,
+        isPolling,
+        fetchExtractions,
+        startPolling,
+        stopPolling,
         removeExtraction,
         clearCompleted,
         selectImage,
-        processQueue
     } = useExtractionStore();
 
     // Image selector modal state
@@ -37,21 +42,29 @@ export default function ExtractionsScreen() {
     // Track app state for foreground refresh
     const appState = useRef(AppState.currentState);
 
-    // Process queue on mount
+    // Start polling on mount, stop on unmount
     useEffect(() => {
-        processQueue();
-    }, []);
+        if (user?.id) {
+            startPolling(user.id);
+        }
 
-    // Re-process queue when app returns to foreground
+        return () => {
+            stopPolling();
+        };
+    }, [user?.id]);
+
+    // Re-start polling when app returns to foreground
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (
                 appState.current.match(/inactive|background/) &&
                 nextAppState === 'active'
             ) {
-                // App has come to the foreground, re-process pending extractions
-                console.log('App returned to foreground, processing extraction queue...');
-                processQueue();
+                // App has come to the foreground, refresh data
+                console.log('App returned to foreground, refreshing extractions...');
+                if (user?.id) {
+                    fetchExtractions(user.id);
+                }
             }
             appState.current = nextAppState;
         });
@@ -59,7 +72,7 @@ export default function ExtractionsScreen() {
         return () => {
             subscription.remove();
         };
-    }, [processQueue]);
+    }, [user?.id, fetchExtractions]);
 
     const getStatusInfo = (status: ExtractionStatus): { icon: string; color: string; text: string } => {
         switch (status) {
@@ -108,21 +121,12 @@ export default function ExtractionsScreen() {
         setIsAnalyzing(false);
         setSelectedExtraction(null);
 
-        // Get updated extraction
-        const updated = useExtractionStore.getState().getExtraction(selectedExtraction.id);
-        if (updated?.status === 'completed') {
-            Alert.alert(
-                '¡Listo!',
-                'La imagen fue analizada. ¿Deseas crear el evento ahora?',
-                [
-                    { text: 'Más tarde', style: 'cancel' },
-                    {
-                        text: 'Crear evento',
-                        onPress: () => handleExtractionPress(updated)
-                    }
-                ]
-            );
-        }
+        // Show feedback that analysis has started
+        Alert.alert(
+            'Análisis iniciado',
+            'La imagen se está analizando. Puedes cerrar la app y volver más tarde.',
+            [{ text: 'OK' }]
+        );
     };
 
     const handleDelete = (id: string) => {
@@ -134,6 +138,12 @@ export default function ExtractionsScreen() {
                 { text: 'Eliminar', style: 'destructive', onPress: () => removeExtraction(id) }
             ]
         );
+    };
+
+    const handleClearCompleted = () => {
+        if (user?.id) {
+            clearCompleted(user.id);
+        }
     };
 
     const formatTime = (timestamp: number): string => {
@@ -233,10 +243,11 @@ export default function ExtractionsScreen() {
                         {pendingCount > 0 && readyCount > 0 ? ' • ' : ''}
                         {readyCount > 0 ? `${readyCount} listas` : ''}
                         {pendingCount === 0 && readyCount === 0 && extractions.length > 0 ? 'Todo listo' : ''}
+                        {isPolling && pendingCount > 0 && ' (actualizando...)'}
                     </Text>
                 </View>
                 {extractions.some(e => e.status === 'completed' || e.status === 'failed') && (
-                    <TouchableOpacity onPress={clearCompleted} style={styles.clearButton}>
+                    <TouchableOpacity onPress={handleClearCompleted} style={styles.clearButton}>
                         <Ionicons name="trash-bin-outline" size={20} color="#9CA3AF" />
                     </TouchableOpacity>
                 )}
@@ -249,6 +260,8 @@ export default function ExtractionsScreen() {
                     <Text style={styles.emptyTitle}>No hay extracciones</Text>
                     <Text style={styles.emptyText}>
                         Las URLs de Instagram que agregues aparecerán aquí mientras se procesan.
+                        {'\n\n'}
+                        Puedes cerrar la app y volver más tarde - tus extracciones se guardan automáticamente.
                     </Text>
                     <TouchableOpacity
                         style={styles.createButton}

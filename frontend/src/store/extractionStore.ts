@@ -1,6 +1,7 @@
-// Web version - no persistence (zustand/middleware uses import.meta which breaks web)
+// Unified extraction store with Supabase persistence and polling
 import { create } from 'zustand';
-import { extractUrl, analyzeExtractedImage } from '../services/api';
+import { supabase } from '../services/supabase';
+import { triggerExtraction, triggerAnalysis } from '../services/api';
 
 export type ExtractionStatus =
     | 'pending'
@@ -30,62 +31,143 @@ export interface Extraction {
 
 interface ExtractionStore {
     extractions: Extraction[];
-    isProcessing: boolean;
-    queueExtraction: (url: string) => string;
-    startExtraction: (id: string) => Promise<void>;
+    isPolling: boolean;
+    pollingInterval: ReturnType<typeof setInterval> | null;
+
+    // Create job in Supabase and trigger backend processing
+    queueExtraction: (url: string, userId: string) => Promise<string | null>;
+
+    // Fetch all extractions from Supabase
+    fetchExtractions: (userId: string) => Promise<void>;
+
+    // Start/stop polling for updates
+    startPolling: (userId: string) => void;
+    stopPolling: () => void;
+
+    // Select image and trigger analysis
     selectImage: (id: string, imageUrl: string) => Promise<void>;
-    removeExtraction: (id: string) => void;
-    clearCompleted: () => void;
+
+    // Delete from Supabase
+    removeExtraction: (id: string) => Promise<void>;
+
+    // Clear completed/failed extractions
+    clearCompleted: (userId: string) => Promise<void>;
+
+    // Get single extraction
     getExtraction: (id: string) => Extraction | undefined;
-    processQueue: () => Promise<void>;
 }
+
+// Map Supabase row to Extraction interface
+const mapToExtraction = (row: any): Extraction => ({
+    id: row.id,
+    url: row.source_url,
+    status: row.status as ExtractionStatus,
+    images: row.extracted_images || undefined,
+    selectedImage: row.selected_image_url || undefined,
+    analysis: row.analysis_result || undefined,
+    error: row.error_message || undefined,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+});
 
 export const useExtractionStore = create<ExtractionStore>()((set, get) => ({
     extractions: [],
-    isProcessing: false,
+    isPolling: false,
+    pollingInterval: null,
 
-    queueExtraction: (url: string) => {
-        const id = `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const now = Date.now();
-        const newExtraction: Extraction = {
-            id, url, status: 'pending', createdAt: now, updatedAt: now,
-        };
-        set(state => ({ extractions: [newExtraction, ...state.extractions] }));
-        setTimeout(() => get().processQueue(), 100);
-        return id;
+    queueExtraction: async (url: string, userId: string) => {
+        try {
+            // Insert into Supabase
+            const { data, error } = await supabase
+                .from('extraction_jobs')
+                .insert({
+                    user_id: userId,
+                    source_url: url,
+                    status: 'pending',
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('[EXTRACTION_STORE] Failed to create job:', error);
+                return null;
+            }
+
+            // Add to local state immediately
+            const newExtraction = mapToExtraction(data);
+            set(state => ({
+                extractions: [newExtraction, ...state.extractions]
+            }));
+
+            // Fire-and-forget trigger to backend
+            triggerExtraction(data.id);
+
+            return data.id;
+        } catch (error: any) {
+            console.error('[EXTRACTION_STORE] Queue extraction error:', error);
+            return null;
+        }
     },
 
-    startExtraction: async (id: string) => {
-        const extraction = get().extractions.find(e => e.id === id);
-        if (!extraction || extraction.status !== 'pending') return;
-
-        set(state => ({
-            extractions: state.extractions.map(e =>
-                e.id === id ? { ...e, status: 'extracting' as const, updatedAt: Date.now() } : e
-            )
-        }));
-
+    fetchExtractions: async (userId: string) => {
         try {
-            const result = await extractUrl(extraction.url);
-            if (result.success && result.extracted_images?.length > 0) {
-                set(state => ({
-                    extractions: state.extractions.map(e =>
-                        e.id === id ? { ...e, status: 'ready' as const, images: result.extracted_images, updatedAt: Date.now() } : e
-                    )
-                }));
-            } else {
-                set(state => ({
-                    extractions: state.extractions.map(e =>
-                        e.id === id ? { ...e, status: 'failed' as const, error: result.error || 'No se encontraron imágenes', updatedAt: Date.now() } : e
-                    )
-                }));
+            const { data, error } = await supabase
+                .from('extraction_jobs')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error) {
+                console.error('[EXTRACTION_STORE] Failed to fetch extractions:', error);
+                return;
             }
+
+            const extractions = (data || []).map(mapToExtraction);
+            set({ extractions });
         } catch (error: any) {
-            set(state => ({
-                extractions: state.extractions.map(e =>
-                    e.id === id ? { ...e, status: 'failed' as const, error: error.message || 'Error de extracción', updatedAt: Date.now() } : e
-                )
-            }));
+            console.error('[EXTRACTION_STORE] Fetch error:', error);
+        }
+    },
+
+    startPolling: (userId: string) => {
+        const { isPolling, pollingInterval } = get();
+
+        // Don't start if already polling
+        if (isPolling || pollingInterval) return;
+
+        console.log('[EXTRACTION_STORE] Starting polling');
+        set({ isPolling: true });
+
+        // Initial fetch
+        get().fetchExtractions(userId);
+
+        // Poll every 3 seconds
+        const interval = setInterval(() => {
+            const { extractions } = get();
+
+            // Check if any extractions are in-progress
+            const hasInProgress = extractions.some(e =>
+                e.status === 'pending' ||
+                e.status === 'extracting' ||
+                e.status === 'analyzing'
+            );
+
+            // Only poll if there are in-progress extractions
+            if (hasInProgress) {
+                get().fetchExtractions(userId);
+            }
+        }, 3000);
+
+        set({ pollingInterval: interval });
+    },
+
+    stopPolling: () => {
+        const { pollingInterval } = get();
+        if (pollingInterval) {
+            console.log('[EXTRACTION_STORE] Stopping polling');
+            clearInterval(pollingInterval);
+            set({ isPolling: false, pollingInterval: null });
         }
     },
 
@@ -93,57 +175,65 @@ export const useExtractionStore = create<ExtractionStore>()((set, get) => ({
         const extraction = get().extractions.find(e => e.id === id);
         if (!extraction || extraction.status !== 'ready') return;
 
+        // Optimistically update local state
         set(state => ({
             extractions: state.extractions.map(e =>
-                e.id === id ? { ...e, status: 'analyzing' as const, selectedImage: imageUrl, updatedAt: Date.now() } : e
+                e.id === id
+                    ? { ...e, status: 'analyzing' as const, selectedImage: imageUrl, updatedAt: Date.now() }
+                    : e
             )
         }));
 
+        // Fire-and-forget trigger to backend
+        triggerAnalysis(id, imageUrl);
+    },
+
+    removeExtraction: async (id: string) => {
         try {
-            const result = await analyzeExtractedImage(imageUrl, 'Event Flyer');
-            if (result.success && result.analysis) {
-                set(state => ({
-                    extractions: state.extractions.map(e =>
-                        e.id === id ? { ...e, status: 'completed' as const, analysis: result.analysis, updatedAt: Date.now() } : e
-                    )
-                }));
-            } else {
-                set(state => ({
-                    extractions: state.extractions.map(e =>
-                        e.id === id ? { ...e, status: 'completed' as const, error: 'Análisis no disponible', updatedAt: Date.now() } : e
-                    )
-                }));
+            // Delete from Supabase
+            const { error } = await supabase
+                .from('extraction_jobs')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('[EXTRACTION_STORE] Failed to delete:', error);
+                return;
             }
-        } catch (error: any) {
+
+            // Remove from local state
             set(state => ({
-                extractions: state.extractions.map(e =>
-                    e.id === id ? { ...e, status: 'completed' as const, error: error.message || 'Error de análisis', updatedAt: Date.now() } : e
-                )
+                extractions: state.extractions.filter(e => e.id !== id)
             }));
+        } catch (error: any) {
+            console.error('[EXTRACTION_STORE] Delete error:', error);
         }
     },
 
-    removeExtraction: (id: string) => {
-        set(state => ({ extractions: state.extractions.filter(e => e.id !== id) }));
-    },
+    clearCompleted: async (userId: string) => {
+        try {
+            // Delete completed/failed from Supabase
+            const { error } = await supabase
+                .from('extraction_jobs')
+                .delete()
+                .eq('user_id', userId)
+                .in('status', ['completed', 'failed']);
 
-    clearCompleted: () => {
-        set(state => ({
-            extractions: state.extractions.filter(e => e.status !== 'completed' && e.status !== 'failed')
-        }));
+            if (error) {
+                console.error('[EXTRACTION_STORE] Failed to clear completed:', error);
+                return;
+            }
+
+            // Remove from local state
+            set(state => ({
+                extractions: state.extractions.filter(e =>
+                    e.status !== 'completed' && e.status !== 'failed'
+                )
+            }));
+        } catch (error: any) {
+            console.error('[EXTRACTION_STORE] Clear completed error:', error);
+        }
     },
 
     getExtraction: (id: string) => get().extractions.find(e => e.id === id),
-
-    processQueue: async () => {
-        const { isProcessing, extractions } = get();
-        if (isProcessing) return;
-        const pending = extractions.filter(e => e.status === 'pending');
-        if (pending.length === 0) return;
-        set({ isProcessing: true });
-        for (const extraction of pending) {
-            await get().startExtraction(extraction.id);
-        }
-        set({ isProcessing: false });
-    },
 }));
