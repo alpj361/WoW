@@ -2,6 +2,111 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.18] - 2026-02-09
+
+### Added
+- 🔮 **Glassmorphism UI**: New visual design system with glass effects
+  - `expo-blur` dependency for native blur effects
+  - `GlassTabBar` component with frosted glass effect using `BlurView`
+  - Semi-transparent background with blur, rounded top corners (24px)
+  - Purple glow border on top edge
+  - Active tab indicator with glow effect
+  - Outline/filled icon variants based on active state
+  - Web fallback with CSS backdrop-filter
+
+- ✨ **Neon Logo Effect**: Updated `WowLogo` component
+  - New gradient: purple → pink → red (`#8B5CF6` → `#D946EF` → `#F43F5E`)
+  - 5-layer glow stack for neon effect
+  - Configurable `glowIntensity` prop (`'low' | 'medium' | 'high'`)
+  - White highlight stroke for extra definition
+  - iOS shadow overlay for enhanced glow
+
+- 📥 **Background Extraction System**: Process Instagram URLs while app is in background
+  - New `extractions` tab in navigation for managing extractions
+  - `extractionStore.ts` (web) and `extractionStore.native.ts` (native) - platform-specific Zustand stores
+  - Web version: No persistence (avoids `import.meta` bundling issues)
+  - Native version: AsyncStorage persistence for iOS/Android
+  - Queue-based processing with automatic retry on app foreground
+  - AppState listener to resume processing when app returns to foreground
+
+- 🔄 **AnimatedLoader Component** (`src/components/AnimatedLoader.tsx`)
+  - `AnimatedLoader`: 3D purple sphere with glow effects and pulse/rotation animations
+  - `InlineLoader`: Bouncing dots for inline status indicators
+  - `MiniSphereLoader`: Mini pulsing sphere for thumbnails
+
+- 📋 **Extractions Screen** (`app/extractions.tsx`)
+  - List view of all extractions with status indicators
+  - Image selector modal for multi-image posts
+  - Auto-navigate to create screen with pre-filled data
+  - Real-time status updates (pending → extracting → ready → analyzing → completed)
+
+### Fixed
+- 🔄 **Flash of Unfiltered Content**: Fixed race condition on initial load
+  - Added `await` to `fetchEvents()` in initialization sequence
+  - Changed `isInitialized` from `useRef` to `useState` to trigger re-renders
+  - Skeleton loader now shows until all data is properly filtered
+
+- ♾️ **Infinite Loading Bug**: Fixed app getting stuck on loading
+  - Root cause: `useRef` doesn't trigger re-renders when value changes
+  - Solution: Converted `isInitialized` to `useState` for proper reactivity
+
+- 📱 **iOS Loading Stuck on Startup**: App was stuck on loading screen
+  - Root cause: `authState.isInitialized` check returned early without setting `loading=false`
+  - Added `restoreFromCache()` function in AuthContext
+
+- 🌐 **Web Bundling Error** (`import.meta` SyntaxError)
+  - Root cause: `zustand/middleware` uses ESM `import.meta.env`
+  - Solution: Platform-specific store files (`.ts` for web, `.native.ts` for native)
+
+### Changed
+- 🎨 **Tab Bar**: Replaced default Expo Router tab bar with custom `GlassTabBar`
+  - Tab bar now has glassmorphism styling instead of solid dark background
+  - Added `extractions` to mainRoutes with cloud-download icon
+- 📝 **Create Screen**: Auto-navigates to extractions tab after URL submission
+
+### Technical Details
+```
+New Files:
+- frontend/src/components/GlassTabBar.tsx
+- frontend/src/components/AnimatedLoader.tsx
+- frontend/src/store/extractionStore.ts (web)
+- frontend/src/store/extractionStore.native.ts (native)
+- frontend/app/extractions.tsx
+
+Modified:
+- frontend/app/_layout.tsx (custom GlassTabBar integration)
+- frontend/app/index.tsx (race condition and loading state fixes)
+- frontend/src/components/WowLogo.tsx (neon glow effect)
+
+Dependencies Added:
+- expo-blur
+```
+
+---
+
+## [0.0.17] - 2026-02-09
+
+### Added
+- 🖼️ **Multiple Image Selection for Instagram Carousels**: When extracting from Instagram posts with multiple images
+  - New image selector modal with horizontal scroll
+  - Users can choose which image to use from carousels
+  - Shows image count indicator (1/5, 2/5, etc.)
+  - Works with both single posts and carousels
+
+### Changed
+- ⏱️ **Increased URL Extraction Timeout**: From 30s to 180s (3 minutes)
+  - Instagram extraction can take longer due to Playwright/yt-dlp processing
+  - Prevents timeout errors on slower connections
+
+### Technical Details
+```
+Modified:
+- frontend/app/create.tsx (image selector modal, handleSelectImage, extractedImages state)
+- frontend/src/services/api.ts (increased timeout, added extracted_images to UrlAnalysisResult)
+```
+
+---
+
 ## [0.0.16] - 2026-02-03
 
 ### Added

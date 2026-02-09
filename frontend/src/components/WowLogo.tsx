@@ -1,72 +1,156 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 
 interface WowLogoProps {
     width?: number;
     height?: number;
+    glowIntensity?: 'low' | 'medium' | 'high';
 }
 
-export const WowLogo: React.FC<WowLogoProps> = ({ width = 120, height = 40 }) => {
+export const WowLogo: React.FC<WowLogoProps> = ({
+    width = 120,
+    height = 40,
+    glowIntensity = 'medium'
+}) => {
+    // Glow opacity based on intensity
+    const glowOpacity = {
+        low: { outer: 0.15, middle: 0.25, inner: 0.4 },
+        medium: { outer: 0.2, middle: 0.35, inner: 0.5 },
+        high: { outer: 0.3, middle: 0.45, inner: 0.6 },
+    }[glowIntensity];
+
     return (
-        <Svg width={width} height={height} viewBox="0 0 1400 450">
-            <Defs>
-                <LinearGradient id="mainGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-                    <Stop offset="0%" stopColor="#5a2d82" stopOpacity="1" />
-                    <Stop offset="18%" stopColor="#6d2973" stopOpacity="1" />
-                    <Stop offset="36%" stopColor="#8f2564" stopOpacity="1" />
-                    <Stop offset="54%" stopColor="#b22d56" stopOpacity="1" />
-                    <Stop offset="72%" stopColor="#d63848" stopOpacity="1" />
-                    <Stop offset="90%" stopColor="#f24737" stopOpacity="1" />
-                    <Stop offset="100%" stopColor="#ff5733" stopOpacity="1" />
-                </LinearGradient>
-            </Defs>
+        <View style={styles.container}>
+            <Svg width={width} height={height} viewBox="0 0 1400 450">
+                <Defs>
+                    {/* Main gradient - vibrant purple to pink/red */}
+                    <LinearGradient id="mainGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+                        <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
+                        <Stop offset="25%" stopColor="#A855F7" stopOpacity="1" />
+                        <Stop offset="50%" stopColor="#D946EF" stopOpacity="1" />
+                        <Stop offset="75%" stopColor="#EC4899" stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#F43F5E" stopOpacity="1" />
+                    </LinearGradient>
 
-            {/* Sombra simulada (Soft Shadow) */}
-            <SvgText
-                x="700"
-                y="328"
-                fontFamily="System"
-                fontSize="320"
-                fontWeight="900"
-                textAnchor="middle"
-                fill="rgba(0,0,0,0.25)"
-                letterSpacing="-15"
-            >
-                WOW!
-            </SvgText>
+                    {/* Neon glow gradient - for outer glow layers */}
+                    <LinearGradient id="glowGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+                        <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
+                        <Stop offset="50%" stopColor="#D946EF" stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#F43F5E" stopOpacity="1" />
+                    </LinearGradient>
+                </Defs>
 
-            {/* Sombra secundaria (Inner Shadow simulada con offset menor) */}
-            <SvgText
-                x="700"
-                y="320"
-                fontFamily="System"
-                fontSize="320"
-                fontWeight="900"
-                textAnchor="middle"
-                fill="rgba(0,0,0,0.15)"
-                letterSpacing="-15"
-            >
-                WOW!
-            </SvgText>
+                {/* Outer glow layer 1 - largest, most diffuse */}
+                <SvgText
+                    x="700"
+                    y="310"
+                    fontFamily="System"
+                    fontSize="330"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="url(#glowGradient)"
+                    opacity={glowOpacity.outer * 0.7}
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
 
-            {/* Texto Principal */}
-            <SvgText
-                x="700"
-                y="310"
-                fontFamily="System"
-                fontSize="320"
-                fontWeight="900"
-                textAnchor="middle"
-                fill="url(#mainGradient)"
-                stroke="url(#mainGradient)"
-                strokeWidth="8"
-                letterSpacing="-15"
-            >
-                WOW!
-            </SvgText>
-        </Svg>
+                {/* Outer glow layer 2 */}
+                <SvgText
+                    x="700"
+                    y="310"
+                    fontFamily="System"
+                    fontSize="320"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="url(#glowGradient)"
+                    opacity={glowOpacity.middle}
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
+
+                {/* Middle glow layer - purple tint */}
+                <SvgText
+                    x="700"
+                    y="310"
+                    fontFamily="System"
+                    fontSize="320"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="#8B5CF6"
+                    opacity={glowOpacity.inner}
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
+
+                {/* Inner glow - pink accent */}
+                <SvgText
+                    x="700"
+                    y="312"
+                    fontFamily="System"
+                    fontSize="320"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="#D946EF"
+                    opacity={0.3}
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
+
+                {/* Main text with gradient fill */}
+                <SvgText
+                    x="700"
+                    y="310"
+                    fontFamily="System"
+                    fontSize="320"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="url(#mainGradient)"
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
+
+                {/* Highlight stroke for extra pop */}
+                <SvgText
+                    x="700"
+                    y="310"
+                    fontFamily="System"
+                    fontSize="320"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="2"
+                    letterSpacing="-15"
+                >
+                    WOW!
+                </SvgText>
+            </Svg>
+
+            {/* Extra glow effect using View shadows (iOS) */}
+            {Platform.OS === 'ios' && (
+                <View style={styles.shadowOverlay} pointerEvents="none" />
+            )}
+        </View>
     );
 };
+
+const styles = StyleSheet.create({
+    container: {
+        position: 'relative',
+    },
+    shadowOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.5,
+        shadowRadius: 15,
+    },
+});
 
 export default WowLogo;

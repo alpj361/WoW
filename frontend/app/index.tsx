@@ -50,6 +50,7 @@ export default function ExploreScreen() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const isFirstLoad = useRef(true);
 
   // Toast state
@@ -63,7 +64,8 @@ export default function ExploreScreen() {
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
-      fetchEvents();
+      await fetchEvents();
+      setIsInitialized(true);
       isFirstLoad.current = false;
     };
     init();
@@ -204,7 +206,8 @@ export default function ExploreScreen() {
   }, [handleSwipeLeft]);
 
   const renderCardContent = () => {
-    if (isLoadingFeed && events.length === 0) {
+    // Show skeleton until initialized OR while loading with no events
+    if (!isInitialized || (isLoadingFeed && events.length === 0)) {
       return <SwipeCardSkeleton />;
     }
 

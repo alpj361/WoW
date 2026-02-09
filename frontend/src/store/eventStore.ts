@@ -166,20 +166,12 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
       // Filter events:
       // 1. Remove events that are already saved (liked)
-      // 2. Remove events that are denied within the last 48 hours
+      // 2. Remove events that are denied (permanently)
       const { savedEvents, deniedEvents } = get();
       const savedEventIds = new Set(savedEvents.map(s => s.event.id));
 
-      const now = new Date();
-      const deniedEventIds = new Set(
-        deniedEvents
-          .filter(d => {
-            const deniedDate = new Date(d.denied_at);
-            const hoursDiff = (now.getTime() - deniedDate.getTime()) / (1000 * 60 * 60);
-            return hoursDiff < 48; // Keep only if denied less than 48h ago
-          })
-          .map(d => d.event_id)
-      );
+      // Filter out ALL denied events permanently (no 48hr window)
+      const deniedEventIds = new Set(deniedEvents.map(d => d.event_id));
 
       const filteredEvents = events.filter(event =>
         !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)
@@ -835,16 +827,8 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const { savedEvents, deniedEvents, events: currentEvents } = get();
       const savedEventIds = new Set(savedEvents.map(s => s.event.id));
 
-      const now = new Date();
-      const deniedEventIds = new Set(
-        deniedEvents
-          .filter(d => {
-            const deniedDate = new Date(d.denied_at);
-            const hoursDiff = (now.getTime() - deniedDate.getTime()) / (1000 * 60 * 60);
-            return hoursDiff < 48;
-          })
-          .map(d => d.event_id)
-      );
+      // Filter out ALL denied events permanently (no 48hr window)
+      const deniedEventIds = new Set(deniedEvents.map(d => d.event_id));
 
       const filteredEvents = newEvents.filter(event =>
         !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)

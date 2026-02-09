@@ -45,7 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Prevent re-initialization on component remount (critical for expo-router)
         // Using authState.isInitialized which persists across module reloads
         if (authState.getState().isInitialized) {
-            console.log('⚠️ Already initialized once, skipping (authState check)');
+            console.log('⚠️ Already initialized once, restoring from cache');
+            // Still need to restore state and set loading=false
+            restoreFromCache();
             return;
         }
         authState.setInitialized(true);
@@ -53,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Also set the ref for within-render safety
         if (isInitializing.current) {
             console.log('⚠️ Already initializing, skipping duplicate call');
+            // Don't return without ensuring loading is handled - restoreFromCache already called above
             return;
         }
         isInitializing.current = true;
@@ -181,6 +184,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [session]);
+
+    // Quick restore from cache when already initialized (prevents loading stuck)
+    const restoreFromCache = async () => {
+        try {
+            const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+            if (cachedProfileStr) {
+                const cachedProfile = JSON.parse(cachedProfileStr);
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (currentSession?.user && cachedProfile.id === currentSession.user.id) {
+                    console.log('🔄 Restored from cache after re-mount');
+                    setSession(currentSession);
+                    setUser(currentSession.user);
+                    setProfile(cachedProfile);
+                }
+            }
+        } catch (e) {
+            console.error('Error restoring from cache:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const initializeAuth = async () => {
         try {

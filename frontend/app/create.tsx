@@ -1,4 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  withDelay,
+  Easing
+} from 'react-native-reanimated';
 import {
   View,
   Text,
@@ -20,9 +29,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEventStore } from '../src/store/eventStore';
-import { router } from 'expo-router';
-import { analyzeImage, analyzeUrl } from '../src/services/api';
+import { router, useLocalSearchParams } from 'expo-router';
+import { analyzeImage, extractUrl, analyzeExtractedImage } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
+import { useExtractionStore } from '../src/store/extractionStore';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -58,7 +68,7 @@ export default function CreateEventScreen() {
   const [registrationFormUrl, setRegistrationFormUrl] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
-  
+
   // Attendance tracking
   const [requiresAttendance, setRequiresAttendance] = useState(false);
 
@@ -69,7 +79,12 @@ export default function CreateEventScreen() {
   // URL Modal state
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [postUrl, setPostUrl] = useState('');
-  const [isExtractingUrl, setIsExtractingUrl] = useState(false);
+
+
+  // Image selector state (for carousels)
+  const [showImageSelector, setShowImageSelector] = useState(false);
+  const [extractedImages, setExtractedImages] = useState<string[]>([]);
+  const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
 
   // Format date for display
   const formatDate = (date: Date): string => {
@@ -222,64 +237,141 @@ export default function CreateEventScreen() {
     }
   };
 
+  // Extraction store
+  const { queueExtraction } = useExtractionStore();
+  const params = useLocalSearchParams();
+
+  // Handle incoming data from Extractions screen
+  useEffect(() => {
+    if (params.extractionId) {
+      if (params.title) setTitle(params.title as string);
+      if (params.description) setDescription(params.description as string);
+      if (params.location) setLocation(params.location as string);
+
+      // Handle image
+      if (params.image) {
+        setImage(params.image as string);
+      }
+
+      // Handle date
+      if (params.date && params.date !== 'No especificado') {
+        let parsedDate = new Date();
+        const dateParts = (params.date as string).split(/[-/]/);
+        if (dateParts.length === 3) {
+          parsedDate = new Date(params.date as string);
+        } else if (dateParts.length === 2) {
+          const currentYear = new Date().getFullYear();
+          const day = parseInt(dateParts[0]);
+          const month = parseInt(dateParts[1]) - 1;
+          parsedDate.setFullYear(currentYear);
+          parsedDate.setMonth(month);
+          parsedDate.setDate(day);
+        }
+        if (!isNaN(parsedDate.getTime())) {
+          setSelectedDate(parsedDate);
+        }
+      }
+
+      // Handle time
+      if (params.time && params.time !== 'No especificado') {
+        const timeParts = (params.time as string).split(':');
+        if (timeParts.length >= 2) {
+          const parsedTime = new Date();
+          parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+          setSelectedTime(parsedTime);
+        }
+      }
+    }
+  }, [params]);
+
   const handleAnalyzeUrl = async () => {
     if (!postUrl.trim()) return;
 
-    setIsExtractingUrl(true);
     try {
-      const result = await analyzeUrl(postUrl.trim());
+      // Add to extraction queue
+      queueExtraction(postUrl.trim());
 
-      if (result.success) {
-        // Set extracted image
-        setImage(result.extracted_image_url);
+      // Close modal and navigate directly to extractions
+      setShowUrlModal(false);
+      setPostUrl('');
 
-        // Auto-fill form fields
-        if (result.analysis) {
-          setTitle(result.analysis.event_name || title);
-          setDescription(result.analysis.description || description);
-          setLocation(result.analysis.location || location);
+      // Navigate to extractions tab to show progress
+      router.push('/extractions');
+    } catch (error: any) {
+      console.error('Queue error:', error);
+      Alert.alert('Error', 'No pudimos agregar la URL a la cola.');
+    }
+  };
 
-          // Parse Date
-          if (result.analysis.date && result.analysis.date !== 'No especificado') {
-            let parsedDate = new Date();
-            const dateParts = result.analysis.date.split(/[-/]/);
-            if (dateParts.length === 3) {
-              parsedDate = new Date(result.analysis.date);
-            } else if (dateParts.length === 2) {
-              const currentYear = new Date().getFullYear();
-              const day = parseInt(dateParts[0]);
-              const month = parseInt(dateParts[1]) - 1;
-              parsedDate.setFullYear(currentYear);
-              parsedDate.setMonth(month);
-              parsedDate.setDate(day);
-            }
-            if (!isNaN(parsedDate.getTime())) {
-              setSelectedDate(parsedDate);
-            }
-          }
+  // Analyze a single image and apply to form
+  const analyzeAndSetImage = async (imageUrl: string) => {
+    setIsAnalyzing(true);
+    try {
+      setImage(imageUrl); // Set image immediately for visual feedback
 
-          // Parse Time
-          if (result.analysis.time && result.analysis.time !== 'No especificado') {
-            const timeParts = result.analysis.time.split(':');
-            if (timeParts.length >= 2) {
-              const parsedTime = new Date();
-              parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-              setSelectedTime(parsedTime);
-            }
-          }
-        }
+      // Step 2: Analyze the selected image with Vision API
+      const analysisResult = await analyzeExtractedImage(imageUrl, 'Event Flyer');
 
-        setShowUrlModal(false);
-        setPostUrl('');
-        Alert.alert('¡Listo!', 'Hemos extraído la imagen y llenado los campos detectados.');
+      if (analysisResult.success && analysisResult.analysis) {
+        applyAnalysisToForm(analysisResult.analysis);
+        Alert.alert('¡Listo!', 'Imagen analizada y campos llenados.');
+      } else {
+        Alert.alert('Imagen guardada', 'La imagen se guardó pero no pudimos extraer los detalles automáticamente.');
       }
     } catch (error: any) {
-      console.error('URL extraction error:', error);
-      const errorMessage = error.response?.data?.error || 'No pudimos extraer el contenido del post. Verifica la URL.';
-      Alert.alert('Error', errorMessage);
+      console.error('Image analysis error:', error);
+      Alert.alert('Imagen guardada', 'La imagen se guardó pero hubo un error al analizarla. Llena los campos manualmente.');
     } finally {
-      setIsExtractingUrl(false);
+      setIsAnalyzing(false);
     }
+  };
+
+
+
+  // Helper function to apply analysis data to form fields
+  const applyAnalysisToForm = (analysis: any) => {
+    if (!analysis) return;
+
+    setTitle(analysis.event_name || title);
+    setDescription(analysis.description || description);
+    setLocation(analysis.location || location);
+
+    // Parse Date
+    if (analysis.date && analysis.date !== 'No especificado') {
+      let parsedDate = new Date();
+      const dateParts = analysis.date.split(/[-/]/);
+      if (dateParts.length === 3) {
+        parsedDate = new Date(analysis.date);
+      } else if (dateParts.length === 2) {
+        const currentYear = new Date().getFullYear();
+        const day = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]) - 1;
+        parsedDate.setFullYear(currentYear);
+        parsedDate.setMonth(month);
+        parsedDate.setDate(day);
+      }
+      if (!isNaN(parsedDate.getTime())) {
+        setSelectedDate(parsedDate);
+      }
+    }
+
+    // Parse Time
+    if (analysis.time && analysis.time !== 'No especificado') {
+      const timeParts = analysis.time.split(':');
+      if (timeParts.length >= 2) {
+        const parsedTime = new Date();
+        parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+        setSelectedTime(parsedTime);
+      }
+    }
+  };
+
+  // Handle image selection from carousel (triggers on-demand analysis)
+  const handleSelectImage = async (imageUrl: string) => {
+    setShowImageSelector(false);
+    setExtractedImages([]);
+    setPendingAnalysis(null);
+    await analyzeAndSetImage(imageUrl);
   };
 
   const handleSubmit = async () => {
@@ -354,7 +446,34 @@ export default function CreateEventScreen() {
 
         {/* Image Upload Section */}
         <View style={styles.imageSection}>
-          {image ? (
+          {isAnalyzing ? (
+            // Animated Loading View
+            <View style={styles.loadingContainer}>
+              <View style={styles.loadingLettersRow}>
+                {'Analizando...'.split('').map((letter, index) => (
+                  <Animated.Text
+                    key={index}
+                    style={[
+                      styles.loadingLetter,
+                      {
+                        transform: [{
+                          translateY: Math.sin((Date.now() / 200) + index * 0.5) * 8
+                        }]
+                      }
+                    ]}
+                  >
+                    {letter}
+                  </Animated.Text>
+                ))}
+              </View>
+              <View style={styles.loadingDotsRow}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+              </View>
+              <Text style={styles.loadingSubtext}>
+                Analizando imagen con IA...
+              </Text>
+            </View>
+          ) : image ? (
             <View style={styles.imagePreview}>
               <Image source={{ uri: image }} style={styles.previewImage} />
 
@@ -859,21 +978,91 @@ export default function CreateEventScreen() {
                 style={[
                   styles.submitButton,
                   { marginTop: 16 },
-                  (!postUrl.trim() || isExtractingUrl) && styles.submitButtonDisabled
+                  (!postUrl.trim()) && styles.submitButtonDisabled
                 ]}
                 onPress={handleAnalyzeUrl}
-                disabled={!postUrl.trim() || isExtractingUrl}
+                disabled={!postUrl.trim()}
               >
-                {isExtractingUrl ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="sparkles" size={20} color="#fff" />
-                    <Text style={styles.submitButtonText}>Extraer y Analizar</Text>
-                  </>
-                )}
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
+                <Text style={styles.submitButtonText}>Agregar a la cola</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image Selector Modal (for carousels) */}
+      <Modal
+        visible={showImageSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowImageSelector(false);
+          setExtractedImages([]);
+          setPendingAnalysis(null);
+        }}
+      >
+        <View style={styles.pickerModalOverlay}>
+          <Pressable
+            style={styles.pickerModalDismiss}
+            onPress={() => {
+              setShowImageSelector(false);
+              setExtractedImages([]);
+              setPendingAnalysis(null);
+            }}
+          />
+          <View style={[styles.pickerModalContent, { maxHeight: '80%' }]}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Selecciona una imagen</Text>
+              <TouchableOpacity onPress={() => {
+                setShowImageSelector(false);
+                setExtractedImages([]);
+                setPendingAnalysis(null);
+              }}>
+                <Text style={styles.pickerModalDone}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: '#9CA3AF', paddingHorizontal: 16, paddingBottom: 12 }}>
+              Este post tiene {extractedImages.length} imágenes. Selecciona la que quieras usar:
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
+            >
+              {extractedImages.map((imgUrl, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => handleSelectImage(imgUrl)}
+                  style={{
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    borderWidth: 2,
+                    borderColor: '#2A2A2A',
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: imgUrl }}
+                    style={{ width: 200, height: 250 }}
+                    resizeMode="cover"
+                  />
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 8,
+                    left: 8,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                  }}>
+                    <Text style={{ color: '#fff', fontWeight: '600' }}>
+                      {index + 1} / {extractedImages.length}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -907,6 +1096,33 @@ const styles = StyleSheet.create({
   },
   imageSection: {
     marginBottom: 24,
+  },
+  loadingContainer: {
+    height: 200,
+    backgroundColor: '#1F1F1F',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingLettersRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLetter: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8B5CF6',
+    marginHorizontal: 1,
+  },
+  loadingDotsRow: {
+    marginTop: 8,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   uploadOptions: {
     flexDirection: 'row',

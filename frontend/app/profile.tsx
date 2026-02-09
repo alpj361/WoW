@@ -10,6 +10,7 @@ import {
   Image,
   LayoutChangeEvent,
 } from 'react-native';
+import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -126,6 +127,9 @@ export default function ProfileScreen() {
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
   const memberNumber = profile?.member_number;
   const memberId = generateMemberId(memberNumber);
+
+  // Check if user is alpha or admin (dev features access)
+  const isDevUser = profile?.role === 'alpha' || profile?.role === 'admin';
 
   const handleObtainPin = () => {
     // Step 1: Flip the card to back first (if not already flipped)
@@ -299,8 +303,8 @@ export default function ProfileScreen() {
             </Animated.View>
           </View>
 
-          {/* Obtener PIN Button - only show on ECARD tab */}
-          {activeTab === 'ecard' && (
+          {/* Obtener PIN Button - only show on ECARD tab for alpha/admin users */}
+          {activeTab === 'ecard' && isDevUser && (
             <TouchableOpacity
               style={styles.obtainPinButton}
               onPress={handleObtainPin}
@@ -353,22 +357,29 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Desarrollo Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
-          <View style={styles.settingsGroup}>
-
-            {/* Test de Movimiento - hidden for now
-            <SettingItem
-              icon="move"
-              title="Test de Movimiento"
-              subtitle="Prueba el movimiento 3D del pin"
-              onPress={() => setShowPinTest(true)}
-              color="#F59E0B"
-            />
-            */}
+        {/* Desarrollo Section - only for alpha/admin users */}
+        {isDevUser && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
+            <View style={styles.settingsGroup}>
+              <SettingItem
+                icon="move"
+                title="Test de Movimiento"
+                subtitle="Prueba el movimiento 3D del pin"
+                onPress={() => setShowPinTest(true)}
+                color="#F59E0B"
+              />
+              <SettingItem
+                icon="planet"
+                title="Radial Demo"
+                subtitle="Demo de avatares orbitando"
+                onPress={() => router.push('/radial-demo')}
+                color="#8B5CF6"
+                isLast
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Informacion Section */}
         <View style={styles.section}>

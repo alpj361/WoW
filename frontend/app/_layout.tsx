@@ -9,6 +9,7 @@ import { WebViewport } from '../src/components/WebViewport';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import SplashScreen from '../src/components/SplashScreen';
 import { authState } from '../src/utils/authState';
+import { GlassTabBar } from '../src/components/GlassTabBar';
 
 // Inner layout that uses auth context
 function RootLayoutNav() {
@@ -132,22 +133,11 @@ function RootLayoutNav() {
     <WebViewport>
       <View style={styles.container}>
         <Tabs
+          tabBar={(props) => <GlassTabBar {...props} />}
           screenOptions={{
             headerShown: false,
-            tabBarStyle: {
-              backgroundColor: '#1A1A1A',
-              borderTopColor: '#2A2A2A',
-              borderTopWidth: 1,
-              height: 60 + insets.bottom,
-              paddingBottom: insets.bottom,
-              paddingTop: 8,
-            },
             tabBarActiveTintColor: '#8B5CF6',
             tabBarInactiveTintColor: '#6B7280',
-            tabBarLabelStyle: {
-              fontSize: 11,
-              fontWeight: '600',
-            },
           }}
         >
           <Tabs.Screen
@@ -165,6 +155,15 @@ function RootLayoutNav() {
               title: 'Crear',
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="add-circle" size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="extractions"
+            options={{
+              title: 'Extracciones',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="cloud-download" size={size} color={color} />
               ),
             }}
           />
@@ -207,6 +206,12 @@ function RootLayoutNav() {
           />
           <Tabs.Screen
             name="event/[id]"
+            options={{
+              href: null,
+            }}
+          />
+          <Tabs.Screen
+            name="radial-demo"
             options={{
               href: null,
             }}

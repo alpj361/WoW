@@ -87,16 +87,16 @@ export interface Attendee {
 }
 
 export interface AttendanceListItem {
-  user_id: string;
-  user_name: string | null;
-  user_email: string | null;
-  user_avatar: string | null;
-  confirmed: boolean;
-  attended: boolean;
-  scanned_by_host: boolean;
-  scanned_at: string | null;
-  registration_status: string | null;
-  payment_receipt_url?: string | null;
+    user_id: string;
+    user_name: string | null;
+    user_email: string | null;
+    user_avatar: string | null;
+    confirmed: boolean;
+    attended: boolean;
+    scanned_by_host: boolean;
+    scanned_at: string | null;
+    registration_status: string | null;
+    payment_receipt_url?: string | null;
 }
 
 /**
@@ -148,10 +148,46 @@ export async function analyzeImage(base64Image: string, title?: string): Promise
     return response.data;
 }
 
+// New response format: extraction only (no analysis)
+export interface UrlExtractionResult {
+    success: boolean;
+    source_url: string;
+    platform: 'instagram';
+    extracted_images: string[];  // All images from carousel/post
+    is_reel?: boolean;
+    post_metadata?: {
+        author?: string;
+        description?: string;
+    };
+    error?: string;
+}
+
+// On-demand image analysis result
+export interface ImageAnalysisResult {
+    success: boolean;
+    analysis: {
+        event_name: string;
+        date: string;
+        time: string;
+        description: string;
+        location: string;
+        confidence: string;
+        extracted_text: string;
+    };
+    metadata?: {
+        model: string;
+        tokens_used: number;
+    };
+    error?: string;
+}
+
+// Legacy type for backwards compatibility
 export interface UrlAnalysisResult extends AnalysisResult {
     source_url: string;
     platform: 'instagram';
     extracted_image_url: string;
+    extracted_images?: string[];
+    is_reel?: boolean;
     post_metadata?: {
         author?: string;
         description?: string;
@@ -159,10 +195,32 @@ export interface UrlAnalysisResult extends AnalysisResult {
 }
 
 /**
- * Analyze an event from an Instagram post URL
+ * Extract images from an Instagram post URL (no analysis)
+ * Step 1 of the two-step flow
+ */
+export async function extractUrl(url: string): Promise<UrlExtractionResult> {
+    const response = await api.post('/events/analyze-url', { url }, { timeout: 180000 });
+    return response.data;
+}
+
+/**
+ * Analyze a single extracted image with Vision API
+ * Step 2 of the two-step flow (on-demand)
+ */
+export async function analyzeExtractedImage(imageUrl: string, title?: string): Promise<ImageAnalysisResult> {
+    const response = await api.post('/events/analyze-extracted-image', {
+        image_url: imageUrl,
+        title
+    }, { timeout: 60000 });
+    return response.data;
+}
+
+/**
+ * Legacy function - kept for backwards compatibility
+ * @deprecated Use extractUrl + analyzeExtractedImage instead
  */
 export async function analyzeUrl(url: string): Promise<UrlAnalysisResult> {
-    const response = await api.post('/events/analyze-url', { url });
+    const response = await api.post('/events/analyze-url', { url }, { timeout: 180000 });
     return response.data;
 }
 
@@ -240,8 +298,8 @@ export async function fetchUserRegistrations(userId: string): Promise<EventRegis
  * Scan a user's QR code to mark attendance at an event
  */
 export async function scanAttendance(
-    eventId: string, 
-    scannedUserId: string, 
+    eventId: string,
+    scannedUserId: string,
     hostUserId: string
 ): Promise<void> {
     const response = await api.post(`/events/${eventId}/scan-attendance`, {
@@ -263,7 +321,7 @@ export async function getAttendanceList(eventId: string): Promise<AttendanceList
  * Update attendance requirement for an event (host only)
  */
 export async function updateAttendanceRequirement(
-    eventId: string, 
+    eventId: string,
     requiresAttendance: boolean
 ): Promise<void> {
     const response = await api.patch(`/events/${eventId}/attendance-requirement`, {
