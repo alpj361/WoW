@@ -1,22 +1,22 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
-export const GlassSphere = ({ imageUrl, alt, placeName, index, delay = 0 }) => {
+export const GlassSphere = ({ imageUrl, alt, placeName, index, delay = 0, sizeClass = 'bubble-lg' }) => {
   const [isBlurring, setIsBlurring] = useState(false);
 
   const handleClick = useCallback(() => {
     if (isBlurring) return;
     setIsBlurring(true);
-    setTimeout(() => setIsBlurring(false), 700);
+    setTimeout(() => setIsBlurring(false), 800);
   }, [isBlurring]);
 
   return (
     <motion.div
-      className="bubble-cell"
+      className={`bubble-wrapper ${sizeClass}`}
       initial={{ opacity: 0, y: 40, scale: 0.85 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
-        duration: 0.6,
+        duration: 0.65,
         delay: delay,
         ease: [0.2, 0.8, 0.2, 1],
       }}
