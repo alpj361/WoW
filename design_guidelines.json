@@ -1,0 +1,107 @@
+{
+  "project_name": "Soon Places",
+  "app_type": "landing_page",
+  "design_philosophy": {
+    "theme": "light",
+    "emotional_tone": "Wanderlust, Premium, Tactile, Airy",
+    "visual_style": "Glassmorphism x Swiss Minimalist"
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Anton, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "scale": {
+      "hero_title": "text-[15vw] md:text-[12vw] leading-[0.8] tracking-tight uppercase",
+      "caption": "text-sm tracking-widest uppercase opacity-60"
+    },
+    "imports": [
+      "@import url('https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;600&display=swap');"
+    ]
+  },
+  "colors": {
+    "background": "#FFFFFF",
+    "foreground": "#000000",
+    "accents": {
+      "glass_highlight": "rgba(255, 255, 255, 0.9)",
+      "glass_shadow": "rgba(0, 0, 0, 0.15)",
+      "blur_tint": "rgba(255, 255, 255, 0.1)"
+    }
+  },
+  "components": {
+    "GlassSphere": {
+      "description": "A circular container with an image inside, overlaid with complex gradients to simulate a solid glass marble.",
+      "structure": [
+        "Container (relative, overflow-hidden, rounded-full)",
+        "Image (absolute, cover, z-0)",
+        "Overlay (absolute, inset-0, z-10, radial-gradient for shine)",
+        "RimLight (inset shadow)"
+      ],
+      "tailwind_classes": {
+        "container": "relative aspect-square w-full rounded-full overflow-hidden cursor-pointer transition-all duration-500 ease-out",
+        "image": "absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-in-out hover:scale-110",
+        "glass_overlay": "absolute inset-0 z-10 pointer-events-none opacity-80"
+      },
+      "custom_css": ".glass-overlay { background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.1) 25%, rgba(0,0,0,0.1) 100%); box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1), inset 5px 5px 10px rgba(255,255,255,0.5); }"
+    },
+    "HeroTitle": {
+      "classes": "text-center font-['Anton'] text-black mix-blend-difference z-20 relative pointer-events-none select-none"
+    }
+  },
+  "layout": {
+    "structure": "Vertical scroll (Mobile-first)",
+    "grid_strategy": "Masonry-style or Staggered Grid. 2 columns on mobile with offset margins.",
+    "spacing": "Gap-4 or Gap-6. Padding-4 for screen edges."
+  },
+  "motion": {
+    "blur_effect": {
+      "trigger": "onClick",
+      "animation": "blur-jump 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "keyframes": "@keyframes blur-jump { 0% { filter: blur(0px); transform: scale(1); } 40% { filter: blur(8px); transform: scale(0.95); } 100% { filter: blur(0px); transform: scale(1); } }"
+    },
+    "entrance": "Staggered fade-up for spheres."
+  },
+  "assets": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1707216386391-4ffb0881a7ef?q=85&w=800&auto=format&fit=crop",
+        "alt": "Aerial City Mountain",
+        "category": "landscape"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1770234894941-f19b2d8f07e2?q=85&w=800&auto=format&fit=crop",
+        "alt": "Empire State Building",
+        "category": "city"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1766133239080-ed4f8f30b320?q=85&w=800&auto=format&fit=crop",
+        "alt": "Red Tower",
+        "category": "architecture"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1766133239036-e37f42a54869?q=85&w=800&auto=format&fit=crop",
+        "alt": "Tokyo Tower",
+        "category": "architecture"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1700653964875-630df46b2620?q=85&w=800&auto=format&fit=crop",
+        "alt": "Park View City",
+        "category": "urban"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1706188553061-1259d37ecd16?q=85&w=800&auto=format&fit=crop",
+        "alt": "Snow Skiing",
+        "category": "adventure"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. Install framer-motion: `yarn add framer-motion` (CRITICAL for smooth interactions).",
+    "2. Create a global CSS file or add to App.css the `@import` for Anton/Manrope fonts.",
+    "3. Implement the `GlassSphere` component with the custom CSS gradients for the realistic look.",
+    "4. Use a `Masonry` layout or simple alternating columns for the grid.",
+    "5. Ensure the 'Soon Places' title is fixed or sticky if needed, or just massive at the top.",
+    "6. Apply the `blur-jump` keyframe animation to the `onClick` event of the sphere.",
+    "7. Keep the background purely white (#FFFFFF) to make the glass effect pop."
+  ]
+}
