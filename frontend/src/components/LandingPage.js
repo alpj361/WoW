@@ -66,22 +66,40 @@ const PLACES = [
   },
 ];
 
+// Layout config: each bubble has position/size defined for organic masonry feel
+const LAYOUT = [
+  // Row 1 - two bubbles, right one peeks from edge
+  { size: 160, x: -10, y: 0 },
+  { size: 140, x: 180, y: 20 },
+  // Row 2 - large left, small right peeking
+  { size: 180, x: 30, y: 10 },
+  { size: 130, x: 240, y: 40 },
+  // --- TITLE GOES HERE ---
+  // Row 3 - after title
+  { size: 150, x: -20, y: 0 },
+  { size: 170, x: 190, y: 30 },
+  // Row 4
+  { size: 130, x: 50, y: 0 },
+  { size: 160, x: 220, y: -20 },
+  // Row 5
+  { size: 175, x: -15, y: 10 },
+  { size: 140, x: 210, y: 40 },
+  // Row 6
+  { size: 155, x: 40, y: 0 },
+  { size: 130, x: 250, y: 20 },
+];
+
 export default function LandingPage() {
   const [showScrollHint, setShowScrollHint] = useState(true);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 100) {
-        setShowScrollHint(false);
-      } else {
-        setShowScrollHint(true);
-      }
+      setShowScrollHint(window.scrollY <= 100);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Split into top row, title area, bottom rows
   const topBubbles = PLACES.slice(0, 4);
   const bottomBubbles = PLACES.slice(4);
 
@@ -98,18 +116,31 @@ export default function LandingPage() {
         Discover the world
       </motion.p>
 
-      {/* Top bubbles */}
-      <div className="bubble-grid" data-testid="bubble-grid-top">
-        {topBubbles.map((place, i) => (
-          <GlassSphere
-            key={place.placeName}
-            imageUrl={place.imageUrl}
-            alt={place.alt}
-            placeName={place.placeName}
-            index={i}
-            delay={0.1 + i * 0.1}
-          />
-        ))}
+      {/* Top bubbles - organic layout */}
+      <div className="organic-grid" data-testid="bubble-grid-top">
+        {topBubbles.map((place, i) => {
+          const layout = LAYOUT[i];
+          return (
+            <div
+              key={place.placeName}
+              className="organic-cell"
+              style={{
+                width: layout.size,
+                height: layout.size,
+                marginLeft: layout.x,
+                marginTop: layout.y,
+              }}
+            >
+              <GlassSphere
+                imageUrl={place.imageUrl}
+                alt={place.alt}
+                placeName={place.placeName}
+                index={i}
+                delay={0.1 + i * 0.12}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Hero Title */}
@@ -123,18 +154,31 @@ export default function LandingPage() {
         Soon<br />Places
       </motion.h1>
 
-      {/* Bottom bubbles */}
-      <div className="bubble-grid" data-testid="bubble-grid-bottom">
-        {bottomBubbles.map((place, i) => (
-          <GlassSphere
-            key={place.placeName}
-            imageUrl={place.imageUrl}
-            alt={place.alt}
-            placeName={place.placeName}
-            index={i + 4}
-            delay={0.6 + i * 0.08}
-          />
-        ))}
+      {/* Bottom bubbles - organic layout */}
+      <div className="organic-grid" data-testid="bubble-grid-bottom">
+        {bottomBubbles.map((place, i) => {
+          const layout = LAYOUT[i + 4];
+          return (
+            <div
+              key={place.placeName}
+              className="organic-cell"
+              style={{
+                width: layout.size,
+                height: layout.size,
+                marginLeft: layout.x,
+                marginTop: layout.y,
+              }}
+            >
+              <GlassSphere
+                imageUrl={place.imageUrl}
+                alt={place.alt}
+                placeName={place.placeName}
+                index={i + 4}
+                delay={0.6 + i * 0.08}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Scroll hint */}
