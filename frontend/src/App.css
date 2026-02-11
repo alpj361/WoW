@@ -1,34 +1,275 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;600&display=swap');
+
+/* ========== BASE ========== */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background: #FFFFFF;
+  font-family: 'Manrope', sans-serif;
+  overflow-x: hidden;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.App {
+  width: 100%;
+  min-height: 100vh;
+  background: #FFFFFF;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* ========== LANDING CONTAINER ========== */
+.landing-container {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+  position: relative;
+  min-height: 100vh;
 }
 
-.App-link {
-    color: #61dafb;
+/* ========== HERO TITLE ========== */
+.hero-title {
+  font-family: 'Anton', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  color: #000000;
+  text-align: center;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
+  z-index: 20;
+  position: relative;
+  font-size: 15vw;
+  padding: 20px 0;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+@media (min-width: 560px) {
+  .hero-title {
+    font-size: 80px;
+  }
+}
+
+/* ========== BUBBLE GRID ========== */
+.bubble-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 4px;
+  position: relative;
+}
+
+.bubble-grid .bubble-cell:nth-child(even) {
+  margin-top: 40px;
+}
+
+.bubble-grid .bubble-cell:nth-child(3n) {
+  transform: scale(0.88);
+}
+
+.bubble-grid .bubble-cell:nth-child(5n) {
+  transform: scale(1.05);
+}
+
+/* ========== TITLE ROW INSIDE GRID ========== */
+.title-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* ========== GLASS SPHERE ========== */
+.glass-sphere {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+              filter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform, filter;
+}
+
+.glass-sphere:hover {
+  transform: scale(1.04);
+}
+
+.glass-sphere:active {
+  transform: scale(0.97);
+}
+
+/* Sphere image */
+.glass-sphere__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  transition: transform 0.7s ease-in-out;
+  z-index: 0;
+}
+
+.glass-sphere:hover .glass-sphere__image {
+  transform: scale(1.1);
+}
+
+/* Glass overlay - creates the 3D sphere illusion */
+.glass-sphere__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.3) 15%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(0, 0, 0, 0.05) 60%,
+    rgba(0, 0, 0, 0.15) 100%
+  );
+  box-shadow:
+    inset -8px -8px 20px rgba(0, 0, 0, 0.12),
+    inset 4px 4px 10px rgba(255, 255, 255, 0.6);
+}
+
+/* Rim light effect */
+.glass-sphere__rim {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* Specular highlight dot */
+.glass-sphere__specular {
+  position: absolute;
+  top: 14%;
+  left: 22%;
+  width: 18%;
+  height: 14%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    transparent 70%
+  );
+  z-index: 12;
+  pointer-events: none;
+  filter: blur(3px);
+}
+
+/* ========== BLUR MOTION ANIMATION ========== */
+@keyframes blur-jump {
+  0% {
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  20% {
+    filter: blur(12px);
+    transform: scale(0.92);
+  }
+  50% {
+    filter: blur(6px);
+    transform: scale(1.03);
+  }
+  100% {
+    filter: blur(0px);
+    transform: scale(1);
+  }
+}
+
+.glass-sphere--blur-active {
+  animation: blur-jump 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* ========== PLACE LABEL ========== */
+.place-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  text-align: center;
+  padding: 20px 8px 14px;
+  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+  border-radius: 0 0 50% 50%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.glass-sphere:hover .place-label {
+  opacity: 1;
+}
+
+.place-label span {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* ========== SUBTITLE ========== */
+.subtitle-text {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: rgba(0,0,0,0.4);
+  text-align: center;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 8px;
+  margin-bottom: 32px;
+}
+
+/* ========== SCROLL HINT ========== */
+.scroll-hint {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0,0,0,0.06);
+  backdrop-filter: blur(12px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  color: rgba(0,0,0,0.4);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: opacity 0.4s ease;
+}
+
+/* ========== ENTRANCE ANIMATIONS ========== */
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.bubble-enter {
+  opacity: 0;
+  animation: float-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
