@@ -26,6 +26,8 @@ export interface Event {
   // Recurring events
   is_recurring?: boolean | null;
   recurring_dates?: string[] | null;
+  // Target audience
+  target_audience?: string[] | null;
 }
 
 export interface SavedEventData {
@@ -684,6 +686,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
         requires_attendance_check: eventData.requires_attendance_check || undefined,
         is_recurring: eventData.is_recurring || undefined,
         recurring_dates: eventData.recurring_dates || undefined,
+        target_audience: eventData.target_audience || undefined,
       });
 
       // Refresh events list

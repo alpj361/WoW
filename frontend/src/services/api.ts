@@ -34,6 +34,8 @@ export interface Event {
     // Recurring events
     is_recurring?: boolean | null;
     recurring_dates?: string[] | null;
+    // Target audience
+    target_audience?: string[] | null;
 }
 
 export interface CreateEventData {
@@ -57,6 +59,8 @@ export interface CreateEventData {
     // Recurring events
     is_recurring?: boolean | null;
     recurring_dates?: string[] | null;
+    // Target audience
+    target_audience?: string[] | null;
 }
 
 export interface EventRegistration {
@@ -139,8 +143,15 @@ export interface AnalysisResult {
         event_name: string;
         date: string;
         time: string;
+        end_time?: string;
         description: string;
         location: string;
+        organizer?: string;
+        price?: string;
+        registration_url?: string;
+        is_recurring?: boolean;
+        recurring_pattern?: string | null;
+        recurring_dates?: string[];
         confidence: string;
         extracted_text: string;
     };
@@ -179,8 +190,15 @@ export interface ImageAnalysisResult {
         event_name: string;
         date: string;
         time: string;
+        end_time?: string;
         description: string;
         location: string;
+        organizer?: string;
+        price?: string;
+        registration_url?: string;
+        is_recurring?: boolean;
+        recurring_pattern?: string | null;
+        recurring_dates?: string[];
         confidence: string;
         extracted_text: string;
     };

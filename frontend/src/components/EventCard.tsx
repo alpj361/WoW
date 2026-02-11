@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
@@ -19,6 +20,8 @@ import Animated, {
   withSequence,
   withTiming,
   runOnJS,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Event } from '../store/eventStore';
@@ -33,11 +36,11 @@ interface EventCardProps {
 const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
     case 'music':
-      return ['#8B5CF6', '#6D28D9'];
+      return ['rgba(139, 92, 246, 0.8)', 'rgba(109, 40, 217, 0.9)'];
     case 'volunteer':
-      return ['#EC4899', '#BE185D'];
+      return ['rgba(236, 72, 153, 0.8)', 'rgba(190, 24, 93, 0.9)'];
     default:
-      return ['#F59E0B', '#D97706'];
+      return ['rgba(245, 158, 11, 0.8)', 'rgba(217, 119, 6, 0.9)'];
   }
 };
 
@@ -69,13 +72,13 @@ export const EventCard: React.FC<EventCardProps> = ({
   onSkip,
   showActions = true,
 }) => {
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const gradient = getCategoryGradient(event.category);
   const icon = getCategoryIcon(event.category);
   const categoryLabel = getCategoryLabel(event.category);
 
-  // Dimensiones dinámicas de la tarjeta - ancho relativo, altura flexible
-  const cardWidth = Math.min(screenWidth * 0.9, 340);
+  const cardWidth = Math.min(screenWidth * 0.88, 360);
+  const cardHeight = Math.min(screenHeight * 0.62, 520);
 
   const router = useRouter();
 
@@ -152,89 +155,118 @@ export const EventCard: React.FC<EventCardProps> = ({
     ],
   }));
 
+  // Glassmorphic info panel content
+  const GlassInfoPanel = () => {
+    const content = (
+      <View style={styles.glassContent}>
+        <View style={styles.categoryBadge}>
+          <Ionicons name={icon as any} size={12} color="#fff" />
+          <Text style={styles.categoryText}>{categoryLabel}</Text>
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
+
+        {event.description && (
+          <Text style={styles.description} numberOfLines={2}>
+            {event.description}
+          </Text>
+        )}
+
+        <View style={styles.metaRow}>
+          {event.date && (
+            <View style={styles.metaItem}>
+              <Ionicons name="calendar" size={12} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.metaText}>{event.date}</Text>
+            </View>
+          )}
+          {event.time && (
+            <View style={styles.metaItem}>
+              <Ionicons name="time" size={12} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.metaText}>{event.time}</Text>
+            </View>
+          )}
+        </View>
+
+        {event.location && (
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.locationText} numberOfLines={1}>{event.location}</Text>
+          </View>
+        )}
+
+        {event.price && parseFloat(String(event.price)) > 0 && (
+          <View style={styles.priceTag}>
+            <Text style={styles.priceText}>Q{parseFloat(String(event.price)).toFixed(0)}</Text>
+          </View>
+        )}
+      </View>
+    );
+
+    if (Platform.OS === 'web') {
+      return (
+        <View style={[styles.glassPanel, styles.glassPanelWeb]}>
+          {content}
+        </View>
+      );
+    }
+
+    return (
+      <BlurView intensity={40} tint="dark" style={styles.glassPanel}>
+        <View style={styles.glassPanelOverlay} />
+        {content}
+      </BlurView>
+    );
+  };
+
   return (
-    <View style={styles.cardWrapper}>
-      <View style={[styles.card, { width: cardWidth }]}>
+    <View style={[styles.cardWrapper, { width: cardWidth, height: cardHeight }]}>
+      <View style={styles.card}>
         <TouchableOpacity
           style={styles.cardTouchable}
-          activeOpacity={0.9}
+          activeOpacity={0.95}
           onPress={handlePress}
         >
-          <LinearGradient
-            colors={gradient}
-            style={styles.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            {event.image ? (
-              <Image
-                source={{ uri: event.image }}
-                style={styles.eventImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.3)" />
-              </View>
-            )}
-
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={styles.contentGradient}
+          {/* Background Image or Gradient */}
+          {event.image ? (
+            <Image
+              source={{ uri: event.image }}
+              style={styles.eventImage}
+              resizeMode="cover"
             />
+          ) : (
+            <LinearGradient
+              colors={gradient}
+              style={styles.placeholderGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name={icon as any} size={80} color="rgba(255,255,255,0.2)" />
+            </LinearGradient>
+          )}
 
-            <View style={styles.overlay}>
-              <View style={styles.categoryBadge}>
-                <Ionicons name={icon as any} size={10} color="#fff" />
-                <Text style={styles.categoryText}>{categoryLabel}</Text>
-              </View>
+          {/* Gradient overlay for better text readability */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
+            locations={[0, 0.5, 1]}
+            style={styles.gradientOverlay}
+          />
 
-              <View style={styles.bottomContent}>
-                <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-
-                {event.description && (
-                  <Text style={styles.description} numberOfLines={2}>
-                    {event.description}
-                  </Text>
-                )}
-
-                <View style={styles.metaRow}>
-                  {event.date && (
-                    <View style={styles.metaItem}>
-                      <Ionicons name="calendar-outline" size={10} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.metaText}>{event.date}</Text>
-                    </View>
-                  )}
-                  {event.time && (
-                    <View style={styles.metaItem}>
-                      <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.metaText}>{event.time}</Text>
-                    </View>
-                  )}
-                  {event.location && (
-                    <View style={styles.metaItem}>
-                      <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
+          {/* Glassmorphic info panel */}
+          <GlassInfoPanel />
         </TouchableOpacity>
 
-        {/* Action buttons outside TouchableOpacity to prevent gesture conflicts */}
+        {/* Action buttons */}
         {showActions && (
           <View style={styles.actionsContainer} pointerEvents="box-none">
             <GestureDetector gesture={skipGesture}>
               <Animated.View style={[styles.actionButton, styles.skipButton, skipAnimatedStyle]}>
-                <Ionicons name="close" size={32} color="#EF4444" />
+                <Ionicons name="close" size={28} color="#fff" />
               </Animated.View>
             </GestureDetector>
 
             <GestureDetector gesture={saveGesture}>
               <Animated.View style={[styles.actionButton, styles.saveButton, saveAnimatedStyle]}>
-                <Ionicons name="heart" size={32} color="#10B981" />
+                <Ionicons name="heart" size={28} color="#fff" />
               </Animated.View>
             </GestureDetector>
           </View>
@@ -246,98 +278,134 @@ export const EventCard: React.FC<EventCardProps> = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
   },
   card: {
     flex: 1,
-    borderRadius: 16,
+    width: '100%',
+    borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
-    maxHeight: 480,
+    // Glass card border
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    // Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
   cardTouchable: {
-    flex: 1,
-  },
-  gradient: {
     flex: 1,
   },
   eventImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  placeholderImage: {
+  placeholderGradient: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  contentGradient: {
+  gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
-  overlay: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  // Glass panel styles
+  glassPanel: {
+    position: 'absolute',
+    bottom: 80,
+    left: 12,
+    right: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  glassPanelOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(30, 30, 40, 0.6)',
+  },
+  glassPanelWeb: {
+    backgroundColor: 'rgba(30, 30, 40, 0.85)',
+    backdropFilter: 'blur(20px)',
+  },
+  glassContent: {
+    padding: 16,
+    gap: 8,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.6)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
+    borderRadius: 12,
+    gap: 6,
   },
   categoryText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
-  bottomContent: {
-    gap: 2,
-    width: '100%',
-    paddingBottom: 80, // Espacio para los botones superpuestos
-  },
   title: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    letterSpacing: -0.3,
   },
   description: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 14,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 18,
   },
   metaRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 2,
+    gap: 16,
+    marginTop: 4,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 6,
   },
   metaText: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '500',
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  locationText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    flex: 1,
+  },
+  priceTag: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  priceText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  // Action buttons
   actionsContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 16,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 40,
+    gap: 50,
     paddingHorizontal: 20,
   },
   actionButton: {
@@ -346,22 +414,21 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    // Glass effect
+    borderWidth: 1.5,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   skipButton: {
-    borderColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   saveButton: {
-    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 });
 

@@ -60,6 +60,7 @@ function getIconName(routeName: string, focused: boolean): string {
   const icons: Record<string, { active: string; inactive: string }> = {
     index: { active: 'compass', inactive: 'compass-outline' },
     create: { active: 'add-circle', inactive: 'add-circle-outline' },
+    places: { active: 'globe', inactive: 'globe-outline' },
     extractions: { active: 'cloud-download', inactive: 'cloud-download-outline' },
     myevents: { active: 'bookmark', inactive: 'bookmark-outline' },
     profile: { active: 'person', inactive: 'person-outline' },
@@ -73,8 +74,8 @@ function getIconName(routeName: string, focused: boolean): string {
 export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
 
-  // Filter out hidden routes - only show main 5 tabs
-  const mainRoutes = ['index', 'create', 'extractions', 'myevents', 'profile'];
+  // Filter out hidden routes - only show main 6 tabs
+  const mainRoutes = ['index', 'create', 'places', 'extractions', 'myevents', 'profile'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 
   const content = (

@@ -33,6 +33,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { analyzeImage, extractUrl, analyzeExtractedImage } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { useExtractionStore } from '../src/store/extractionStore';
+import AudienceSelector from '../src/components/AudienceSelector';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -74,6 +75,9 @@ export default function CreateEventScreen() {
 
   // Attendance tracking
   const [requiresAttendance, setRequiresAttendance] = useState(false);
+
+  // Target audience
+  const [targetAudience, setTargetAudience] = useState<string[]>(['audiencia:general']);
 
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -388,6 +392,19 @@ export default function CreateEventScreen() {
       setOrganizer(analysis.organizer);
     }
 
+    // Set price if found
+    if (analysis.price && analysis.price !== 'No especificado' && analysis.price !== 'Gratis') {
+      const priceMatch = analysis.price.match(/[\d.]+/);
+      if (priceMatch) {
+        setPrice(priceMatch[0]);
+      }
+    }
+
+    // Set registration URL if found
+    if (analysis.registration_url && analysis.registration_url !== 'No especificado') {
+      setRegistrationFormUrl(analysis.registration_url);
+    }
+
     // Parse Date
     if (analysis.date && analysis.date !== 'No especificado') {
       let parsedDate = new Date();
@@ -414,6 +431,35 @@ export default function CreateEventScreen() {
         const parsedTime = new Date();
         parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
         setSelectedTime(parsedTime);
+      }
+    }
+
+    // Parse End Time
+    if (analysis.end_time && analysis.end_time !== 'No especificado') {
+      const endTimeParts = analysis.end_time.split(':');
+      if (endTimeParts.length >= 2) {
+        const parsedEndTime = new Date();
+        parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
+        setSelectedEndTime(parsedEndTime);
+      }
+    }
+
+    // Handle recurring events
+    if (analysis.is_recurring && Array.isArray(analysis.recurring_dates) && analysis.recurring_dates.length > 0) {
+      setIsRecurring(true);
+      const parsedRecurringDates: Date[] = [];
+      for (const dateStr of analysis.recurring_dates) {
+        const dateParts = dateStr.split('-').map(Number);
+        if (dateParts.length === 3) {
+          const [year, month, day] = dateParts;
+          const date = new Date(year, month - 1, day);
+          if (!isNaN(date.getTime())) {
+            parsedRecurringDates.push(date);
+          }
+        }
+      }
+      if (parsedRecurringDates.length > 0) {
+        setRecurringDates(parsedRecurringDates.sort((a, b) => a.getTime() - b.getTime()));
       }
     }
   };
@@ -464,6 +510,8 @@ export default function CreateEventScreen() {
         // Recurring event
         is_recurring: isRecurring,
         recurring_dates: isRecurring && recurringDates.length > 0 ? recurringDates.map(d => formatDateForStorage(d)) : null,
+        // Target audience
+        target_audience: targetAudience.length > 0 ? targetAudience : ['audiencia:general'],
       });
       // Reset form and navigate to events
       setTitle('');
@@ -483,6 +531,7 @@ export default function CreateEventScreen() {
       setRequiresAttendance(false);
       setIsRecurring(false);
       setRecurringDates([]);
+      setTargetAudience(['audiencia:general']);
       router.replace('/');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
@@ -905,6 +954,13 @@ export default function CreateEventScreen() {
               autoCorrect={false}
             />
           </View>
+
+          {/* Target Audience Selector */}
+          <AudienceSelector
+            value={targetAudience}
+            onChange={setTargetAudience}
+            label="Organizado para"
+          />
 
           {/* Payment & Registration Fields - Available for all events */}
           <View style={styles.divider} />

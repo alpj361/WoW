@@ -2,6 +2,134 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.24] - 2026-02-11
+
+### Added - Event Details & Recurring Dates
+
+#### Event Details Screen (`event/[id].tsx`)
+- **Todos los nuevos campos visibles**:
+  - `end_time` - Hora de finalización (19:00 - 22:00)
+  - `organizer` - Nombre del organizador con icono de persona
+  - `price` - Precio en verde con icono de etiqueta (Q50.00)
+  - `requires_attendance_check` - Indicador amarillo "Requiere check-in con QR"
+  - `target_audience` - Chips magenta con audiencia, universidades, miembros
+
+#### Eventos Recurrentes - UI Mejorada
+- **Vista unificada de fechas**: Todas las fechas se muestran juntas como chips
+- **Indicador**: "Evento recurrente (X fechas)" con icono morado
+- **Fecha principal destacada**: Borde más grueso para distinguirla
+- Removida sección separada "Fechas adicionales"
+
+#### Procesamiento Inteligente de Fechas (`extractions.tsx`)
+- **Nueva función `processRecurringDates()`**:
+  - Para eventos recurrentes: **IGNORA** el campo `date` (a menudo incorrecto)
+  - Usa **SOLO** `recurring_dates` del análisis de IA
+  - Selecciona la fecha más cercana al día actual como fecha principal
+  - Resto de fechas futuras van a `recurringDates`
+  - Ejemplo: fechas [12, 15, 17] y hoy es 14 → main=15, recurring=[17]
+
+### Fixed
+
+#### GlassSphere Web Blur
+- **Reducido blur excesivo en web**: Las imágenes ahora son visibles
+- Removido `backdrop-filter: blur()` del overlay estático
+- Reducido blur de animación de 20px a 8px
+- Reducida opacidad de 0.4 a 0.25
+
+### Technical Details
+```typescript
+// Nueva lógica de fechas para eventos recurrentes
+const { mainDate, recurringDates, isRecurring } = processRecurringDates(
+    analysis.date,           // Se ignora si is_recurring=true
+    analysis.recurring_dates,
+    analysis.is_recurring
+);
+
+// Para eventos recurrentes con recurring_dates:
+// 1. Ignora analysis.date (el AI a veces pone fechas incorrectas)
+// 2. Usa solo recurring_dates
+// 3. Ordena y filtra fechas pasadas
+// 4. Primera fecha futura = mainDate
+// 5. Resto = recurringDates
+```
+
+---
+
+## [0.0.23] - 2026-02-11
+
+### Added - Soon Places
+
+Nueva pantalla de descubrimiento de lugares con efecto glassmorphic premium.
+
+#### New Components
+- **GlassSphere.tsx** - Componente de esfera de cristal con animaciones avanzadas
+  - Efecto blur-jump al hacer tap (800ms)
+  - Animación de escala: 1 → 0.90 → 1.05 → 0.99 → 1
+  - Rotación sutil: 0 → 1.5deg → -0.5deg → 0
+  - Zoom de imagen al presionar
+  - Feedback háptico en dispositivos nativos
+  - Soporte para 3 tamaños: `sm`, `md`, `lg`
+
+#### Platform-Specific Glass Effects
+- **iOS**: Silicon glass effect usando `expo-blur` BlurView con gradiente sutil
+- **Web**: CSS glassmorphism con `backdrop-filter: blur(12px) saturate(180%)`
+
+#### New Screen
+- **places.tsx** - Nueva tab "Places" en posición central
+  - Layout masonry con 2 columnas
+  - 12 destinos: Paris, Tokyo, Bali, Portugal, New York, Alps, Kyoto, Maldives, Amsterdam, Shibuya, London, Istanbul
+  - Título hero "SOON PLACES"
+  - Indicador de scroll con efecto glass
+  - Background negro (#0F0F0F) con acentos purple de la app
+
+#### Navigation
+- Nueva tab "Places" agregada a `GlassTabBar.tsx`
+- Icono: globe/globe-outline
+- Posición: 3ra (centro de 6 tabs)
+
+---
+
+## [0.0.22] - 2026-02-10
+
+### Fixed - Vertical Feed & Gestures
+
+#### Vertical Event Stack
+- **Corregido conflicto de gestos** entre `VerticalEventStack` y `ScrollView`
+- Separado el stack de gestos fuera del ScrollView cuando hay eventos
+- Creado componente `AnimatedCard` interno para manejo correcto de animaciones
+- Eliminados hooks de estilo animado duplicados
+
+#### index.tsx Changes
+```typescript
+// Ahora renderiza condicionalmente
+{showVerticalStack ? (
+  <View style={styles.stackContainer}>
+    <VerticalEventStack ... />
+  </View>
+) : (
+  <ScrollView>
+    {renderCardContent()}
+  </ScrollView>
+)}
+```
+
+### Added - Batch Analysis Mode
+
+#### Extractions Enhancement
+- Modo de análisis por lotes para múltiples imágenes
+- Análisis mejorado de imagen para detectar:
+  - `end_time` (hora de finalización)
+  - Eventos recurrentes
+  - Información de audiencia target
+
+### Enhanced - EventCard Glassmorphic
+
+- Aplicado efecto glassmorphic a `EventCard`
+- Animaciones suaves de entrada/salida
+- Efecto de profundidad con sombras y bordes sutiles
+
+---
+
 ## [0.0.21] - 2026-02-10
 
 ### Added

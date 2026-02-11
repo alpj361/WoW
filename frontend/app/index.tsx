@@ -245,15 +245,8 @@ export default function ExploreScreen() {
       );
     }
 
-    return (
-      <VerticalEventStack
-        events={events}
-        currentIndex={currentIndex}
-        onIndexChange={setCurrentIndex}
-        onSave={handleSaveEvent}
-        onSkip={handleSkipEvent}
-      />
-    );
+    // This case is handled outside ScrollView now
+    return null;
   };
 
   const pickReceipt = async () => {
@@ -304,6 +297,9 @@ export default function ExploreScreen() {
     }
   };
 
+  // Determine if we should show the vertical stack (gestures) or scrollable content
+  const showVerticalStack = isInitialized && events.length > 0 && currentIndex < events.length;
+
   return (
     <GestureHandlerRootView style={styles.container}>
       {/* Toast notification */}
@@ -333,23 +329,36 @@ export default function ExploreScreen() {
         onSelectCategory={setCategory}
       />
 
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8B5CF6"
-            colors={['#8B5CF6']}
+      {/* Vertical stack with gesture handling - rendered outside ScrollView */}
+      {showVerticalStack ? (
+        <View style={styles.stackContainer}>
+          <VerticalEventStack
+            events={events}
+            currentIndex={currentIndex}
+            onIndexChange={setCurrentIndex}
+            onSave={handleSaveEvent}
+            onSkip={handleSkipEvent}
           />
-        }
-        scrollEnabled={events.length === 0 || currentIndex >= events.length}
-      >
-        <View style={styles.cardsContainer}>
-          {renderCardContent()}
         </View>
-      </ScrollView>
+      ) : (
+        /* ScrollView only for loading/empty states with pull-to-refresh */
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#8B5CF6"
+              colors={['#8B5CF6']}
+            />
+          }
+        >
+          <View style={styles.cardsContainer}>
+            {renderCardContent()}
+          </View>
+        </ScrollView>
+      )}
 
       {/* Payment Alert Modal */}
       <Modal
@@ -518,6 +527,11 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  stackContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   scrollContainer: {
     flex: 1,
   },
@@ -531,7 +545,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingBottom: 8,
-    overflow: 'hidden',
     minHeight: '100%',
   },
   loadingContainer: {

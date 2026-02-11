@@ -1,0 +1,4 @@
+# Project Rules
+
+1.  **Check Routes First**: Always check existing routes and file paths before applying modifications to avoid errors.
+2.  **Follow Conventions**: Adhere to the conventions listed in `.agent/workflows/rules.md`.

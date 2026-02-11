@@ -24,6 +24,8 @@ La aplicación está optimizada para funcionar en:
 - ⚡ **Animaciones Fluidas**: Transiciones suaves con Reanimated
 - 💾 **Gestión de Estado**: Zustand para state management
 
+> 🌟 **Nuestra Misión y Visión**: Lee más sobre qué nos mueve en [MISSION_VISION.md](fundamental_docs/MISSION_VISION.md)
+
 ## 🏗️ Arquitectura del Proyecto
 
 ```

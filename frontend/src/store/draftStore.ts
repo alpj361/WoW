@@ -22,6 +22,7 @@ export interface EventDraft {
   source_image_url?: string | null;
   is_recurring?: boolean | null;
   recurring_dates?: string[] | null;
+  target_audience?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -100,6 +101,7 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
           source_image_url: draft.source_image_url || null,
           is_recurring: draft.is_recurring || null,
           recurring_dates: draft.recurring_dates || null,
+          target_audience: draft.target_audience || null,
         })
         .select()
         .single();
@@ -193,6 +195,12 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Create event from draft data
+      console.log('[DRAFT_STORE] Publishing draft:', {
+        title: draft.title,
+        date: draft.date,
+        category: draft.category,
+      });
+
       const { data: eventData, error: createError } = await supabase
         .from('events')
         .insert({
@@ -211,6 +219,7 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
           bank_account_number: draft.bank_account_number,
           is_recurring: draft.is_recurring,
           recurring_dates: draft.recurring_dates,
+          target_audience: draft.target_audience,
           user_id: null, // Not a hosted event by default
         })
         .select()
@@ -221,6 +230,8 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
         set({ error: createError.message, isLoading: false });
         return false;
       }
+
+      console.log('[DRAFT_STORE] Event created successfully:', eventData);
 
       // Delete the draft after successful event creation
       const { error: deleteError } = await supabase

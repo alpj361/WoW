@@ -159,6 +159,15 @@ function RootLayoutNav() {
             }}
           />
           <Tabs.Screen
+            name="places"
+            options={{
+              title: 'Places',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="globe" size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
             name="extractions"
             options={{
               title: 'Extracciones',

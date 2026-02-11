@@ -71,6 +71,7 @@ PORT=3001
 3. **Push to git** after completing features
 4. **Backend runs in Docker** on VPS
 5. **Supabase** is the only database (MongoDB disabled)
+6. **Check Routes**: Always verify file paths and routes before modification.
 
 ---
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "WOW - Descubre Eventos",
     "slug": "wow-events",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "wow-events",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wow.events",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "WOW necesita acceso a tu cámara para escanear códigos QR y tomar fotos de eventos",
         "NSPhotoLibraryUsageDescription": "WOW necesita acceso a tu galería para seleccionar imágenes de eventos",

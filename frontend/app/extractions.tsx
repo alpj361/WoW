@@ -26,12 +26,102 @@ import { supabase } from '../src/services/supabase';
 import { AnimatedLoader, InlineLoader, MiniSphereLoader } from '../src/components/AnimatedLoader';
 import { useAuth } from '../src/context/AuthContext';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import AudienceSelector from '../src/components/AudienceSelector';
 
 const categories = [
     { id: 'music', label: 'Musica', icon: 'musical-notes', color: '#8B5CF6' },
     { id: 'volunteer', label: 'Voluntariado', icon: 'heart', color: '#EC4899' },
     { id: 'general', label: 'General', icon: 'fast-food', color: '#F59E0B' },
 ];
+
+/**
+ * Process recurring event dates to set the closest future date as main date
+ * and remaining future dates as recurring_dates
+ *
+ * For recurring events: IGNORE the main date field (often wrong) and use only recurring_dates
+ * For non-recurring events: use the main date
+ *
+ * @param mainDateStr - The main date from analysis (format: YYYY-MM-DD or DD-MM-YYYY)
+ * @param recurringDatesStr - Array of recurring dates (format: YYYY-MM-DD)
+ * @param isRecurringEvent - Whether the event is marked as recurring
+ * @returns { mainDate: Date | null, recurringDates: Date[], isRecurring: boolean }
+ */
+const processRecurringDates = (
+    mainDateStr: string | null | undefined,
+    recurringDatesStr: string[] | null | undefined,
+    isRecurringEvent: boolean = false
+): { mainDate: Date | null; recurringDates: Date[]; isRecurring: boolean } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Helper to parse a date string (handles YYYY-MM-DD and DD-MM-YYYY)
+    const parseDate = (dateStr: string): Date | null => {
+        const parts = dateStr.split(/[-/]/).map(Number);
+        if (parts.length === 3) {
+            let year: number, month: number, day: number;
+            if (parts[0] > 1000) {
+                // YYYY-MM-DD
+                [year, month, day] = parts;
+            } else {
+                // DD-MM-YYYY
+                [day, month, year] = parts;
+            }
+            const date = new Date(year, month - 1, day);
+            return isNaN(date.getTime()) ? null : date;
+        } else if (parts.length === 2) {
+            // DD-MM format, add current year
+            const currentYear = new Date().getFullYear();
+            const [day, month] = parts;
+            const date = new Date(currentYear, month - 1, day);
+            return isNaN(date.getTime()) ? null : date;
+        }
+        return null;
+    };
+
+    // For recurring events with recurring_dates: ONLY use recurring_dates (ignore mainDateStr)
+    // The AI often puts wrong dates in the main date field for recurring events
+    if (isRecurringEvent && recurringDatesStr && recurringDatesStr.length > 0) {
+        const recurringParsed: Date[] = [];
+        for (const dateStr of recurringDatesStr) {
+            const date = parseDate(dateStr);
+            if (date) recurringParsed.push(date);
+        }
+
+        if (recurringParsed.length > 0) {
+            // Sort all dates
+            recurringParsed.sort((a, b) => a.getTime() - b.getTime());
+
+            // Filter future dates
+            const futureDates = recurringParsed.filter(d => d >= today);
+
+            if (futureDates.length > 0) {
+                // First future date is main, rest are recurring
+                return {
+                    mainDate: futureDates[0],
+                    recurringDates: futureDates.slice(1),
+                    isRecurring: futureDates.length > 1
+                };
+            } else {
+                // All dates in past - use the last (most recent) one
+                return {
+                    mainDate: recurringParsed[recurringParsed.length - 1],
+                    recurringDates: recurringParsed.slice(0, -1),
+                    isRecurring: recurringParsed.length > 1
+                };
+            }
+        }
+    }
+
+    // Non-recurring event or no recurring_dates: just use main date
+    if (mainDateStr && mainDateStr !== 'No especificado') {
+        const mainDate = parseDate(mainDateStr);
+        if (mainDate) {
+            return { mainDate, recurringDates: [], isRecurring: false };
+        }
+    }
+
+    return { mainDate: null, recurringDates: [], isRecurring: false };
+};
 
 export default function ExtractionsScreen() {
     const insets = useSafeAreaInsets();
@@ -69,6 +159,13 @@ export default function ExtractionsScreen() {
     const [isProcessingQueue, setIsProcessingQueue] = useState(false);
     const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
 
+    // Batch analysis mode - auto-creates drafts without opening modal
+    const [isBatchMode, setIsBatchMode] = useState(false);
+    const [batchTotal, setBatchTotal] = useState(0);
+    const [batchCompleted, setBatchCompleted] = useState(0);
+    const [batchDraftsCreated, setBatchDraftsCreated] = useState(0);
+    const [batchSourceExtraction, setBatchSourceExtraction] = useState<Extraction | null>(null);
+
     // Create event modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [currentDraftData, setCurrentDraftData] = useState<Partial<DraftFormData> | null>(null);
@@ -87,10 +184,16 @@ export default function ExtractionsScreen() {
     const [formImage, setFormImage] = useState<string | null>(null);
     const [formPrice, setFormPrice] = useState('');
     const [formRegistrationUrl, setFormRegistrationUrl] = useState('');
+    const [formTargetAudience, setFormTargetAudience] = useState<string[]>(['audiencia:general']);
+    const [formEndTime, setFormEndTime] = useState<Date | null>(null);
+    const [formIsRecurring, setFormIsRecurring] = useState(false);
+    const [formRecurringDates, setFormRecurringDates] = useState<Date[]>([]);
 
     // Picker visibility
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
+    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+    const [showRecurringDatePicker, setShowRecurringDatePicker] = useState(false);
 
     // Submitting state
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,22 +234,53 @@ export default function ExtractionsScreen() {
         };
     }, [user?.id, fetchExtractions, fetchDrafts]);
 
-    // Watch for completed analysis to open create modal
+    // Watch for completed analysis - either open modal or auto-create draft (batch mode)
     useEffect(() => {
         if (!lastAnalyzedId) return;
 
-        const justCompleted = extractions.find(e =>
-            e.id === lastAnalyzedId &&
-            e.status === 'completed' &&
-            e.analysis
-        );
+        const targetExtraction = extractions.find(e => e.id === lastAnalyzedId);
+        if (!targetExtraction) return;
 
-        if (justCompleted) {
-            // Open create modal with pre-filled data
-            openCreateModalWithAnalysis(justCompleted);
+        // Handle completed analysis
+        if (targetExtraction.status === 'completed' && targetExtraction.analysis) {
+            if (isBatchMode) {
+                // Batch mode: auto-create draft without opening modal
+                autoCreateDraftFromAnalysis(targetExtraction);
+            } else {
+                // Normal mode: open create modal with pre-filled data
+                openCreateModalWithAnalysis(targetExtraction);
+            }
             setLastAnalyzedId(null);
         }
-    }, [extractions, lastAnalyzedId]);
+
+        // Handle failed analysis in batch mode
+        if (targetExtraction.status === 'failed' && isBatchMode) {
+            // Increment completed counter but not drafts counter
+            setBatchCompleted(prev => prev + 1);
+
+            // Check if batch is complete
+            const newCompleted = batchCompleted + 1;
+            if (newCompleted >= batchTotal) {
+                setIsBatchMode(false);
+                setBatchTotal(0);
+                setBatchCompleted(0);
+                setBatchSourceExtraction(null);
+
+                if (user?.id) {
+                    fetchDrafts(user.id);
+                }
+
+                const failedCount = newCompleted - batchDraftsCreated;
+                Alert.alert(
+                    'Análisis completado',
+                    `Se crearon ${batchDraftsCreated} borrador${batchDraftsCreated !== 1 ? 'es' : ''}.${failedCount > 0 ? `\n${failedCount} imagen${failedCount !== 1 ? 'es' : ''} fallaron.` : ''}`,
+                    [{ text: 'OK' }]
+                );
+            }
+
+            setLastAnalyzedId(null);
+        }
+    }, [extractions, lastAnalyzedId, isBatchMode, batchCompleted, batchTotal, batchDraftsCreated, user?.id]);
 
     // Process analysis queue one by one
     useEffect(() => {
@@ -173,41 +307,30 @@ export default function ExtractionsScreen() {
             e.id === pendingAnalysisQueue[0]?.extractionId
         );
 
-        if (currentExtraction?.status === 'completed' || currentExtraction?.status === 'failed') {
+        // In batch mode, 'ready' means the draft was auto-created and we can continue
+        // In normal mode, 'completed' means user needs to interact with modal
+        const canContinue = currentExtraction?.status === 'failed' ||
+            (isBatchMode && currentExtraction?.status === 'ready') ||
+            (!isBatchMode && currentExtraction?.status === 'completed');
+
+        if (canContinue) {
             // Remove from queue and continue
             setPendingAnalysisQueue(prev => prev.slice(1));
             setIsProcessingQueue(false);
             setCurrentQueueIndex(prev => prev + 1);
         }
-    }, [extractions, isProcessingQueue, pendingAnalysisQueue]);
+    }, [extractions, isProcessingQueue, pendingAnalysisQueue, isBatchMode]);
 
     const openCreateModalWithAnalysis = (extraction: Extraction) => {
         const analysis = extraction.analysis;
         if (!analysis) return;
 
-        // Parse date - manually to avoid timezone issues
-        let parsedDate: Date | null = null;
-        if (analysis.date && analysis.date !== 'No especificado') {
-            const dateParts = analysis.date.split(/[-/]/).map(Number);
-            if (dateParts.length === 3) {
-                // Format: YYYY-MM-DD or DD-MM-YYYY
-                let year: number, month: number, day: number;
-                if (dateParts[0] > 1000) {
-                    // YYYY-MM-DD
-                    [year, month, day] = dateParts;
-                } else {
-                    // DD-MM-YYYY
-                    [day, month, year] = dateParts;
-                }
-                parsedDate = new Date(year, month - 1, day);
-            } else if (dateParts.length === 2) {
-                // DD-MM format, add current year
-                const currentYear = new Date().getFullYear();
-                const [day, month] = dateParts;
-                parsedDate = new Date(currentYear, month - 1, day);
-            }
-            if (parsedDate && isNaN(parsedDate.getTime())) parsedDate = null;
-        }
+        // Process all dates - for recurring events, ONLY use recurring_dates (ignore main date)
+        const { mainDate, recurringDates, isRecurring } = processRecurringDates(
+            analysis.date,
+            analysis.recurring_dates,
+            analysis.is_recurring || false
+        );
 
         // Parse time
         let parsedTime: Date | null = null;
@@ -223,7 +346,7 @@ export default function ExtractionsScreen() {
         setFormDescription(analysis.description || '');
         setFormLocation(analysis.location || '');
         setFormOrganizer(analysis.organizer || '');
-        setFormDate(parsedDate);
+        setFormDate(mainDate);
         setFormTime(parsedTime);
         setFormImage(extraction.selectedImage || null);
         setFormCategory('general');
@@ -238,6 +361,23 @@ export default function ExtractionsScreen() {
         }
         setFormPrice(priceValue);
         setFormRegistrationUrl(analysis.registration_url || '');
+        setFormTargetAudience(['audiencia:general']);
+
+        // Parse end time
+        let parsedEndTime: Date | null = null;
+        if (analysis.end_time && analysis.end_time !== 'No especificado') {
+            const endTimeParts = analysis.end_time.split(':');
+            if (endTimeParts.length >= 2) {
+                parsedEndTime = new Date();
+                parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
+            }
+        }
+        setFormEndTime(parsedEndTime);
+
+        // Set recurring dates (already processed - only future dates after the main date)
+        setFormIsRecurring(isRecurring);
+        setFormRecurringDates(recurringDates);
+
         setEditingDraftId(null);
 
         setCurrentDraftData({
@@ -280,6 +420,38 @@ export default function ExtractionsScreen() {
         setFormCategory(draft.category || 'general');
         setFormPrice(draft.price ? String(draft.price) : '');
         setFormRegistrationUrl(draft.registration_form_url || '');
+        setFormTargetAudience(draft.target_audience || ['audiencia:general']);
+
+        // Parse end time from draft
+        let parsedEndTime: Date | null = null;
+        if (draft.end_time) {
+            const endTimeParts = draft.end_time.split(':');
+            if (endTimeParts.length >= 2) {
+                parsedEndTime = new Date();
+                parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
+            }
+        }
+        setFormEndTime(parsedEndTime);
+
+        // Load recurring data from draft
+        setFormIsRecurring(draft.is_recurring || false);
+        if (draft.recurring_dates && Array.isArray(draft.recurring_dates)) {
+            const parsedRecurringDates: Date[] = [];
+            for (const dateStr of draft.recurring_dates) {
+                const dateParts = dateStr.split('-').map(Number);
+                if (dateParts.length === 3) {
+                    const [year, month, day] = dateParts;
+                    const date = new Date(year, month - 1, day);
+                    if (!isNaN(date.getTime())) {
+                        parsedRecurringDates.push(date);
+                    }
+                }
+            }
+            setFormRecurringDates(parsedRecurringDates.sort((a, b) => a.getTime() - b.getTime()));
+        } else {
+            setFormRecurringDates([]);
+        }
+
         setEditingDraftId(draft.id);
 
         setCurrentDraftData({
@@ -301,6 +473,10 @@ export default function ExtractionsScreen() {
         setFormImage(null);
         setFormPrice('');
         setFormRegistrationUrl('');
+        setFormTargetAudience(['audiencia:general']);
+        setFormEndTime(null);
+        setFormIsRecurring(false);
+        setFormRecurringDates([]);
         setEditingDraftId(null);
         setCurrentDraftData(null);
     };
@@ -340,6 +516,105 @@ export default function ExtractionsScreen() {
         });
     };
 
+    // Auto-create draft from analysis (batch mode)
+    const autoCreateDraftFromAnalysis = async (extraction: Extraction) => {
+        if (!user?.id || !extraction.analysis) return;
+
+        const analysis = extraction.analysis;
+
+        // Process all dates - for recurring events, ONLY use recurring_dates (ignore main date)
+        const { mainDate, recurringDates, isRecurring } = processRecurringDates(
+            analysis.date,
+            analysis.recurring_dates,
+            analysis.is_recurring || false
+        );
+
+        // Convert main date to string format YYYY-MM-DD
+        let dateStr: string | null = null;
+        if (mainDate) {
+            dateStr = mainDate.toISOString().split('T')[0];
+        }
+
+        // Convert recurring dates to string array
+        const recurringDatesStr: string[] | null = recurringDates.length > 0
+            ? recurringDates.map(d => d.toISOString().split('T')[0])
+            : null;
+
+        // Parse time
+        let timeStr: string | null = null;
+        if (analysis.time && analysis.time !== 'No especificado') {
+            timeStr = analysis.time;
+        }
+
+        // Parse end time
+        let endTimeStr: string | null = null;
+        if (analysis.end_time && analysis.end_time !== 'No especificado') {
+            endTimeStr = analysis.end_time;
+        }
+
+        // Parse price
+        let priceValue: number | null = null;
+        if (analysis.price && analysis.price !== 'No especificado' && analysis.price !== 'Gratis') {
+            const priceMatch = analysis.price.match(/[\d.]+/);
+            if (priceMatch) {
+                priceValue = parseFloat(priceMatch[0]);
+            }
+        }
+
+        const draftData: DraftFormData = {
+            user_id: user.id,
+            extraction_job_id: extraction.id,
+            title: analysis.event_name || 'Evento sin título',
+            description: analysis.description || null,
+            category: 'general',
+            image: extraction.selectedImage || null,
+            date: dateStr,
+            time: timeStr,
+            location: analysis.location || null,
+            organizer: analysis.organizer || null,
+            price: priceValue,
+            registration_form_url: analysis.registration_url || null,
+            source_image_url: extraction.selectedImage || null,
+            target_audience: ['audiencia:general'],
+            end_time: endTimeStr,
+            is_recurring: isRecurring,
+            recurring_dates: recurringDatesStr,
+        };
+
+        const draftId = await saveDraft(draftData);
+
+        if (draftId) {
+            setBatchDraftsCreated(prev => prev + 1);
+        }
+
+        setBatchCompleted(prev => prev + 1);
+
+        // Reset extraction to ready for next image
+        await resetExtractionToReady(extraction.id);
+
+        // Check if batch is complete
+        if (batchCompleted + 1 >= batchTotal) {
+            // Batch complete!
+            const draftsCreated = batchDraftsCreated + (draftId ? 1 : 0);
+            setIsBatchMode(false);
+            setBatchTotal(0);
+            setBatchCompleted(0);
+            setBatchDraftsCreated(0);
+            setBatchSourceExtraction(null);
+
+            // Refresh drafts
+            if (user?.id) {
+                await fetchDrafts(user.id);
+            }
+
+            Alert.alert(
+                'Análisis completado',
+                `Se crearon ${draftsCreated} borrador${draftsCreated !== 1 ? 'es' : ''} exitosamente.\n\nPuedes verlos en la sección de Borradores.`,
+                [{ text: 'OK' }]
+            );
+        }
+    };
+
     const handleSaveDraft = async () => {
         if (!formTitle.trim()) {
             Alert.alert('Error', 'Por favor ingresa un titulo para el evento.');
@@ -367,6 +642,12 @@ export default function ExtractionsScreen() {
             price: formPrice ? parseFloat(formPrice) : null,
             registration_form_url: formRegistrationUrl.trim() || null,
             source_image_url: currentDraftData?.source_image_url || formImage,
+            target_audience: formTargetAudience.length > 0 ? formTargetAudience : ['audiencia:general'],
+            end_time: formEndTime ? formatTimeForStorage(formEndTime) : null,
+            is_recurring: formIsRecurring,
+            recurring_dates: formIsRecurring && formRecurringDates.length > 0
+                ? formRecurringDates.map(d => formatDateForStorage(d))
+                : null,
         };
 
         let success: boolean;
@@ -583,6 +864,8 @@ export default function ExtractionsScreen() {
     const handleAnalyzeSelected = async () => {
         if (!selectedExtraction || selectedImages.length === 0) return;
 
+        const isMultiple = selectedImages.length > 1;
+
         // Create queue of images to analyze
         const queue = selectedImages.map(imageUrl => ({
             extractionId: selectedExtraction.id,
@@ -590,7 +873,17 @@ export default function ExtractionsScreen() {
         }));
 
         // Close modal and start processing
+        const sourceExtraction = selectedExtraction;
         setSelectedExtraction(null);
+
+        if (isMultiple) {
+            // Batch mode: auto-create drafts for each analysis
+            setIsBatchMode(true);
+            setBatchTotal(queue.length);
+            setBatchCompleted(0);
+            setBatchDraftsCreated(0);
+            setBatchSourceExtraction(sourceExtraction);
+        }
 
         // Start processing the first one
         setIsAnalyzing(true);
@@ -671,6 +964,33 @@ export default function ExtractionsScreen() {
         if (event.type === 'set' && date) {
             setFormTime(date);
         }
+    };
+
+    const onEndTimeChange = (event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowEndTimePicker(false);
+        }
+        if (event.type === 'set' && date) {
+            setFormEndTime(date);
+        }
+    };
+
+    const onRecurringDateChange = (event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowRecurringDatePicker(false);
+        }
+        if (event.type === 'set' && date) {
+            const dateStr = formatDateForStorage(date);
+            const exists = formRecurringDates.some(d => formatDateForStorage(d) === dateStr);
+            if (!exists) {
+                setFormRecurringDates(prev => [...prev, date].sort((a, b) => a.getTime() - b.getTime()));
+            }
+        }
+    };
+
+    const removeRecurringDate = (dateToRemove: Date) => {
+        const dateStr = formatDateForStorage(dateToRemove);
+        setFormRecurringDates(prev => prev.filter(d => formatDateForStorage(d) !== dateStr));
     };
 
     const renderExtraction = ({ item }: { item: Extraction }) => {
@@ -821,6 +1141,33 @@ export default function ExtractionsScreen() {
                     </TouchableOpacity>
                 )}
             </View>
+
+            {/* Batch Analysis Progress Banner */}
+            {isBatchMode && (
+                <View style={styles.batchProgressBanner}>
+                    <View style={styles.batchProgressContent}>
+                        <MiniSphereLoader />
+                        <View style={styles.batchProgressText}>
+                            <Text style={styles.batchProgressTitle}>
+                                Analizando imágenes ({batchCompleted + 1}/{batchTotal})
+                            </Text>
+                            <Text style={styles.batchProgressSubtitle}>
+                                {batchDraftsCreated > 0
+                                    ? `${batchDraftsCreated} borrador${batchDraftsCreated !== 1 ? 'es' : ''} creado${batchDraftsCreated !== 1 ? 's' : ''}`
+                                    : 'Creando borradores automáticamente...'}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.batchProgressBar}>
+                        <View
+                            style={[
+                                styles.batchProgressFill,
+                                { width: `${((batchCompleted) / batchTotal) * 100}%` }
+                            ]}
+                        />
+                    </View>
+                </View>
+            )}
 
             <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
                 {/* Drafts Section */}
@@ -1132,7 +1479,7 @@ export default function ExtractionsScreen() {
                                         </TouchableOpacity>
                                     </View>
                                     <View style={[styles.formSection, { flex: 1 }]}>
-                                        <Text style={styles.formLabel}>Hora</Text>
+                                        <Text style={styles.formLabel}>Hora Inicio</Text>
                                         <TouchableOpacity
                                             style={styles.pickerButton}
                                             onPress={() => setShowTimePicker(true)}
@@ -1143,6 +1490,66 @@ export default function ExtractionsScreen() {
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
+                                    <View style={[styles.formSection, { flex: 1 }]}>
+                                        <Text style={styles.formLabel}>Hora Fin</Text>
+                                        <TouchableOpacity
+                                            style={styles.pickerButton}
+                                            onPress={() => setShowEndTimePicker(true)}
+                                        >
+                                            <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                                            <Text style={formEndTime ? styles.pickerText : styles.pickerPlaceholder}>
+                                                {formEndTime ? formatTime(formEndTime) : 'Opcional'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Recurring Event Toggle */}
+                                <View style={styles.formSection}>
+                                    <TouchableOpacity
+                                        style={styles.recurringToggle}
+                                        onPress={() => {
+                                            setFormIsRecurring(!formIsRecurring);
+                                            if (formIsRecurring) {
+                                                setFormRecurringDates([]);
+                                            }
+                                        }}
+                                    >
+                                        <View style={[styles.checkbox, formIsRecurring && styles.checkboxChecked]}>
+                                            {formIsRecurring && <Ionicons name="checkmark" size={14} color="#fff" />}
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.recurringLabel}>Evento Recurrente</Text>
+                                            <Text style={styles.recurringHint}>Agregar fechas adicionales</Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {formIsRecurring && (
+                                        <View style={styles.recurringDatesContainer}>
+                                            <TouchableOpacity
+                                                style={styles.addDateButton}
+                                                onPress={() => setShowRecurringDatePicker(true)}
+                                            >
+                                                <Ionicons name="add-circle" size={18} color="#8B5CF6" />
+                                                <Text style={styles.addDateText}>Agregar fecha</Text>
+                                            </TouchableOpacity>
+
+                                            {formRecurringDates.length > 0 && (
+                                                <View style={styles.recurringDatesList}>
+                                                    {formRecurringDates.map((date, index) => (
+                                                        <View key={index} style={styles.recurringDateChip}>
+                                                            <Text style={styles.recurringDateText}>
+                                                                {formatDate(date)}
+                                                            </Text>
+                                                            <TouchableOpacity onPress={() => removeRecurringDate(date)}>
+                                                                <Ionicons name="close-circle" size={18} color="#EF4444" />
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
                                 </View>
 
                                 {/* Location */}
@@ -1174,6 +1581,15 @@ export default function ExtractionsScreen() {
                                         }}
                                         autoCapitalize="none"
                                         autoCorrect={false}
+                                    />
+                                </View>
+
+                                {/* Target Audience */}
+                                <View style={styles.formSection}>
+                                    <AudienceSelector
+                                        value={formTargetAudience}
+                                        onChange={setFormTargetAudience}
+                                        label="Organizado para"
                                     />
                                 </View>
 
@@ -1323,6 +1739,95 @@ export default function ExtractionsScreen() {
                     display="default"
                     onChange={onTimeChange}
                     is24Hour={false}
+                />
+            )}
+
+            {/* iOS End Time Picker Modal */}
+            {Platform.OS === 'ios' && showEndTimePicker && (
+                <Modal
+                    transparent
+                    animationType="slide"
+                    visible={showEndTimePicker}
+                    onRequestClose={() => setShowEndTimePicker(false)}
+                >
+                    <View style={styles.pickerModalOverlay}>
+                        <Pressable
+                            style={styles.modalDismiss}
+                            onPress={() => setShowEndTimePicker(false)}
+                        />
+                        <View style={styles.pickerModalContent}>
+                            <View style={styles.pickerModalHeader}>
+                                <Text style={styles.pickerModalTitle}>Hora de Fin</Text>
+                                <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
+                                    <Text style={styles.pickerModalDone}>Listo</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                                value={formEndTime || new Date()}
+                                mode="time"
+                                display="spinner"
+                                onChange={onEndTimeChange}
+                                locale="es-MX"
+                                textColor="#fff"
+                            />
+                        </View>
+                    </View>
+                </Modal>
+            )}
+
+            {/* Android End Time Picker */}
+            {Platform.OS === 'android' && showEndTimePicker && (
+                <DateTimePicker
+                    value={formEndTime || new Date()}
+                    mode="time"
+                    display="default"
+                    onChange={onEndTimeChange}
+                    is24Hour={false}
+                />
+            )}
+
+            {/* iOS Recurring Date Picker Modal */}
+            {Platform.OS === 'ios' && showRecurringDatePicker && (
+                <Modal
+                    transparent
+                    animationType="slide"
+                    visible={showRecurringDatePicker}
+                    onRequestClose={() => setShowRecurringDatePicker(false)}
+                >
+                    <View style={styles.pickerModalOverlay}>
+                        <Pressable
+                            style={styles.modalDismiss}
+                            onPress={() => setShowRecurringDatePicker(false)}
+                        />
+                        <View style={styles.pickerModalContent}>
+                            <View style={styles.pickerModalHeader}>
+                                <Text style={styles.pickerModalTitle}>Agregar Fecha</Text>
+                                <TouchableOpacity onPress={() => setShowRecurringDatePicker(false)}>
+                                    <Text style={styles.pickerModalDone}>Listo</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                                value={new Date()}
+                                mode="date"
+                                display="spinner"
+                                onChange={onRecurringDateChange}
+                                minimumDate={new Date()}
+                                locale="es-MX"
+                                textColor="#fff"
+                            />
+                        </View>
+                    </View>
+                </Modal>
+            )}
+
+            {/* Android Recurring Date Picker */}
+            {Platform.OS === 'android' && showRecurringDatePicker && (
+                <DateTimePicker
+                    value={new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={onRecurringDateChange}
+                    minimumDate={new Date()}
                 />
             )}
         </View>
@@ -1844,5 +2349,116 @@ const styles = StyleSheet.create({
         color: '#8B5CF6',
         fontSize: 16,
         fontWeight: '600',
+    },
+    // Recurring event styles
+    recurringToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#1F1F1F',
+        padding: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#6B7280',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxChecked: {
+        backgroundColor: '#8B5CF6',
+        borderColor: '#8B5CF6',
+    },
+    recurringLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#fff',
+    },
+    recurringHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    recurringDatesContainer: {
+        marginTop: 12,
+    },
+    addDateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#1F1F1F',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        borderStyle: 'dashed',
+    },
+    addDateText: {
+        color: '#8B5CF6',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    recurringDatesList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
+    },
+    recurringDateChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#2A2A2A',
+        paddingVertical: 8,
+        paddingLeft: 12,
+        paddingRight: 8,
+        borderRadius: 20,
+    },
+    recurringDateText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    // Batch analysis progress styles
+    batchProgressBanner: {
+        backgroundColor: '#1F1F1F',
+        borderBottomWidth: 1,
+        borderBottomColor: '#2A2A2A',
+        padding: 16,
+    },
+    batchProgressContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 12,
+    },
+    batchProgressText: {
+        flex: 1,
+    },
+    batchProgressTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    batchProgressSubtitle: {
+        color: '#9CA3AF',
+        fontSize: 13,
+        marginTop: 2,
+    },
+    batchProgressBar: {
+        height: 4,
+        backgroundColor: '#2A2A2A',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    batchProgressFill: {
+        height: '100%',
+        backgroundColor: '#8B5CF6',
+        borderRadius: 2,
     },
 });

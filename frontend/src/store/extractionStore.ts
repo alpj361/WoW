@@ -21,9 +21,17 @@ export interface Extraction {
         event_name: string;
         date: string;
         time: string;
+        end_time?: string;
         description: string;
         location: string;
         organizer?: string;
+        price?: string;
+        registration_url?: string;
+        is_recurring?: boolean;
+        recurring_pattern?: string | null;
+        recurring_dates?: string[];
+        confidence?: string;
+        extracted_text?: string;
     };
     error?: string;
     createdAt: number;

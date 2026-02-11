@@ -14,15 +14,21 @@ interface Event {
     title: string;
     date: string;
     time: string;
+    end_time?: string | null;
     location: string;
     description: string;
     image: string;
     category: string;
+    organizer?: string | null;
     price?: number | null;
     registration_form_url?: string | null;
     bank_name?: string | null;
     bank_account_number?: string | null;
     user_id?: string | null;
+    requires_attendance_check?: boolean | null;
+    is_recurring?: boolean | null;
+    recurring_dates?: string[] | null;
+    target_audience?: string[] | null;
 }
 
 export default function EventDetails() {
@@ -259,19 +265,112 @@ export default function EventDetails() {
                     </View>
 
                     <View style={styles.metaContainer}>
-                        <View style={styles.metaRow}>
-                            <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
-                            <Text style={styles.metaText}>{event.date}</Text>
-                        </View>
+                        {/* Fecha - Si es recurrente, mostrar todas las fechas como chips */}
+                        {event.is_recurring && event.recurring_dates && event.recurring_dates.length > 0 ? (
+                            <View style={styles.allDatesContainer}>
+                                <View style={styles.metaRow}>
+                                    <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                                    <Text style={[styles.metaText, { color: '#8B5CF6', fontWeight: '600' }]}>
+                                        Evento recurrente ({1 + event.recurring_dates.length} fechas)
+                                    </Text>
+                                </View>
+                                <View style={styles.recurringContainer}>
+                                    {/* Fecha principal */}
+                                    <View style={[styles.recurringChip, styles.mainDateChip]}>
+                                        <Ionicons name="calendar" size={14} color="#8B5CF6" />
+                                        <Text style={styles.recurringChipText}>{event.date}</Text>
+                                    </View>
+                                    {/* Fechas adicionales */}
+                                    {event.recurring_dates.map((dateStr, index) => (
+                                        <View key={index} style={styles.recurringChip}>
+                                            <Ionicons name="calendar" size={14} color="#8B5CF6" />
+                                            <Text style={styles.recurringChipText}>{dateStr}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.metaRow}>
+                                <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+                                <Text style={styles.metaText}>{event.date}</Text>
+                            </View>
+                        )}
+
+                        {/* Hora inicio - fin */}
                         <View style={styles.metaRow}>
                             <Ionicons name="time-outline" size={20} color="#9CA3AF" />
-                            <Text style={styles.metaText}>{event.time}</Text>
+                            <Text style={styles.metaText}>
+                                {event.time}{event.end_time ? ` - ${event.end_time}` : ''}
+                            </Text>
                         </View>
+
+                        {/* Ubicación */}
                         <View style={styles.metaRow}>
                             <Ionicons name="location-outline" size={20} color="#9CA3AF" />
                             <Text style={styles.metaText}>{event.location}</Text>
                         </View>
+
+                        {/* Organizador */}
+                        {event.organizer && (
+                            <View style={styles.metaRow}>
+                                <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+                                <Text style={styles.metaText}>{event.organizer}</Text>
+                            </View>
+                        )}
+
+                        {/* Precio */}
+                        {event.price && event.price > 0 && (
+                            <View style={styles.metaRow}>
+                                <Ionicons name="pricetag-outline" size={20} color="#10B981" />
+                                <Text style={[styles.metaText, styles.priceText]}>
+                                    Q{event.price.toFixed(2)}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Control de asistencia */}
+                        {event.requires_attendance_check && (
+                            <View style={styles.metaRow}>
+                                <Ionicons name="qr-code-outline" size={20} color="#F59E0B" />
+                                <Text style={[styles.metaText, { color: '#F59E0B' }]}>
+                                    Requiere check-in con QR
+                                </Text>
+                            </View>
+                        )}
                     </View>
+
+                    {/* Target Audience */}
+                    {event.target_audience && event.target_audience.length > 0 && (
+                        <>
+                            <View style={styles.divider} />
+                            <Text style={styles.sectionTitle}>Organizado para</Text>
+                            <View style={styles.audienceContainer}>
+                                {event.target_audience.map((audience, index) => {
+                                    const [type, value, extra] = audience.split(':');
+                                    let displayText = '';
+                                    let icon: keyof typeof Ionicons.glyphMap = 'people-outline';
+
+                                    if (type === 'audiencia') {
+                                        displayText = value;
+                                        icon = 'people-outline';
+                                    } else if (type === 'universidad') {
+                                        displayText = extra ? `${value} - ${extra}` : value;
+                                        icon = 'school-outline';
+                                    } else if (type === 'miembros') {
+                                        displayText = `Miembros: ${value}`;
+                                        icon = 'person-circle-outline';
+                                    }
+
+                                    return (
+                                        <View key={index} style={styles.audienceChip}>
+                                            <Ionicons name={icon} size={14} color="#D946EF" />
+                                            <Text style={styles.audienceChipText}>{displayText}</Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </>
+                    )}
 
                     <View style={styles.divider} />
 
@@ -509,6 +608,61 @@ const styles = StyleSheet.create({
     metaText: {
         color: '#D1D5DB',
         fontSize: 16,
+    },
+    priceText: {
+        color: '#10B981',
+        fontWeight: '600',
+    },
+    allDatesContainer: {
+        gap: 12,
+    },
+    mainDateChip: {
+        borderColor: 'rgba(139, 92, 246, 0.5)',
+        borderWidth: 1.5,
+    },
+    recurringContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 8,
+    },
+    recurringChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(139, 92, 246, 0.3)',
+    },
+    recurringChipText: {
+        color: '#C4B5FD',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    audienceContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 8,
+    },
+    audienceChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(217, 70, 239, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(217, 70, 239, 0.3)',
+    },
+    audienceChipText: {
+        color: '#F0ABFC',
+        fontSize: 13,
+        fontWeight: '500',
     },
     divider: {
         height: 1,
