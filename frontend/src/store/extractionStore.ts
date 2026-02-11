@@ -23,6 +23,7 @@ export interface Extraction {
         time: string;
         description: string;
         location: string;
+        organizer?: string;
     };
     error?: string;
     createdAt: number;
@@ -46,6 +47,9 @@ interface ExtractionStore {
 
     // Select image and trigger analysis
     selectImage: (id: string, imageUrl: string) => Promise<void>;
+
+    // Retry failed extraction (reset to ready if has images)
+    retryExtraction: (id: string) => Promise<void>;
 
     // Delete from Supabase
     removeExtraction: (id: string) => Promise<void>;
@@ -136,27 +140,16 @@ export const useExtractionStore = create<ExtractionStore>()((set, get) => ({
         // Don't start if already polling
         if (isPolling || pollingInterval) return;
 
-        console.log('[EXTRACTION_STORE] Starting polling');
+        console.log('[EXTRACTION_STORE] Starting polling for user:', userId);
         set({ isPolling: true });
 
         // Initial fetch
         get().fetchExtractions(userId);
 
-        // Poll every 3 seconds
+        // Poll every 3 seconds - always fetch to catch updates
         const interval = setInterval(() => {
-            const { extractions } = get();
-
-            // Check if any extractions are in-progress
-            const hasInProgress = extractions.some(e =>
-                e.status === 'pending' ||
-                e.status === 'extracting' ||
-                e.status === 'analyzing'
-            );
-
-            // Only poll if there are in-progress extractions
-            if (hasInProgress) {
-                get().fetchExtractions(userId);
-            }
+            console.log('[EXTRACTION_STORE] Polling...');
+            get().fetchExtractions(userId);
         }, 3000);
 
         set({ pollingInterval: interval });
@@ -173,19 +166,71 @@ export const useExtractionStore = create<ExtractionStore>()((set, get) => ({
 
     selectImage: async (id: string, imageUrl: string) => {
         const extraction = get().extractions.find(e => e.id === id);
-        if (!extraction || extraction.status !== 'ready') return;
+        // Allow selection if status is 'ready' OR 'failed' with images (retry scenario)
+        if (!extraction) return;
+        if (extraction.status !== 'ready' && extraction.status !== 'failed') return;
+        if (!extraction.images?.length) return;
 
         // Optimistically update local state
         set(state => ({
             extractions: state.extractions.map(e =>
                 e.id === id
-                    ? { ...e, status: 'analyzing' as const, selectedImage: imageUrl, updatedAt: Date.now() }
+                    ? { ...e, status: 'analyzing' as const, selectedImage: imageUrl, error: undefined, updatedAt: Date.now() }
                     : e
             )
         }));
 
+        // Update Supabase to reset error and set analyzing status
+        await supabase
+            .from('extraction_jobs')
+            .update({
+                status: 'analyzing',
+                selected_image_url: imageUrl,
+                error_message: null,
+            })
+            .eq('id', id);
+
         // Fire-and-forget trigger to backend
         triggerAnalysis(id, imageUrl);
+    },
+
+    retryExtraction: async (id: string) => {
+        const extraction = get().extractions.find(e => e.id === id);
+        if (!extraction || extraction.status !== 'failed') return;
+
+        // If has images, reset to 'ready' so user can select again
+        if (extraction.images?.length) {
+            set(state => ({
+                extractions: state.extractions.map(e =>
+                    e.id === id
+                        ? { ...e, status: 'ready' as const, error: undefined, updatedAt: Date.now() }
+                        : e
+                )
+            }));
+
+            // Update Supabase
+            await supabase
+                .from('extraction_jobs')
+                .update({ status: 'ready', error_message: null })
+                .eq('id', id);
+        } else {
+            // No images, need to re-extract - reset to pending
+            set(state => ({
+                extractions: state.extractions.map(e =>
+                    e.id === id
+                        ? { ...e, status: 'pending' as const, error: undefined, updatedAt: Date.now() }
+                        : e
+                )
+            }));
+
+            // Update Supabase and trigger extraction again
+            await supabase
+                .from('extraction_jobs')
+                .update({ status: 'pending', error_message: null })
+                .eq('id', id);
+
+            triggerExtraction(id);
+        }
     },
 
     removeExtraction: async (id: string) => {

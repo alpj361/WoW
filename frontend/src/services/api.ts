@@ -19,7 +19,9 @@ export interface Event {
     image: string | null;
     date: string | null;
     time: string | null;
+    end_time?: string | null;
     location: string | null;
+    organizer?: string | null;
     user_id?: string | null;
     created_at: string;
     // Nuevos campos para eventos de pago y registro
@@ -29,6 +31,9 @@ export interface Event {
     bank_name?: string | null;
     // Attendance tracking
     requires_attendance_check?: boolean | null;
+    // Recurring events
+    is_recurring?: boolean | null;
+    recurring_dates?: string[] | null;
 }
 
 export interface CreateEventData {
@@ -38,7 +43,9 @@ export interface CreateEventData {
     image?: string | null;
     date?: string | null;
     time?: string | null;
+    end_time?: string | null;
     location?: string | null;
+    organizer?: string | null;
     user_id?: string | null;
     // Nuevos campos para eventos de pago y registro
     price?: number | null;
@@ -47,6 +54,9 @@ export interface CreateEventData {
     bank_name?: string | null;
     // Attendance tracking
     requires_attendance_check?: boolean | null;
+    // Recurring events
+    is_recurring?: boolean | null;
+    recurring_dates?: string[] | null;
 }
 
 export interface EventRegistration {

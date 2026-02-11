@@ -2,6 +2,221 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.21] - 2026-02-10
+
+### Added
+- ⏰ **Hora de Finalización**: Nuevo campo para indicar cuándo termina el evento
+  - Picker nativo para iOS/Android con modal estilizado
+  - Input HTML time para web
+  - Icono naranja distintivo para diferenciar de hora de inicio
+  - Campo `end_time` (TIME) en base de datos
+
+- 🔄 **Eventos Recurrentes**: Sistema para eventos que ocurren en múltiples fechas
+  - Checkbox "Evento Recurrente" que habilita selector de fechas
+  - **Date Picker** para agregar fechas adicionales (no días de la semana)
+  - Fechas seleccionadas se muestran como chips removibles
+  - Soporte para múltiples fechas por evento
+  - Campos `is_recurring` (BOOLEAN) y `recurring_dates` (TEXT[]) en base de datos
+
+- 🗂️ **Multi-Select de Imágenes** (Extractions): Seleccionar múltiples imágenes de un carrusel
+  - Botón "Seleccionar" y "Seleccionar Todos" para modo multi-selección
+  - Cola de análisis secuencial para evitar rate limits de OpenAI
+  - Checkboxes visuales en cada imagen del carrusel
+
+- 💰 **Precio desde Análisis**: El precio detectado por IA ahora se llena automáticamente
+  - Parsea valores numéricos de strings como "Q50.00" o "50 quetzales"
+
+### Changed
+- 🏷️ **Etiquetas de Hora**: "Hora" renombrado a "Hora Inicio" para mayor claridad
+- 🔄 **Reset de Extracción**: Después de guardar borrador, la extracción vuelve a estado 'ready'
+- 📱 **Row de Fecha/Hora**: Ahora muestra 3 campos en fila (Fecha, Hora Inicio, Hora Fin)
+
+### Fixed
+- 📅 **Fecha un Día Antes**: Corregido problema de timezone al parsear fechas
+  - Causa: `new Date("2026-02-13")` se interpretaba como UTC, mostrando día anterior
+  - Solución: Parsing manual con `new Date(year, month - 1, day)` para hora local
+  - Corregido en 3 lugares: `formatDraftDate`, `openCreateModalWithAnalysis`, `openCreateModalForEdit`
+
+- 🗑️ **Botón Eliminar en Web**: Fixed `Alert.alert` no funcionaba en web
+  - Implementado `window.confirm` para plataforma web
+  - `Alert.alert` se usa solo en iOS/Android
+
+### Database Migration
+```sql
+-- Nuevos campos en events y event_drafts
+ALTER TABLE events
+ADD COLUMN end_time TIME,
+ADD COLUMN is_recurring BOOLEAN DEFAULT FALSE,
+ADD COLUMN recurring_dates TEXT[];
+
+ALTER TABLE event_drafts
+ADD COLUMN end_time TIME,
+ADD COLUMN is_recurring BOOLEAN DEFAULT FALSE,
+ADD COLUMN recurring_dates TEXT[];
+```
+
+### Technical Details
+```
+Modified:
+- frontend/app/create.tsx (end time picker, recurring dates UI, form handling)
+- frontend/app/extractions.tsx (multi-select, date fixes, price parsing, web delete)
+- frontend/src/store/eventStore.ts (new fields in Event interface)
+- frontend/src/store/draftStore.ts (new fields, saveDraft, publishDraft)
+- frontend/src/services/api.ts (new fields in Event and CreateEventData)
+
+New State Variables (create.tsx):
+- selectedEndTime, showEndTimePicker
+- isRecurring, recurringDates, showRecurringDatePicker
+
+New Functions:
+- onEndTimeChange() - Handler for end time picker
+- onRecurringDateChange() - Handler for adding recurring dates
+- removeRecurringDate() - Remove a date from recurring list
+```
+
+### UI Components
+```
+Recurring Dates Section:
+┌─────────────────────────────────────────┐
+│ ☑️ Evento Recurrente                    │
+│    Agregar fechas adicionales del evento│
+├─────────────────────────────────────────┤
+│ [+ Agregar fecha]                       │
+│                                         │
+│ [Sáb, 15 feb 2026 ✕] [Dom, 22 feb ✕]   │
+└─────────────────────────────────────────┘
+
+Time Row:
+┌──────────┬──────────┬──────────┐
+│  Fecha   │Hora Inicio│ Hora Fin │
+│ 📅 15 feb│ 🕐 19:00 │ 🕐 22:00 │
+└──────────┴──────────┴──────────┘
+```
+
+---
+
+## [0.0.20] - 2026-02-10
+
+### Added
+- 📝 **Sistema de Borradores de Eventos**: Nuevo flujo para crear eventos desde extracciones
+  - **Tabla `event_drafts`**: Nueva tabla en Supabase para almacenar borradores con RLS
+  - **Draft Store** (`draftStore.ts`): Store de Zustand para operaciones CRUD de borradores
+    - `fetchDrafts(userId)` - Obtener borradores del usuario
+    - `saveDraft(data)` - Guardar nuevo borrador
+    - `updateDraft(id, data)` - Actualizar borrador existente
+    - `deleteDraft(id)` - Eliminar borrador
+    - `publishDraft(id)` - Publicar borrador como evento real
+  - **Modal de Crear Borrador**: Formulario completo dentro de extractions.tsx
+    - Campos pre-llenados con análisis de IA
+    - Selector de categoría (Música, Voluntariado, General)
+    - Date/Time pickers nativos para iOS y Android
+    - Preview de imagen extraída
+    - Campos de precio y URL de registro
+  - **Lista de Borradores Pendientes**: Nueva sección en pantalla de extracciones
+    - Badge con contador de borradores
+    - Cards con thumbnail, título y categoría
+    - Acciones: Editar (lápiz), Publicar (send), Eliminar (trash)
+  - **Flujo Mejorado**: Seleccionar imagen → Analizar → Modal con formulario → Guardar borrador
+
+### Changed
+- 🔄 **Extractions Screen**: Rediseño completo para soportar borradores
+  - Sección de borradores arriba de extracciones
+  - Al completar análisis, se abre modal de crear borrador automáticamente
+  - Las extracciones completadas se pueden reabrir para crear más borradores
+  - Header muestra contador de borradores pendientes
+
+### Technical Details
+```
+New Files:
+- frontend/src/store/draftStore.ts (Zustand store for drafts)
+
+Modified:
+- frontend/app/extractions.tsx (complete redesign with draft modal and list)
+
+Database Migration:
+- create_event_drafts_table (new table with RLS policies)
+
+New Supabase Table:
+- event_drafts (id, user_id, extraction_job_id, title, description, category,
+  image, date, time, location, organizer, price, registration_form_url,
+  bank_name, bank_account_number, source_image_url, created_at, updated_at)
+```
+
+### User Flow
+```
+URL → Extraer imágenes → Por cada imagen:
+  ├── Seleccionar → Analizar → Modal con formulario
+  ├── Editar campos → "Guardar borrador" (NO publica)
+  └── Repetir con otras imágenes
+
+Lista de borradores → Publicar individualmente cuando el usuario quiera
+```
+
+---
+
+## [0.0.19] - 2026-02-09
+
+### Fixed
+- ⌨️ **Keyboard Covers URL Input**: Fixed keyboard covering the URL input field in Instagram modal
+  - Wrapped modal content with `KeyboardAvoidingView`
+  - Added proper `paddingBottom: 40` to ensure submit button is visible on iOS
+
+### Changed
+- 🔄 **Extraction System Rewrite**: Complete rewrite to support background processing with Supabase persistence
+  - Extractions now persist in Supabase `extraction_jobs` table (survives app closure)
+  - Polling-based updates every 3 seconds when jobs are in-progress
+  - Unified `extractionStore.ts` (removed separate native version)
+  - Fire-and-forget API triggers (no more long waits for responses)
+
+### Added
+- 🚀 **Fire-and-forget API triggers**: New functions in `api.ts`
+  - `triggerExtraction(jobId)` - Start extraction without waiting for response
+  - `triggerAnalysis(jobId, imageUrl)` - Start analysis without waiting
+
+- 📡 **Polling System**: New extraction store methods
+  - `startPolling(userId)` - Start polling Supabase for updates
+  - `stopPolling()` - Stop polling on unmount
+  - `fetchExtractions(userId)` - Fetch user's extractions from Supabase
+  - `queueExtraction(url, userId)` - Create job in Supabase + trigger backend
+
+### Removed
+- `extractionStore.native.ts` - Unified into single `extractionStore.ts`
+
+### Technical Details
+```
+Modified Files:
+- app/create.tsx (KeyboardAvoidingView, userId in queueExtraction)
+- app/extractions.tsx (Polling integration, useAuth for userId)
+- src/store/extractionStore.ts (Complete rewrite with Supabase + polling)
+- src/services/api.ts (Added triggerExtraction, triggerAnalysis)
+
+Deleted Files:
+- src/store/extractionStore.native.ts (unified into main store)
+
+Database:
+- New `extraction_jobs` table in Supabase with RLS policies
+- Auto-updating `updated_at` trigger
+```
+
+### Architecture
+```
+Frontend                  Supabase                 WoWBack
+   │                         │                        │
+   │ 1. Insert job           │                        │
+   │ ─────────────────────► │                        │
+   │                         │                        │
+   │ 2. Fire-and-forget      │                        │
+   │ ─────────────────────────────────────────────► │
+   │                         │                        │
+   │                         │ 3. Update status/data │
+   │                         │ ◄───────────────────── │
+   │                         │                        │
+   │ 4. Poll for updates     │                        │
+   │ ◄───────────────────── │                        │
+```
+
+---
+
 ## [0.0.18] - 2026-02-09
 
 ### Added

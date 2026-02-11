@@ -57,11 +57,14 @@ export default function CreateEventScreen() {
   const [category, setCategory] = useState('general');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
+  const [selectedEndTime, setSelectedEndTime] = useState<Date | null>(null);
   const [location, setLocation] = useState('');
+  const [organizer, setOrganizer] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   // Payment & Registration fields
   const [price, setPrice] = useState('');
@@ -75,6 +78,7 @@ export default function CreateEventScreen() {
   // Picker visibility state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
   // URL Modal state
   const [showUrlModal, setShowUrlModal] = useState(false);
@@ -136,6 +140,38 @@ export default function CreateEventScreen() {
     if (event.type === 'set' && date) {
       setSelectedTime(date);
     }
+  };
+
+  const onEndTimeChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowEndTimePicker(false);
+    }
+    if (event.type === 'set' && date) {
+      setSelectedEndTime(date);
+    }
+  };
+
+  // Recurring dates picker
+  const [showRecurringDatePicker, setShowRecurringDatePicker] = useState(false);
+  const [recurringDates, setRecurringDates] = useState<Date[]>([]);
+
+  const onRecurringDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowRecurringDatePicker(false);
+    }
+    if (event.type === 'set' && date) {
+      // Check if date already exists
+      const dateStr = formatDateForStorage(date);
+      const exists = recurringDates.some(d => formatDateForStorage(d) === dateStr);
+      if (!exists) {
+        setRecurringDates(prev => [...prev, date].sort((a, b) => a.getTime() - b.getTime()));
+      }
+    }
+  };
+
+  const removeRecurringDate = (dateToRemove: Date) => {
+    const dateStr = formatDateForStorage(dateToRemove);
+    setRecurringDates(prev => prev.filter(d => formatDateForStorage(d) !== dateStr));
   };
 
   const pickImage = async () => {
@@ -247,6 +283,7 @@ export default function CreateEventScreen() {
       if (params.title) setTitle(params.title as string);
       if (params.description) setDescription(params.description as string);
       if (params.location) setLocation(params.location as string);
+      if (params.organizer) setOrganizer(params.organizer as string);
 
       // Handle image
       if (params.image) {
@@ -346,6 +383,11 @@ export default function CreateEventScreen() {
     setDescription(analysis.description || description);
     setLocation(analysis.location || location);
 
+    // Set organizer if found
+    if (analysis.organizer && analysis.organizer !== 'No especificado') {
+      setOrganizer(analysis.organizer);
+    }
+
     // Parse Date
     if (analysis.date && analysis.date !== 'No especificado') {
       let parsedDate = new Date();
@@ -407,7 +449,9 @@ export default function CreateEventScreen() {
         category,
         date: selectedDate ? formatDateForStorage(selectedDate) : null,
         time: selectedTime ? formatTimeForStorage(selectedTime) : null,
+        end_time: selectedEndTime ? formatTimeForStorage(selectedEndTime) : null,
         location: location.trim() || null,
+        organizer: organizer.trim() || null,
         image,
         user_id: isHost ? user?.id : null,
         // Price and registration fields available for all events
@@ -417,6 +461,9 @@ export default function CreateEventScreen() {
         bank_account_number: priceNum > 0 && bankAccountNumber.trim() ? bankAccountNumber.trim() : null,
         // Attendance tracking
         requires_attendance_check: isHost && requiresAttendance,
+        // Recurring event
+        is_recurring: isRecurring,
+        recurring_dates: isRecurring && recurringDates.length > 0 ? recurringDates.map(d => formatDateForStorage(d)) : null,
       });
       // Reset form and navigate to events
       setTitle('');
@@ -424,7 +471,9 @@ export default function CreateEventScreen() {
       setCategory('general');
       setSelectedDate(null);
       setSelectedTime(null);
+      setSelectedEndTime(null);
       setLocation('');
+      setOrganizer('');
       setImage(null);
       setIsHost(false);
       setPrice('');
@@ -432,6 +481,8 @@ export default function CreateEventScreen() {
       setBankName('');
       setBankAccountNumber('');
       setRequiresAttendance(false);
+      setIsRecurring(false);
+      setRecurringDates([]);
       router.replace('/');
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
@@ -665,7 +716,7 @@ export default function CreateEventScreen() {
               )}
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.inputLabel}>Hora</Text>
+              <Text style={styles.inputLabel}>Hora Inicio</Text>
               {Platform.OS === 'web' ? (
                 <View style={styles.pickerButton}>
                   <Ionicons name="time" size={20} color="#8B5CF6" />
@@ -698,11 +749,130 @@ export default function CreateEventScreen() {
                 >
                   <Ionicons name="time" size={20} color="#8B5CF6" />
                   <Text style={selectedTime ? styles.pickerText : styles.pickerPlaceholder}>
-                    {selectedTime ? formatTime(selectedTime) : 'Seleccionar hora'}
+                    {selectedTime ? formatTime(selectedTime) : 'Hora inicio'}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={styles.inputLabel}>Hora Fin</Text>
+              {Platform.OS === 'web' ? (
+                <View style={styles.pickerButton}>
+                  <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                  <input
+                    type="time"
+                    value={selectedEndTime ? formatTimeForStorage(selectedEndTime) : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [hours, minutes] = e.target.value.split(':');
+                        const date = new Date();
+                        date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                        setSelectedEndTime(date);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: selectedEndTime ? '#fff' : '#6B7280',
+                      fontSize: 14,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.pickerButton}
+                  onPress={() => setShowEndTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                  <Text style={selectedEndTime ? styles.pickerText : styles.pickerPlaceholder}>
+                    {selectedEndTime ? formatTime(selectedEndTime) : 'Hora fin'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Recurring Event Toggle */}
+          <View style={styles.recurringContainer}>
+            <TouchableOpacity
+              style={styles.checkboxRow}
+              onPress={() => {
+                setIsRecurring(!isRecurring);
+                if (isRecurring) {
+                  setRecurringDates([]);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, isRecurring && styles.checkboxChecked]}>
+                {isRecurring && <Ionicons name="checkmark" size={16} color="#fff" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.checkboxLabel}>Evento Recurrente</Text>
+                <Text style={styles.checkboxHint}>Agregar fechas adicionales del evento</Text>
+              </View>
+            </TouchableOpacity>
+
+            {isRecurring && (
+              <View style={styles.recurringDatesSection}>
+                {/* Add Date Button */}
+                {Platform.OS === 'web' ? (
+                  <View style={styles.addDateRow}>
+                    <Ionicons name="add-circle" size={20} color="#8B5CF6" />
+                    <input
+                      type="date"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const newDate = new Date(e.target.value + 'T12:00:00');
+                          const dateStr = formatDateForStorage(newDate);
+                          const exists = recurringDates.some(d => formatDateForStorage(d) === dateStr);
+                          if (!exists) {
+                            setRecurringDates(prev => [...prev, newDate].sort((a, b) => a.getTime() - b.getTime()));
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: '#8B5CF6',
+                        fontSize: 14,
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    <Text style={styles.addDateText}>Agregar fecha</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.addDateRow}
+                    onPress={() => setShowRecurringDatePicker(true)}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#8B5CF6" />
+                    <Text style={styles.addDateText}>Agregar fecha</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Selected Dates */}
+                {recurringDates.length > 0 && (
+                  <View style={styles.selectedDatesContainer}>
+                    {recurringDates.map((date, index) => (
+                      <View key={index} style={styles.selectedDateChip}>
+                        <Text style={styles.selectedDateText}>{formatDate(date)}</Text>
+                        <TouchableOpacity onPress={() => removeRecurringDate(date)}>
+                          <Ionicons name="close-circle" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -713,6 +883,26 @@ export default function CreateEventScreen() {
               placeholderTextColor="#6B7280"
               value={location}
               onChangeText={setLocation}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Organizador</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="@instagram_del_organizador"
+              placeholderTextColor="#6B7280"
+              value={organizer}
+              onChangeText={(text) => {
+                // Ensure it starts with @ if user types something
+                if (text && !text.startsWith('@')) {
+                  setOrganizer('@' + text);
+                } else {
+                  setOrganizer(text);
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
 
@@ -949,6 +1139,103 @@ export default function CreateEventScreen() {
             display="default"
             onChange={onTimeChange}
             is24Hour={false}
+          />
+        )
+      }
+
+      {/* End Time Picker Modal (iOS) */}
+      {
+        Platform.OS === 'ios' && showEndTimePicker && (
+          <Modal
+            transparent
+            animationType="slide"
+            visible={showEndTimePicker}
+            onRequestClose={() => setShowEndTimePicker(false)}
+          >
+            <View style={styles.pickerModalOverlay}>
+              <Pressable
+                style={styles.pickerModalDismiss}
+                onPress={() => setShowEndTimePicker(false)}
+              />
+              <View style={styles.pickerModalContent}>
+                <View style={styles.pickerModalHeader}>
+                  <Text style={styles.pickerModalTitle}>Hora de Finalización</Text>
+                  <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
+                    <Text style={styles.pickerModalDone}>Listo</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={selectedEndTime || new Date()}
+                  mode="time"
+                  display="spinner"
+                  onChange={onEndTimeChange}
+                  locale="es-MX"
+                  textColor="#fff"
+                />
+              </View>
+            </View>
+          </Modal>
+        )
+      }
+
+      {/* Android End Time Picker */}
+      {
+        Platform.OS === 'android' && showEndTimePicker && (
+          <DateTimePicker
+            value={selectedEndTime || new Date()}
+            mode="time"
+            display="default"
+            onChange={onEndTimeChange}
+            is24Hour={false}
+          />
+        )
+      }
+
+      {/* Recurring Date Picker Modal (iOS) */}
+      {
+        Platform.OS === 'ios' && showRecurringDatePicker && (
+          <Modal
+            transparent
+            animationType="slide"
+            visible={showRecurringDatePicker}
+            onRequestClose={() => setShowRecurringDatePicker(false)}
+          >
+            <View style={styles.pickerModalOverlay}>
+              <Pressable
+                style={styles.pickerModalDismiss}
+                onPress={() => setShowRecurringDatePicker(false)}
+              />
+              <View style={styles.pickerModalContent}>
+                <View style={styles.pickerModalHeader}>
+                  <Text style={styles.pickerModalTitle}>Agregar Fecha Recurrente</Text>
+                  <TouchableOpacity onPress={() => setShowRecurringDatePicker(false)}>
+                    <Text style={styles.pickerModalDone}>Listo</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={onRecurringDateChange}
+                  minimumDate={new Date()}
+                  locale="es-MX"
+                  textColor="#fff"
+                />
+              </View>
+            </View>
+          </Modal>
+        )
+      }
+
+      {/* Android Recurring Date Picker */}
+      {
+        Platform.OS === 'android' && showRecurringDatePicker && (
+          <DateTimePicker
+            value={new Date()}
+            mode="date"
+            display="default"
+            onChange={onRecurringDateChange}
+            minimumDate={new Date()}
           />
         )
       }
@@ -1387,5 +1674,81 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 6,
+  },
+  recurringContainer: {
+    marginBottom: 16,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1F1F1F',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#6B7280',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  checkboxHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  recurringDatesSection: {
+    marginTop: 12,
+  },
+  addDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#1F1F1F',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    borderStyle: 'dashed',
+  },
+  addDateText: {
+    color: '#8B5CF6',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  selectedDatesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  selectedDateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2A2A2A',
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 20,
+  },
+  selectedDateText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

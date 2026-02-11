@@ -11,7 +11,9 @@ export interface Event {
   image: string | null;
   date: string | null;
   time: string | null;
+  end_time?: string | null;
   location: string | null;
+  organizer?: string | null;
   user_id?: string | null;
   created_at: string;
   // Nuevos campos para eventos de pago y registro
@@ -21,6 +23,9 @@ export interface Event {
   bank_name?: string | null;
   // Attendance tracking
   requires_attendance_check?: boolean | null;
+  // Recurring events
+  is_recurring?: boolean | null;
+  recurring_dates?: string[] | null;
 }
 
 export interface SavedEventData {
@@ -668,13 +673,17 @@ export const useEventStore = create<EventStore>((set, get) => ({
         image: eventData.image,
         date: eventData.date,
         time: eventData.time,
+        end_time: eventData.end_time || undefined,
         location: eventData.location || undefined,
+        organizer: eventData.organizer || undefined,
         user_id: eventData.user_id || undefined,
         price: eventData.price || undefined,
         registration_form_url: eventData.registration_form_url || undefined,
         bank_account_number: eventData.bank_account_number || undefined,
         bank_name: eventData.bank_name || undefined,
         requires_attendance_check: eventData.requires_attendance_check || undefined,
+        is_recurring: eventData.is_recurring || undefined,
+        recurring_dates: eventData.recurring_dates || undefined,
       });
 
       // Refresh events list
