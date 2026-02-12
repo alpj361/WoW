@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  withSpring,
   FadeIn,
-  FadeOut,
   SlideInUp,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
 import { GlassSphere, SphereSize } from '../src/components/GlassSphere';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -55,9 +48,8 @@ const PLACES: Place[] = [
     imageUrl: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?q=85&w=800&auto=format&fit=crop',
     alt: 'Rooftop bar at night',
     placeName: 'Sky Lounge',
-    size: 'md',
+    size: 'lg',
   },
-  // --- TITLE BREAK ---
   // Restaurants
   {
     imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=85&w=800&auto=format&fit=crop',
@@ -76,7 +68,7 @@ const PLACES: Place[] = [
     imageUrl: 'https://images.unsplash.com/photo-1559329007-40df8a9345d8?q=85&w=800&auto=format&fit=crop',
     alt: 'Brunch spot with plants',
     placeName: 'Garden Brunch',
-    size: 'sm',
+    size: 'md',
   },
   {
     imageUrl: 'https://images.unsplash.com/photo-1525610553991-2bede1a236e2?q=85&w=800&auto=format&fit=crop',
@@ -88,7 +80,7 @@ const PLACES: Place[] = [
     imageUrl: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?q=85&w=800&auto=format&fit=crop',
     alt: 'Craft beer pub',
     placeName: 'Cervecería',
-    size: 'md',
+    size: 'lg',
   },
   {
     imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=85&w=800&auto=format&fit=crop',
@@ -110,56 +102,59 @@ const PLACES: Place[] = [
   },
 ];
 
-// Split places for masonry layout
-const topPlaces = PLACES.slice(0, 4);
-const bottomPlaces = PLACES.slice(4);
+// Organic scattered layout — each row has a preset config for visual variation
+interface RowConfig {
+  items: number[];       // indices into PLACES[]
+  offsets: number[];     // horizontal offset per bubble (%)
+  verticalNudge: number; // px nudge for the whole row
+}
+
+const ROW_CONFIGS: RowConfig[] = [
+  { items: [0, 1], offsets: [5, -3], verticalNudge: 0 },
+  { items: [2, 3], offsets: [-8, 6], verticalNudge: -12 },
+  { items: [4, 5, 6], offsets: [2, -5, 8], verticalNudge: -8 },
+  { items: [7, 8], offsets: [10, -6], verticalNudge: -16 },
+  { items: [9, 10, 11], offsets: [-4, 7, 0], verticalNudge: -10 },
+];
 
 export default function PlacesScreen() {
   const insets = useSafeAreaInsets();
-  const scrollY = useSharedValue(0);
-  const showScrollHint = useSharedValue(1);
 
-  // Animated styles
-  const scrollHintStyle = useAnimatedStyle(() => ({
-    opacity: showScrollHint.value,
-    transform: [{ translateY: showScrollHint.value === 0 ? 20 : 0 }],
-  }));
-
-  const handleScroll = (event: any) => {
-    const y = event.nativeEvent.contentOffset.y;
-    scrollY.value = y;
-    showScrollHint.value = withTiming(y <= 50 ? 1 : 0, { duration: 200 });
-  };
-
-  // Render masonry column
-  const renderMasonryColumn = (
-    places: Place[],
-    isRightColumn: boolean,
-    startIndex: number,
-  ) => {
-    const columnPlaces = places.filter((_, i) =>
-      isRightColumn ? i % 2 === 1 : i % 2 === 0
-    );
+  const renderScatteredRow = (config: RowConfig, rowIndex: number) => {
+    const places = config.items.map(i => PLACES[i]);
+    const globalDelay = rowIndex * 120;
 
     return (
-      <View style={[styles.masonryColumn, isRightColumn && styles.masonryColumnRight]}>
-        {columnPlaces.map((place, i) => {
-          const actualIndex = isRightColumn ? i * 2 + 1 : i * 2;
-          const delay = (startIndex + actualIndex) * 100;
+      <View
+        key={`row-${rowIndex}`}
+        style={[
+          styles.scatteredRow,
+          { marginTop: config.verticalNudge },
+        ]}
+      >
+        {places.map((place, i) => {
+          const offset = config.offsets[i] || 0;
+          const itemDelay = globalDelay + i * 80;
 
           return (
             <Animated.View
               key={place.placeName}
-              entering={SlideInUp.delay(delay).springify().damping(15)}
-              style={styles.sphereWrapper}
+              entering={SlideInUp.delay(itemDelay).springify().damping(14).stiffness(100)}
+              style={[
+                styles.bubbleWrapper,
+                {
+                  marginLeft: `${Math.max(0, offset)}%`,
+                  marginRight: `${Math.max(0, -offset)}%`,
+                } as any,
+              ]}
             >
               <GlassSphere
                 imageUrl={place.imageUrl}
                 alt={place.alt}
                 placeName={place.placeName}
                 size={place.size}
-                index={startIndex + actualIndex}
-                delay={delay / 1000}
+                index={config.items[i]}
+                delay={itemDelay / 1000}
               />
             </Animated.View>
           );
@@ -168,13 +163,16 @@ export default function PlacesScreen() {
     );
   };
 
+  // Split rows around the hero title
+  const topRows = ROW_CONFIGS.slice(0, 2);
+  const bottomRows = ROW_CONFIGS.slice(2);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
         scrollEventThrottle={16}
       >
         {/* Subtitle */}
@@ -182,14 +180,11 @@ export default function PlacesScreen() {
           entering={FadeIn.delay(100).duration(500)}
           style={styles.subtitle}
         >
-          Descubre la ciudad
+          Tus lugares favoritos conectados
         </Animated.Text>
 
-        {/* Top bubbles masonry */}
-        <View style={styles.masonryContainer}>
-          {renderMasonryColumn(topPlaces, false, 0)}
-          {renderMasonryColumn(topPlaces, true, 0)}
-        </View>
+        {/* Top scattered bubbles */}
+        {topRows.map((cfg, i) => renderScatteredRow(cfg, i))}
 
         {/* Hero Title */}
         <Animated.View
@@ -200,21 +195,13 @@ export default function PlacesScreen() {
           <Text style={styles.heroTitle}>PLACES</Text>
         </Animated.View>
 
-        {/* Bottom bubbles masonry */}
-        <View style={styles.masonryContainer}>
-          {renderMasonryColumn(bottomPlaces, false, 4)}
-          {renderMasonryColumn(bottomPlaces, true, 4)}
-        </View>
+        {/* Bottom scattered bubbles */}
+        {bottomRows.map((cfg, i) => renderScatteredRow(cfg, i + topRows.length))}
 
-        {/* Extra padding at bottom */}
-        <View style={{ height: 120 }} />
+        {/* Bottom padding */}
+        <View style={{ height: 140 }} />
       </ScrollView>
 
-      {/* Scroll hint - fixed at bottom */}
-      <Animated.View style={[styles.scrollHint, scrollHintStyle]}>
-        <Text style={styles.scrollHintText}>scroll</Text>
-        <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
-      </Animated.View>
     </View>
   );
 }
@@ -228,37 +215,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxWidth: 480,
+    alignSelf: 'center',
+    width: '100%',
   },
-  // Subtitle
   subtitle: {
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.35)',
     textAlign: 'center',
     letterSpacing: 4,
     textTransform: 'uppercase',
-    marginBottom: 20,
+    marginBottom: 24,
     fontWeight: '400',
   },
-  // Masonry layout
-  masonryContainer: {
+  // Scattered organic layout
+  scatteredRow: {
     flexDirection: 'row',
-    gap: 14,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 16,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  masonryColumn: {
-    flex: 1,
-    gap: 14,
-  },
-  masonryColumnRight: {
-    marginTop: 40,
-  },
-  sphereWrapper: {
+  bubbleWrapper: {
     alignItems: 'center',
+    flexShrink: 1,
   },
   // Hero title
   heroContainer: {
-    paddingVertical: 24,
+    paddingVertical: 32,
     alignItems: 'center',
   },
   heroTitle: {
@@ -267,35 +254,12 @@ const styles = StyleSheet.create({
       android: 'sans-serif-condensed',
       default: 'System',
     }),
-    fontSize: SCREEN_WIDTH * 0.22,
+    fontSize: Math.min(SCREEN_WIDTH * 0.22, 80),
     fontWeight: '900',
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: SCREEN_WIDTH * 0.2,
+    lineHeight: Math.min(SCREEN_WIDTH * 0.2, 72),
     letterSpacing: -2,
     textTransform: 'uppercase',
-  },
-  // Scroll hint
-  scrollHint: {
-    position: 'absolute',
-    bottom: 100,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(30, 30, 40, 0.85)',
-    backdropFilter: 'blur(16px)',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  scrollHintText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.4)',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontWeight: '500',
   },
 });

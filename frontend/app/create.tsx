@@ -34,6 +34,7 @@ import { analyzeImage, extractUrl, analyzeExtractedImage } from '../src/services
 import { useAuth } from '../src/context/AuthContext';
 import { useExtractionStore } from '../src/store/extractionStore';
 import AudienceSelector from '../src/components/AudienceSelector';
+import ExtractionsScreen from './extractions';
 
 const categories = [
   { id: 'music', label: 'Música & Cultura', icon: 'musical-notes', color: '#8B5CF6' },
@@ -52,6 +53,9 @@ export default function CreateEventScreen() {
     const role = profile?.role?.toLowerCase() || '';
     return ['admin', 'alpha', 'beta'].includes(role);
   }, [profile]);
+
+  // Sub-tab state: 'crear' or 'extracciones'
+  const [activeTab, setActiveTab] = useState<'crear' | 'extracciones'>('crear');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -539,16 +543,65 @@ export default function CreateEventScreen() {
     setIsSubmitting(false);
   };
 
+  // If showing extractions tab, render that screen instead
+  if (activeTab === 'extracciones') {
+    return (
+      <View style={styles.container}>
+        {/* Sub-tab selector */}
+        <View style={[styles.subTabBar, { paddingTop: insets.top + 10, marginHorizontal: 20 }]}>
+          <TouchableOpacity
+            style={styles.subTab}
+            onPress={() => setActiveTab('crear')}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#6B7280" />
+            <Text style={styles.subTabText}>Crear</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTab, styles.subTabActive]}
+            onPress={() => setActiveTab('extracciones')}
+          >
+            <Ionicons name="cloud-download-outline" size={18} color="#fff" />
+            <Text style={[styles.subTabText, styles.subTabTextActive]}>Extracciones</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1 }}>
+          <ExtractionsScreen embedded />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 10 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 10, flexGrow: 1 }]}
         showsVerticalScrollIndicator={false}
+        bounces={true}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
       >
+        {/* Sub-tab selector */}
+        <View style={styles.subTabBar}>
+          <TouchableOpacity
+            style={[styles.subTab, styles.subTabActive]}
+            onPress={() => setActiveTab('crear')}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#fff" />
+            <Text style={[styles.subTabText, styles.subTabTextActive]}>Crear</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.subTab}
+            onPress={() => setActiveTab('extracciones')}
+          >
+            <Ionicons name="cloud-download-outline" size={18} color="#6B7280" />
+            <Text style={styles.subTabText}>Extracciones</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.header}>
           <Text style={styles.title}>Crear Evento</Text>
           <Text style={styles.subtitle}>Comparte tu evento con la comunidad</Text>
@@ -1806,5 +1859,36 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '500',
+  },
+  subTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#1A1A2E',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.15)',
+  },
+  subTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  subTabActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.4)',
+  },
+  subTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  subTabTextActive: {
+    color: '#fff',
   },
 });

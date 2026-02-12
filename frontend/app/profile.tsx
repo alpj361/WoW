@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -87,7 +87,7 @@ const generateMemberId = (memberNumber?: number): string => {
 
 export default function ProfileScreen() {
   const { savedEvents, attendedEvents, fetchEvents } = useEventStore();
-  const { profile, user, signOut } = useAuth();
+  const { profile, user, signOut, refreshProfile } = useAuth();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
   const [showPinTest, setShowPinTest] = useState(false);
   const [showPinAward, setShowPinAward] = useState(false);
@@ -97,6 +97,11 @@ export default function ProfileScreen() {
   const [cardWidth, setCardWidth] = useState(0);
   const cardRef = useRef<DigitalCardRef>(null);
   const slideAnim = useSharedValue(0);
+
+  // Refresh profile on mount to ensure avatar_url is up-to-date
+  useEffect(() => {
+    refreshProfile();
+  }, []);
 
   // Get container width on layout
   const handleContainerLayout = (event: LayoutChangeEvent) => {
@@ -124,7 +129,7 @@ export default function ProfileScreen() {
   // Get user display name
   const userName = profile?.full_name || user?.user_metadata?.full_name || 'Usuario';
   const userEmail = profile?.email || user?.email || '';
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
   const memberNumber = profile?.member_number;
   const memberId = generateMemberId(memberNumber);
 

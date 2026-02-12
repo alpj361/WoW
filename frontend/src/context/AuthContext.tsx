@@ -20,6 +20,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Module-level flag removed - using authState.isInitialized instead (survives module reloads)
 
+// Merge avatar_url from user_metadata into a cached profile if missing or stale
+const mergeAvatarFromMetadata = (cachedProfile: any, user: User | null): any => {
+    if (!user || !cachedProfile) return cachedProfile;
+    const metaAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+    if (metaAvatar && (!cachedProfile.avatar_url || cachedProfile.avatar_url !== metaAvatar)) {
+        console.log('🖼️ Updating avatar_url from user_metadata');
+        return { ...cachedProfile, avatar_url: metaAvatar };
+    }
+    return cachedProfile;
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
@@ -90,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     // 1. Primero verificar memoria
                     if (profileRef.current && profileRef.current.id === newSession.user.id) {
                         console.log('🚀 Using memory profile for SIGNED_IN');
+                        const merged = mergeAvatarFromMetadata(profileRef.current, newSession.user);
+                        if (merged !== profileRef.current) {
+                            setProfile(merged);
+                            await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                        }
                         setUser(newSession.user);
                         setLoading(false);
                         return;
@@ -102,8 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const cached = JSON.parse(cachedStr);
                             if (cached.id === newSession.user.id) {
                                 console.log('📦 Using cached profile for SIGNED_IN');
+                                const merged = mergeAvatarFromMetadata(cached, newSession.user);
                                 setUser(newSession.user);
-                                setProfile(cached);
+                                setProfile(merged);
+                                if (merged !== cached) {
+                                    await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                                }
                                 setLoading(false);
                                 return; // NO hacer fetch
                             }
@@ -194,9 +214,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const { data: { session: currentSession } } = await supabase.auth.getSession();
                 if (currentSession?.user && cachedProfile.id === currentSession.user.id) {
                     console.log('🔄 Restored from cache after re-mount');
+                    const merged = mergeAvatarFromMetadata(cachedProfile, currentSession.user);
                     setSession(currentSession);
                     setUser(currentSession.user);
-                    setProfile(cachedProfile);
+                    setProfile(merged);
+                    if (merged !== cachedProfile) {
+                        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                    }
                 }
             }
         } catch (e) {
@@ -230,8 +254,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // and DO NOT fetch - the cache is sufficient for loading the app
                 if (cachedProfile && cachedProfile.id === session.user.id) {
                     console.log('🚀 Using cached profile for instant load');
+                    const merged = mergeAvatarFromMetadata(cachedProfile, session.user);
                     setUser(session.user);
-                    setProfile(cachedProfile);
+                    setProfile(merged);
+                    if (merged !== cachedProfile) {
+                        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                    }
                     authState.reset(); // Clean state after successful load
                     setLoading(false);
                     return; // NO fetch - cache is sufficient

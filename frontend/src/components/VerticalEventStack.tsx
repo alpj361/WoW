@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, memo } from 'react';
+import React, { useCallback, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -158,12 +158,13 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
   const translateY = useSharedValue(0);
   const lastNavTime = useRef(0);
   const isAnimating = useRef(false);
+  const containerRef = useRef<View>(null);
 
   const triggerHaptic = useCallback(async () => {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const navigateTo = useCallback(
@@ -187,6 +188,27 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
     },
     [currentIndex, events.length, onIndexChange, triggerHaptic],
   );
+
+  // Scroll-wheel support for web desktop
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleWheel = (evt: any) => {
+      evt.preventDefault();
+      const delta = evt.deltaY as number;
+      if (Math.abs(delta) > 30) {
+        navigateTo(delta > 0 ? 1 : -1);
+      }
+    };
+
+    // Attach to the stack element on web for scroll wheel navigation
+    const target = document.querySelector('[data-event-stack]') || document;
+    target.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      target.removeEventListener('wheel', handleWheel);
+    };
+  }, [navigateTo]);
 
   const gesture = Gesture.Pan()
     .activeOffsetY([-15, 15])
@@ -277,10 +299,13 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={containerRef}>
       {/* Card Stack */}
       <GestureDetector gesture={gesture}>
-        <Animated.View style={styles.stackContainer}>
+        <Animated.View
+          style={styles.stackContainer}
+          {...(Platform.OS === 'web' ? { 'data-event-stack': 'true' } as any : {})}
+        >
           {events.map((event, index) => renderCard(event, index))}
         </Animated.View>
       </GestureDetector>

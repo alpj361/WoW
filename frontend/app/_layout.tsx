@@ -170,10 +170,7 @@ function RootLayoutNav() {
           <Tabs.Screen
             name="extractions"
             options={{
-              title: 'Extracciones',
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="cloud-download" size={size} color={color} />
-              ),
+              href: null,
             }}
           />
           <Tabs.Screen

@@ -65,15 +65,16 @@ export const GlassSphere: React.FC<GlassSphereProps> = ({
   const imageScale = useSharedValue(1);
   const labelOpacity = useSharedValue(0);
 
-  // Calculate size based on screen width and size prop
-  const baseSize = (SCREEN_WIDTH - 48) / 2 - 8;
+  // Calculate size based on screen width and size prop, capped for wide screens
+  const rawBase = (SCREEN_WIDTH - 48) / 2 - 8;
+  const baseSize = Math.min(rawBase, 160);
   const sphereSize = baseSize * getSizeMultiplier(size);
 
   const triggerHaptic = useCallback(async () => {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const handlePressIn = useCallback(() => {
@@ -234,7 +235,13 @@ export const GlassSphere: React.FC<GlassSphereProps> = ({
               colors={['transparent', 'rgba(0,0,0,0.7)']}
               style={styles.labelGradient}
             >
-              <Text style={styles.labelText}>{placeName}</Text>
+              <Text
+                style={[styles.labelText, { fontSize: Math.max(9, sphereSize * 0.1) }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {placeName}
+              </Text>
             </LinearGradient>
           </Animated.View>
         </View>
@@ -263,7 +270,8 @@ const styles = StyleSheet.create({
         elevation: 15,
       },
       web: {
-        boxShadow: '0 8px 32px rgba(139, 92, 246, 0.25), 0 4px 16px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 8px 40px rgba(139, 92, 246, 0.3), 0 4px 20px rgba(0, 0, 0, 0.25)',
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
       },
     }),
   },
@@ -305,10 +313,8 @@ const styles = StyleSheet.create({
   },
   webGlassInner: {
     ...StyleSheet.absoluteFillObject,
-    // Subtle glass effect - no heavy blur that obscures the image
-    backgroundColor: 'transparent',
-    // Light gradient for glass reflection effect only
-    backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 35%, transparent 60%)',
+    // Rich glass reflections with dual gradients
+    backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.08) 25%, transparent 50%), radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.12) 0%, transparent 60%)',
   } as any,
 
   // ===== Shared Glass Elements =====
@@ -335,7 +341,7 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
       },
       web: {
-        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.15), 0 0 20px rgba(139, 92, 246, 0.1)',
+        boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2), inset 0 -1px 1px rgba(0,0,0,0.1), 0 0 24px rgba(139, 92, 246, 0.12)',
       },
     }),
   },
@@ -367,25 +373,29 @@ const styles = StyleSheet.create({
   },
   labelGradient: {
     width: '100%',
-    paddingBottom: '20%',
-    paddingTop: '18%',
+    paddingBottom: '18%',
+    paddingTop: '15%',
+    paddingHorizontal: '12%',
     alignItems: 'center',
     borderBottomLeftRadius: 9999,
     borderBottomRightRadius: 9999,
   },
   labelText: {
     color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textAlign: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.5,
-        shadowRadius: 2,
+        shadowOpacity: 0.8,
+        shadowRadius: 3,
       },
+      web: {
+        textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0px 8px rgba(0,0,0,0.4)',
+      } as any,
     }),
   },
 });

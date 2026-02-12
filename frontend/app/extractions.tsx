@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -123,7 +123,7 @@ const processRecurringDates = (
     return { mainDate: null, recurringDates: [], isRecurring: false };
 };
 
-export default function ExtractionsScreen() {
+export default function ExtractionsScreen({ embedded = false }: { embedded?: boolean } = {}) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
 
@@ -165,6 +165,9 @@ export default function ExtractionsScreen() {
     const [batchCompleted, setBatchCompleted] = useState(0);
     const [batchDraftsCreated, setBatchDraftsCreated] = useState(0);
     const [batchSourceExtraction, setBatchSourceExtraction] = useState<Extraction | null>(null);
+
+    // Guard ref to prevent re-calling openCreateModalWithAnalysis when extractions array updates from polling
+    const processedAnalysisRef = useRef<string | null>(null);
 
     // Create event modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -243,6 +246,13 @@ export default function ExtractionsScreen() {
 
         // Handle completed analysis
         if (targetExtraction.status === 'completed' && targetExtraction.analysis) {
+            // Guard: don't re-process the same extraction (polling updates extractions array every 3s)
+            if (processedAnalysisRef.current === lastAnalyzedId) {
+                setLastAnalyzedId(null);
+                return;
+            }
+            processedAnalysisRef.current = lastAnalyzedId;
+
             if (isBatchMode) {
                 // Batch mode: auto-create draft without opening modal
                 autoCreateDraftFromAnalysis(targetExtraction);
@@ -484,6 +494,7 @@ export default function ExtractionsScreen() {
     const closeCreateModal = () => {
         setShowCreateModal(false);
         resetForm();
+        processedAnalysisRef.current = null; // Allow next analysis to open modal
     };
 
     const formatDateForStorage = (date: Date): string => {
@@ -1118,12 +1129,14 @@ export default function ExtractionsScreen() {
     const readyCount = extractions.filter(e => e.status === 'ready').length;
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, !embedded && { paddingTop: insets.top }]}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
-                </TouchableOpacity>
+                {!embedded && (
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                )}
                 <View>
                     <Text style={styles.title}>Extracciones</Text>
                     <Text style={styles.subtitle}>
@@ -1169,7 +1182,7 @@ export default function ExtractionsScreen() {
                 </View>
             )}
 
-            <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollContainer} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} bounces={true} nestedScrollEnabled={true}>
                 {/* Drafts Section */}
                 {drafts.length > 0 && (
                     <View style={styles.section}>
@@ -1374,6 +1387,7 @@ export default function ExtractionsScreen() {
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
+                    keyboardVerticalOffset={0}
                 >
                     <View style={styles.createModalOverlay}>
                         <Pressable
@@ -1391,9 +1405,12 @@ export default function ExtractionsScreen() {
                             </View>
 
                             <ScrollView
-                                style={styles.createForm}
-                                showsVerticalScrollIndicator={false}
+                                style={{ flex: 1 }}
+                                contentContainerStyle={styles.createForm}
+                                showsVerticalScrollIndicator={true}
                                 keyboardShouldPersistTaps="handled"
+                                bounces={true}
+                                nestedScrollEnabled={true}
                             >
                                 {/* Image Preview */}
                                 {formImage && (
@@ -1468,39 +1485,118 @@ export default function ExtractionsScreen() {
                                 <View style={styles.formRow}>
                                     <View style={[styles.formSection, { flex: 1 }]}>
                                         <Text style={styles.formLabel}>Fecha</Text>
-                                        <TouchableOpacity
-                                            style={styles.pickerButton}
-                                            onPress={() => setShowDatePicker(true)}
-                                        >
-                                            <Ionicons name="calendar" size={18} color="#8B5CF6" />
-                                            <Text style={formDate ? styles.pickerText : styles.pickerPlaceholder}>
-                                                {formDate ? formatDate(formDate) : 'Seleccionar'}
-                                            </Text>
-                                        </TouchableOpacity>
+                                        {Platform.OS === 'web' ? (
+                                            <View style={styles.pickerButton}>
+                                                <Ionicons name="calendar" size={18} color="#8B5CF6" />
+                                                <input
+                                                    type="date"
+                                                    value={formDate ? formatDateForStorage(formDate) : ''}
+                                                    onChange={(e: any) => {
+                                                        if (e.target.value) {
+                                                            setFormDate(new Date(e.target.value + 'T12:00:00'));
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        color: formDate ? '#fff' : '#6B7280',
+                                                        fontSize: 14,
+                                                        outline: 'none',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                    min={new Date().toISOString().split('T')[0]}
+                                                />
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.pickerButton}
+                                                onPress={() => setShowDatePicker(true)}
+                                            >
+                                                <Ionicons name="calendar" size={18} color="#8B5CF6" />
+                                                <Text style={formDate ? styles.pickerText : styles.pickerPlaceholder}>
+                                                    {formDate ? formatDate(formDate) : 'Seleccionar'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                     <View style={[styles.formSection, { flex: 1 }]}>
                                         <Text style={styles.formLabel}>Hora Inicio</Text>
-                                        <TouchableOpacity
-                                            style={styles.pickerButton}
-                                            onPress={() => setShowTimePicker(true)}
-                                        >
-                                            <Ionicons name="time" size={18} color="#8B5CF6" />
-                                            <Text style={formTime ? styles.pickerText : styles.pickerPlaceholder}>
-                                                {formTime ? formatTime(formTime) : 'Seleccionar'}
-                                            </Text>
-                                        </TouchableOpacity>
+                                        {Platform.OS === 'web' ? (
+                                            <View style={styles.pickerButton}>
+                                                <Ionicons name="time" size={18} color="#8B5CF6" />
+                                                <input
+                                                    type="time"
+                                                    value={formTime ? formatTimeForStorage(formTime) : ''}
+                                                    onChange={(e: any) => {
+                                                        if (e.target.value) {
+                                                            const [hours, minutes] = e.target.value.split(':');
+                                                            const date = new Date();
+                                                            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                                            setFormTime(date);
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        color: formTime ? '#fff' : '#6B7280',
+                                                        fontSize: 14,
+                                                        outline: 'none',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                />
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.pickerButton}
+                                                onPress={() => setShowTimePicker(true)}
+                                            >
+                                                <Ionicons name="time" size={18} color="#8B5CF6" />
+                                                <Text style={formTime ? styles.pickerText : styles.pickerPlaceholder}>
+                                                    {formTime ? formatTime(formTime) : 'Seleccionar'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                     <View style={[styles.formSection, { flex: 1 }]}>
                                         <Text style={styles.formLabel}>Hora Fin</Text>
-                                        <TouchableOpacity
-                                            style={styles.pickerButton}
-                                            onPress={() => setShowEndTimePicker(true)}
-                                        >
-                                            <Ionicons name="time-outline" size={18} color="#F59E0B" />
-                                            <Text style={formEndTime ? styles.pickerText : styles.pickerPlaceholder}>
-                                                {formEndTime ? formatTime(formEndTime) : 'Opcional'}
-                                            </Text>
-                                        </TouchableOpacity>
+                                        {Platform.OS === 'web' ? (
+                                            <View style={styles.pickerButton}>
+                                                <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                                                <input
+                                                    type="time"
+                                                    value={formEndTime ? formatTimeForStorage(formEndTime) : ''}
+                                                    onChange={(e: any) => {
+                                                        if (e.target.value) {
+                                                            const [hours, minutes] = e.target.value.split(':');
+                                                            const date = new Date();
+                                                            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                                            setFormEndTime(date);
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        color: formEndTime ? '#fff' : '#6B7280',
+                                                        fontSize: 14,
+                                                        outline: 'none',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                />
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.pickerButton}
+                                                onPress={() => setShowEndTimePicker(true)}
+                                            >
+                                                <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                                                <Text style={formEndTime ? styles.pickerText : styles.pickerPlaceholder}>
+                                                    {formEndTime ? formatTime(formEndTime) : 'Opcional'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                 </View>
 
@@ -1526,13 +1622,44 @@ export default function ExtractionsScreen() {
 
                                     {formIsRecurring && (
                                         <View style={styles.recurringDatesContainer}>
-                                            <TouchableOpacity
-                                                style={styles.addDateButton}
-                                                onPress={() => setShowRecurringDatePicker(true)}
-                                            >
-                                                <Ionicons name="add-circle" size={18} color="#8B5CF6" />
-                                                <Text style={styles.addDateText}>Agregar fecha</Text>
-                                            </TouchableOpacity>
+                                            {Platform.OS === 'web' ? (
+                                                <View style={styles.addDateButton}>
+                                                    <Ionicons name="add-circle" size={18} color="#8B5CF6" />
+                                                    <input
+                                                        type="date"
+                                                        onChange={(e: any) => {
+                                                            if (e.target.value) {
+                                                                const newDate = new Date(e.target.value + 'T12:00:00');
+                                                                const dateStr = formatDateForStorage(newDate);
+                                                                const exists = formRecurringDates.some(d => formatDateForStorage(d) === dateStr);
+                                                                if (!exists) {
+                                                                    setFormRecurringDates(prev => [...prev, newDate].sort((a, b) => a.getTime() - b.getTime()));
+                                                                }
+                                                                e.target.value = '';
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            flex: 1,
+                                                            backgroundColor: 'transparent',
+                                                            border: 'none',
+                                                            color: '#8B5CF6',
+                                                            fontSize: 14,
+                                                            outline: 'none',
+                                                            cursor: 'pointer',
+                                                        }}
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                    />
+                                                    <Text style={styles.addDateText}>Agregar fecha</Text>
+                                                </View>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    style={styles.addDateButton}
+                                                    onPress={() => setShowRecurringDatePicker(true)}
+                                                >
+                                                    <Ionicons name="add-circle" size={18} color="#8B5CF6" />
+                                                    <Text style={styles.addDateText}>Agregar fecha</Text>
+                                                </TouchableOpacity>
+                                            )}
 
                                             {formRecurringDates.length > 0 && (
                                                 <View style={styles.recurringDatesList}>
@@ -2220,10 +2347,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#1F1F1F',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        maxHeight: '90%',
+        height: '85%',
+        overflow: 'hidden',
     },
     createForm: {
         padding: 16,
+        paddingBottom: 40,
     },
     formImagePreview: {
         borderRadius: 12,

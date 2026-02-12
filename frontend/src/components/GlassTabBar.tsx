@@ -74,8 +74,8 @@ function getIconName(routeName: string, focused: boolean): string {
 export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
 
-  // Filter out hidden routes - only show main 6 tabs
-  const mainRoutes = ['index', 'create', 'places', 'extractions', 'myevents', 'profile'];
+  // Filter out hidden routes - only show main 5 tabs
+  const mainRoutes = ['index', 'create', 'places', 'myevents', 'profile'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 
   const content = (
@@ -138,9 +138,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   webFallback: {
-    backgroundColor: 'rgba(20, 20, 30, 0.95)',
-    backdropFilter: 'blur(20px)',
-  },
+    backgroundColor: 'rgba(15, 15, 25, 0.75)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(139, 92, 246, 0.15)',
+    boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.3)',
+  } as any,
   blurContainer: {
     overflow: 'hidden',
     borderTopLeftRadius: 24,
