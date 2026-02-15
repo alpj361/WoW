@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,69 +7,58 @@ import {
   ScrollView,
   RefreshControl,
   Image,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Pressable,
   Dimensions,
+  FlatList,
+  Modal,
+  Alert,
+  TextInput,
+  ActivityIndicator,
   Platform,
+  StatusBar,
+  Pressable,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
-import { TouchableOpacity as GestureTouchable, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
-import * as ImagePicker from 'expo-image-picker';
-import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-  useSharedValue,
-  FadeIn,
-  FadeInDown,
-  Layout,
-} from 'react-native-reanimated';
-import { useEventStore, SavedEventData, AttendedEventData } from '../src/store/eventStore';
-import { EmojiRating } from '../src/components/EmojiRating';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+import { useEventStore, HostedEventData } from '../src/store/eventStore';
+import { useAuth } from '../src/context/AuthContext';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
-import { useAuth } from '../src/context/AuthContext';
-import { EventListSkeleton } from '../src/components/SkeletonLoader';
-import { AnimatedToast } from '../src/components/AnimatedToast';
-import { FreshDataBanner } from '../src/components/FreshDataBanner';
-import { CollectibleAnimation } from '../src/components/CollectibleAnimation';
-import EventReactionsModal, { EventReaction } from '../src/components/EventReactionsModal';
 
-type Tab = 'saved' | 'attended' | 'hosted';
+const { width } = Dimensions.get('window');
 
-const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
-  switch (category) {
-    case 'music':
-      return ['#8B5CF6', '#6D28D9'];
-    case 'volunteer':
-      return ['#EC4899', '#BE185D'];
-    default:
-      return ['#F59E0B', '#D97706'];
+// -- Types --
+const getStatusColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'published': return '#4ADE80';
+    case 'draft': return '#94A3B8';
+    case 'cancelled': return '#F87171';
+    case 'completed': return '#60A5FA';
+    default: return '#94A3B8';
   }
 };
 
-const getCategoryIcon = (category: string): string => {
-  switch (category) {
-    case 'music':
-      return 'musical-notes';
-    case 'volunteer':
-      return 'heart';
-    default:
-      return 'fast-food';
+const getStatusLabel = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'published': return 'Publicado';
+    case 'draft': return 'Borrador';
+    case 'cancelled': return 'Cancelado';
+    case 'completed': return 'Finalizado';
+    default: return status || 'Borrador';
   }
 };
 
 export default function MyEventsScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
+
   const {
     savedEvents,
     attendedEvents,
@@ -82,43 +71,17 @@ export default function MyEventsScreen() {
     approveRegistration,
     rejectRegistration,
     unsaveEvent,
-    markAttended,
-    updateEventReaction,
     removeAttended,
-    resubmitRegistration,
     deleteEvent,
-    silentRefreshSaved,
-    hasNewSavedData,
-    clearNewDataFlags,
-    isLoadingSaved,
-    isLoadingAttended,
-    isLoadingHosted,
   } = useEventStore();
 
-  const [activeTab, setActiveTab] = useState<Tab>('saved');
-  const [refreshing, setRefreshing] = useState(false);
+  // -- State --
+  const [activeTab, setActiveTab] = useState<'collection' | 'attended' | 'hosted'>('collection');
   const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
-    visible: false,
-    message: '',
-    type: 'info',
-  });
-  const [ratingModal, setRatingModal] = useState<{
-    visible: boolean;
-    eventId: string;
-    eventTitle: string;
-    eventImage?: string;
-    eventCategory: string;
-  }>({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' });
+  const [refreshing, setRefreshing] = useState(false);
+  const isFirstLoad = useRef(true);
 
-  const [collectibleAnimation, setCollectibleAnimation] = useState<{
-    visible: boolean;
-    eventTitle: string;
-    eventImage?: string;
-    eventCategory: string;
-    emoji?: string;
-  }>({ visible: false, eventTitle: '', eventCategory: 'food' });
-
+  // Attendees modal
   const [attendeesModal, setAttendeesModal] = useState<{
     visible: boolean;
     eventId: string;
@@ -127,6 +90,7 @@ export default function MyEventsScreen() {
     loading: boolean;
   }>({ visible: false, eventId: '', eventTitle: '', attendees: [], loading: false });
 
+  // Registrations modal
   const [registrationsModal, setRegistrationsModal] = useState<{
     visible: boolean;
     eventId: string;
@@ -138,6 +102,7 @@ export default function MyEventsScreen() {
     hasAttendance: boolean;
   }>({ visible: false, eventId: '', eventTitle: '', registrations: [], loading: false, activeTab: 'payments', hasPayments: false, hasAttendance: false });
 
+  // Reject modal
   const [rejectModal, setRejectModal] = useState<{
     visible: boolean;
     registrationId: string;
@@ -145,23 +110,14 @@ export default function MyEventsScreen() {
     reason: string;
   }>({ visible: false, registrationId: '', userName: '', reason: '' });
 
-  const [paymentModal, setPaymentModal] = useState<{
-    visible: boolean;
-    event: any | null;
-  }>({ visible: false, event: null });
-
-  const [paymentReceiptUrl, setPaymentReceiptUrl] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { registerForEvent } = useEventStore();
-  const { user } = useAuth();
-
-  // QR Scanner and Attendance List states
+  // Scanner modal
   const [scannerModal, setScannerModal] = useState<{
     visible: boolean;
     eventId: string;
     eventTitle: string;
   }>({ visible: false, eventId: '', eventTitle: '' });
 
+  // Attendance list modal
   const [attendanceListModal, setAttendanceListModal] = useState<{
     visible: boolean;
     eventId: string;
@@ -170,232 +126,116 @@ export default function MyEventsScreen() {
     loading: boolean;
   }>({ visible: false, eventId: '', eventTitle: '', attendees: [], loading: false });
 
+  // Receipt viewer
   const [receiptModal, setReceiptModal] = useState<{
     visible: boolean;
     imageUrl: string;
     userName: string;
   }>({ visible: false, imageUrl: '', userName: '' });
 
-  const [reactionsModal, setReactionsModal] = useState<{
-    visible: boolean;
-    attendedEvent: AttendedEventData | null;
-  }>({ visible: false, attendedEvent: null });
-
-  // Track previous counts for detecting new items (for haptic feedback)
-  const [previousSavedCount, setPreviousSavedCount] = useState(0);
-  const [previousAttendedCount, setPreviousAttendedCount] = useState(0);
-  const isFirstLoad = useRef(true);
-
-  // Initial data load
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
+  // -- Load Data --
+  const loadData = useCallback(async () => {
+    try {
       await Promise.all([
         fetchSavedEvents(),
         fetchAttendedEvents(),
-        fetchHostedEvents()
+        fetchHostedEvents(),
       ]);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    } finally {
       setIsLoading(false);
+      setRefreshing(false);
       isFirstLoad.current = false;
-    };
-    loadData();
-  }, []);
+    }
+  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents]);
 
-  // Silent refresh when tab is focused (after first load)
   useFocusEffect(
     useCallback(() => {
-      if (!isFirstLoad.current) {
-        // Silently check for new data in background
-        silentRefreshSaved();
+      if (isFirstLoad.current) {
+        loadData();
       }
-    }, [silentRefreshSaved])
+    }, [loadData])
   );
 
-  // Handler for banner press
-  const handleRefreshFromBanner = useCallback(async () => {
+  const onRefresh = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRefreshing(true);
-    await Promise.all([
-      fetchSavedEvents(),
-      fetchAttendedEvents(),
-      fetchHostedEvents()
-    ]);
-    clearNewDataFlags();
-    setRefreshing(false);
-  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents, clearNewDataFlags]);
-
-  // Haptic feedback helper
-  const triggerHaptic = useCallback(async (type: 'success' | 'warning' | 'light') => {
-    if (Platform.OS === 'web') return;
-    try {
-      if (type === 'success') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else if (type === 'warning') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } else {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (e) { }
-  }, []);
-
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
-    setToast({ visible: true, message, type });
-  }, []);
-
-  // Track count changes for haptic feedback on new items
-  useEffect(() => {
-    if (attendedEvents.length > previousAttendedCount && previousAttendedCount > 0) {
-      triggerHaptic('success');
-    }
-    setPreviousAttendedCount(attendedEvents.length);
-  }, [attendedEvents.length]);
-
-  useEffect(() => {
-    if (savedEvents.length > previousSavedCount && previousSavedCount > 0) {
-      triggerHaptic('light');
-    }
-    setPreviousSavedCount(savedEvents.length);
-  }, [savedEvents.length]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([
-      fetchSavedEvents(),
-      fetchAttendedEvents(),
-      fetchHostedEvents()
-    ]);
-    setRefreshing(false);
-  }, []);
-
-  const handleMarkAttended = (eventId: string, eventTitle: string, eventImage?: string, eventCategory: string = 'food') => {
-    setRatingModal({ visible: true, eventId, eventTitle, eventImage, eventCategory });
+    loadData();
   };
 
-  const handleSelectEmoji = async (emoji: string) => {
-    const currentModal = { ...ratingModal };
-    try {
-      await markAttended(ratingModal.eventId, emoji || undefined);
-      triggerHaptic('success');
-      setRatingModal({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' });
+  // -- Handlers --
 
-      // Show collectible animation
-      setCollectibleAnimation({
-        visible: true,
-        eventTitle: currentModal.eventTitle,
-        eventImage: currentModal.eventImage,
-        eventCategory: currentModal.eventCategory,
-        emoji: emoji || undefined,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo marcar como asistido.');
-    }
-  };
-
-  const handleCollectibleAnimationComplete = () => {
-    setCollectibleAnimation({ visible: false, eventTitle: '', eventCategory: 'food' });
-    showToast('¡Evento coleccionado!', 'success');
+  const handleDeleteHosted = async (eventId: string) => {
+    Alert.alert(
+      'Eliminar evento',
+      '¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEvent(eventId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo eliminar el evento.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleUnsave = async (eventId: string) => {
-    triggerHaptic('warning');
-
-    const doUnsave = async () => {
-      try {
-        await unsaveEvent(eventId);
-        showToast('Evento eliminado', 'info');
-      } catch (error) {
-        console.error('Error unsaving:', error);
-        if (Platform.OS === 'web') {
-          alert('No se pudo eliminar de guardados');
-        } else {
-          Alert.alert('Error', 'No se pudo eliminar de guardados');
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      // Use window.confirm for web
-      if (window.confirm('¿Seguro que quieres quitar este evento de guardados?')) {
-        await doUnsave();
-      }
-    } else {
-      // Use Alert.alert for native
-      Alert.alert(
-        'Eliminar de guardados',
-        '¿Seguro que quieres quitar este evento?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: doUnsave,
+    Alert.alert(
+      'Eliminar de guardados',
+      '¿Seguro que quieres quitar este evento?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await unsaveEvent(eventId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo eliminar de guardados');
+            }
           },
-        ]
-      );
-    }
+        },
+      ]
+    );
   };
-
 
   const handleRemoveAttended = async (eventId: string) => {
-    const doRemove = async () => {
-      try {
-        await removeAttended(eventId);
-      } catch (error) {
-        console.error('Error removing attended:', error);
-        if (Platform.OS === 'web') {
-          alert('No se pudo eliminar de asistidos');
-        } else {
-          Alert.alert('Error', 'No se pudo eliminar de asistidos');
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('¿Seguro que quieres quitar este evento de asistidos?')) {
-        await doRemove();
-      }
-    } else {
-      Alert.alert(
-        'Eliminar de asistidos',
-        '¿Seguro que quieres quitar este evento?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Eliminar', style: 'destructive', onPress: doRemove },
-        ]
-      );
-    }
+    Alert.alert(
+      'Eliminar de colección',
+      '¿Seguro que quieres quitar este evento?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeAttended(eventId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo eliminar de la colección');
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const handleDeleteHosted = async (eventId: string) => {
-    const doDelete = async () => {
-      try {
-        await deleteEvent(eventId);
-      } catch (error) {
-        if (Platform.OS === 'web') {
-          alert('No se pudo eliminar el evento.');
-        } else {
-          Alert.alert('Error', 'No se pudo eliminar el evento.');
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.')) {
-        await doDelete();
-      }
-    } else {
-      Alert.alert(
-        'Eliminar evento',
-        '¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Eliminar', style: 'destructive', onPress: doDelete },
-        ]
-      );
-    }
-  };
+  // -- Attendees / Registrations --
   const handleShowAttendees = async (eventId: string, eventTitle: string) => {
-    // Check if event has price/registration - show registrations modal instead
-    const event = hostedEvents.find(h => h.event.id === eventId)?.event;
+    const hostedItem = hostedEvents.find(h => h.event.id === eventId);
+    const event = hostedItem?.event as any;
     const hasPrice = event?.price && parseFloat(String(event.price)) > 0;
     const hasForm = !!event?.registration_form_url;
 
@@ -404,14 +244,7 @@ export default function MyEventsScreen() {
       return;
     }
 
-    setAttendeesModal({
-      visible: true,
-      eventId,
-      eventTitle,
-      attendees: [],
-      loading: true
-    });
-
+    setAttendeesModal({ visible: true, eventId, eventTitle, attendees: [], loading: true });
     try {
       const attendees = await fetchEventAttendees(eventId);
       setAttendeesModal(prev => ({ ...prev, attendees, loading: false }));
@@ -422,7 +255,8 @@ export default function MyEventsScreen() {
   };
 
   const handleShowRegistrations = async (eventId: string, eventTitle: string, initialTab: 'payments' | 'attendance' = 'payments') => {
-    const event = hostedEvents.find(h => h.event.id === eventId)?.event;
+    const hostedItem = hostedEvents.find(h => h.event.id === eventId);
+    const event = hostedItem?.event as any;
     const hasPrice = event?.price && parseFloat(String(event.price)) > 0;
     const hasForm = !!event?.registration_form_url;
     const hasAttendance = !!event?.requires_attendance_check;
@@ -435,7 +269,7 @@ export default function MyEventsScreen() {
       loading: true,
       activeTab: initialTab,
       hasPayments: hasPrice || hasForm,
-      hasAttendance
+      hasAttendance,
     });
 
     try {
@@ -447,43 +281,26 @@ export default function MyEventsScreen() {
     }
   };
 
-  const loadAttendanceListInModal = async () => {
-    if (!registrationsModal.eventId) return;
-
-    setAttendanceListModal(prev => ({ ...prev, loading: true }));
-    try {
-      const attendees = await getAttendanceList(registrationsModal.eventId);
-      setAttendanceListModal(prev => ({
-        ...prev,
-        attendees,
-        loading: false,
-        eventId: registrationsModal.eventId,
-        eventTitle: registrationsModal.eventTitle
-      }));
-    } catch (error) {
-      console.error('Error loading attendance:', error);
-      setAttendanceListModal(prev => ({ ...prev, loading: false }));
-    }
-  };
-
   const handleTabChange = async (tab: 'payments' | 'attendance') => {
     setRegistrationsModal(prev => ({ ...prev, activeTab: tab }));
-
-    // Load attendance list if switching to attendance tab
     if (tab === 'attendance' && registrationsModal.hasAttendance) {
-      await loadAttendanceListInModal();
+      setAttendanceListModal(prev => ({ ...prev, loading: true, eventId: registrationsModal.eventId, eventTitle: registrationsModal.eventTitle }));
+      try {
+        const attendees = await getAttendanceList(registrationsModal.eventId);
+        setAttendanceListModal(prev => ({ ...prev, attendees, loading: false, visible: false }));
+      } catch (error) {
+        setAttendanceListModal(prev => ({ ...prev, loading: false }));
+      }
     }
   };
 
   const handleApprove = async (registrationId: string) => {
     try {
       await approveRegistration(registrationId);
-      // Refresh registrations
       if (registrationsModal.eventId) {
         const registrations = await fetchEventRegistrations(registrationsModal.eventId);
         setRegistrationsModal(prev => ({ ...prev, registrations }));
       }
-      // Refresh saved events to update badges
       await fetchSavedEvents();
       Alert.alert('¡Aprobado!', 'La solicitud ha sido aprobada');
     } catch (error) {
@@ -492,12 +309,7 @@ export default function MyEventsScreen() {
   };
 
   const handleRejectClick = (registrationId: string, userName: string) => {
-    setRejectModal({
-      visible: true,
-      registrationId,
-      userName,
-      reason: ''
-    });
+    setRejectModal({ visible: true, registrationId, userName, reason: '' });
   };
 
   const handleConfirmReject = async () => {
@@ -505,17 +317,13 @@ export default function MyEventsScreen() {
       Alert.alert('Error', 'Por favor ingresa una razón para el rechazo');
       return;
     }
-
     try {
       await rejectRegistration(rejectModal.registrationId, rejectModal.reason);
       setRejectModal({ visible: false, registrationId: '', userName: '', reason: '' });
-
-      // Refresh registrations
       if (registrationsModal.eventId) {
         const registrations = await fetchEventRegistrations(registrationsModal.eventId);
         setRegistrationsModal(prev => ({ ...prev, registrations }));
       }
-      // Refresh saved events to update badges
       await fetchSavedEvents();
       Alert.alert('Rechazado', 'La solicitud ha sido rechazada');
     } catch (error) {
@@ -523,78 +331,7 @@ export default function MyEventsScreen() {
     }
   };
 
-  const pickReceipt = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para subir el comprobante.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets[0].base64) {
-      setPaymentReceiptUrl(`data:image/jpeg;base64,${result.assets[0].base64}`);
-    }
-  };
-
-  const handleSubmitPayment = async () => {
-    if (!paymentModal.event) return;
-
-    if (!paymentReceiptUrl) {
-      Alert.alert('Error', 'Por favor sube el comprobante de pago');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await registerForEvent(
-        paymentModal.event.id,
-        paymentReceiptUrl,
-        paymentModal.event.registration_form_url ? true : false
-      );
-      setPaymentModal({ visible: false, event: null });
-      setPaymentReceiptUrl('');
-      // Refresh saved events to show pending badge
-      await fetchSavedEvents();
-      Alert.alert(
-        '¡Solicitud enviada!',
-        'Tu solicitud de registro ha sido enviada. El organizador la revisará pronto.'
-      );
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo enviar la solicitud. Intenta de nuevo.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResubmit = async (eventId: string) => {
-    const event = savedEvents.find(s => s.event.id === eventId)?.event;
-    if (!event) return;
-
-    // Check if event has price
-    const hasPrice = event.price && parseFloat(String(event.price)) > 0;
-
-    if (hasPrice) {
-      // Show payment modal again
-      setPaymentModal({ visible: true, event });
-    } else {
-      // Resubmit directly if free
-      try {
-        await resubmitRegistration(eventId);
-        await fetchSavedEvents();
-        Alert.alert('¡Reenviado!', 'Tu solicitud ha sido reenviada');
-      } catch (error) {
-        Alert.alert('Error', 'No se pudo reenviar la solicitud');
-      }
-    }
-  };
-
-  // QR Scanner handlers
+  // -- QR Scanner --
   const handleOpenScanner = (eventId: string, eventTitle: string) => {
     setScannerModal({ visible: true, eventId, eventTitle });
   };
@@ -604,64 +341,29 @@ export default function MyEventsScreen() {
       Alert.alert('Error', 'No se pudo identificar al host');
       return;
     }
-
     try {
-      // scannedData should be the user_id from the QR code
       await scanAttendance(scannerModal.eventId, scannedData, user.id);
-
-      // Refresh the attendance list to show updated status
-      if (attendanceListModal.eventId === scannerModal.eventId) {
-        const attendees = await getAttendanceList(scannerModal.eventId);
-        setAttendanceListModal(prev => ({ ...prev, attendees }));
-      }
-
-      // Refresh hosted events
       await fetchHostedEvents();
     } catch (error: any) {
-      console.error('Error scanning attendance:', error);
-
-      // Extract error message from response
       let errorMessage = 'No se pudo registrar la asistencia';
+      if (error.response?.data?.error) errorMessage = error.response.data.error;
+      else if (error.message) errorMessage = error.message;
 
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      // Show user-friendly error messages
       if (errorMessage.includes('not confirmed')) {
-        Alert.alert(
-          'Usuario No Confirmado',
-          'Este usuario no está confirmado para el evento. Debe estar registrado y aprobado primero.'
-        );
+        Alert.alert('Usuario No Confirmado', 'Este usuario no está confirmado para el evento.');
       } else if (errorMessage.includes('not require attendance')) {
-        Alert.alert(
-          'Asistencia No Requerida',
-          'Este evento no tiene habilitada la opción de llevar asistencia.'
-        );
+        Alert.alert('Asistencia No Requerida', 'Este evento no tiene habilitada la opción de llevar asistencia.');
       } else if (errorMessage.includes('Only the event host')) {
-        Alert.alert(
-          'Sin Permiso',
-          'Solo el organizador del evento puede escanear asistencias.'
-        );
+        Alert.alert('Sin Permiso', 'Solo el organizador del evento puede escanear asistencias.');
       } else {
         Alert.alert('Error al Escanear', errorMessage);
       }
-
-      throw error; // Re-throw to let QRScanner handle it
+      throw error;
     }
   };
 
   const handleShowAttendanceList = async (eventId: string, eventTitle: string) => {
-    setAttendanceListModal({
-      visible: true,
-      eventId,
-      eventTitle,
-      attendees: [],
-      loading: true
-    });
-
+    setAttendanceListModal({ visible: true, eventId, eventTitle, attendees: [], loading: true });
     try {
       const attendees = await getAttendanceList(eventId);
       setAttendanceListModal(prev => ({ ...prev, attendees, loading: false }));
@@ -671,551 +373,370 @@ export default function MyEventsScreen() {
     }
   };
 
-  const renderHostedItem = (item: any) => {
-    const { event } = item;
-    const gradient = getCategoryGradient(event.category);
-    const icon = getCategoryIcon(event.category);
-    const attendeeCount = event.attendee_count || 0;
+  // -- Renders --
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <Text style={styles.headerTitle}>Mis Eventos</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => router.push('/create')}
+        >
+          <Feather name="plus" size={20} color="#fff" />
+          <Text style={styles.createButtonText}>Crear</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'collection' && styles.activeTab]}
+          onPress={() => { setActiveTab('collection'); Haptics.selectionAsync(); }}
+        >
+          <Text style={[styles.tabText, activeTab === 'collection' && styles.activeTabText]}>
+            Interesados
+          </Text>
+          {savedEvents.length > 0 && (
+            <View style={styles.badge}><Text style={styles.badgeText}>{savedEvents.length}</Text></View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'attended' && styles.activeTab]}
+          onPress={() => { setActiveTab('attended'); Haptics.selectionAsync(); }}
+        >
+          <Text style={[styles.tabText, activeTab === 'attended' && styles.activeTabText]}>
+            Colección
+          </Text>
+          {attendedEvents.length > 0 && (
+            <View style={styles.badge}><Text style={styles.badgeText}>{attendedEvents.length}</Text></View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'hosted' && styles.activeTab]}
+          onPress={() => { setActiveTab('hosted'); Haptics.selectionAsync(); }}
+        >
+          <Text style={[styles.tabText, activeTab === 'hosted' && styles.activeTabText]}>
+            Anfitrión
+          </Text>
+          {hostedEvents.length > 0 && (
+            <View style={styles.badge}><Text style={styles.badgeText}>{hostedEvents.length}</Text></View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderSavedCard = (item: any, index: number) => {
+    const event = item.event || item;
+    const imageUri = event.image || event.image_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30';
 
     return (
-      <View key={event.id} style={styles.eventCard}>
+      <TouchableOpacity
+        key={event.id}
+        style={styles.savedCard}
+        onPress={() => { Haptics.selectionAsync(); router.push(`/event/${event.id}`); }}
+        onLongPress={() => handleUnsave(event.id)}
+        delayLongPress={500}
+        activeOpacity={0.9}
+      >
+        <Image source={{ uri: imageUri }} style={styles.savedImage} resizeMode="cover" />
         <LinearGradient
-          colors={gradient}
-          style={styles.cardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={['transparent', 'rgba(0,0,0,0.85)']}
+          style={styles.savedGradient}
         >
-          {event.image ? (
-            <Image source={{ uri: event.image }} style={styles.cardImage} />
-          ) : (
-            <View style={styles.cardIconContainer}>
-              <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
-            </View>
-          )}
-          <View style={styles.attendeeBadge}>
-            <Ionicons name="people" size={12} color="#fff" />
-            <Text style={styles.attendeeBadgeText}>{attendeeCount}</Text>
+          <View style={styles.savedContent}>
+            <Text style={styles.savedTitle} numberOfLines={2}>{event.title}</Text>
+            {event.date && (
+              <Text style={styles.savedDate}>
+                {format(new Date(event.date.substring(0, 10) + 'T12:00:00'), 'd MMM', { locale: es })}
+              </Text>
+            )}
           </View>
         </LinearGradient>
-
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {event.title}
-          </Text>
-          {event.date && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText}>{event.date}</Text>
-            </View>
-          )}
-          {event.location && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText} numberOfLines={1}>
-                {event.location}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.hostActions}>
-            {event.requires_attendance_check && (
-              <TouchableOpacity
-                style={styles.scanButton}
-                onPress={() => handleOpenScanner(event.id, event.title)}
-              >
-                <Ionicons name="qr-code-outline" size={16} color="#8B5CF6" />
-                <Text style={styles.scanButtonText}>Escanear</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Si tiene AMBOS (pagos Y asistencia) - mostrar UN SOLO botón que abre el modal con tabs */}
-            {((event.price && parseFloat(String(event.price)) > 0) || event.registration_form_url) && event.requires_attendance_check ? (
-              <TouchableOpacity
-                style={styles.viewAttendeesButton}
-                onPress={() => handleShowRegistrations(event.id, event.title, 'payments')}
-              >
-                <Ionicons name="list" size={16} color="#F59E0B" />
-                <Text style={styles.viewAttendeesText}>Gestión</Text>
-              </TouchableOpacity>
-            ) : (event.price && parseFloat(String(event.price)) > 0) || event.registration_form_url ? (
-              // Solo pagos
-              <TouchableOpacity
-                style={styles.viewAttendeesButton}
-                onPress={() => handleShowRegistrations(event.id, event.title, 'payments')}
-              >
-                <Ionicons name="card" size={16} color="#F59E0B" />
-                <Text style={styles.viewAttendeesText}>Pagos</Text>
-              </TouchableOpacity>
-            ) : event.requires_attendance_check ? (
-              // Solo asistencia
-              <TouchableOpacity
-                style={[styles.viewAttendeesButton, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}
-                onPress={() => handleShowRegistrations(event.id, event.title, 'attendance')}
-              >
-                <Ionicons name="list" size={16} color="#8B5CF6" />
-                <Text style={[styles.viewAttendeesText, { color: '#8B5CF6' }]}>Asistencia</Text>
-              </TouchableOpacity>
-            ) : (
-              // Sin pagos ni asistencia - eventos gratuitos simples
-              <TouchableOpacity
-                style={styles.viewAttendeesButton}
-                onPress={() => handleShowAttendees(event.id, event.title)}
-              >
-                <Ionicons name="list" size={16} color="#F59E0B" />
-                <Text style={styles.viewAttendeesText}>Lista</Text>
-              </TouchableOpacity>
-            )}
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.removeButton,
-                pressed && { opacity: 0.6 }
-              ]}
-              onPress={() => {
-                console.log('Delete hosted pressed:', event.id);
-                handleDeleteHosted(event.id);
-              }}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            >
-              <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </Pressable>
-          </View>
-        </View>
-      </View>
+        <TouchableOpacity
+          style={styles.unsaveBtn}
+          onPress={() => handleUnsave(event.id)}
+        >
+          <Ionicons name="bookmark" size={16} color="#4ADE80" />
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
-  const renderSavedItem = (item: SavedEventData, index: number) => {
-    const { event, registration } = item;
-    const gradient = getCategoryGradient(event.category);
-    const icon = getCategoryIcon(event.category);
-
-    // Check if event has price
-    const eventPrice = event.price ? parseFloat(String(event.price)) : 0;
-    const hasPrice = eventPrice > 0;
-
-    // Check registration status
-    const isApproved = registration?.status === 'approved';
-    const isPending = registration?.status === 'pending';
-    const isRejected = registration?.status === 'rejected';
+  const renderAttendedItem = (item: any) => {
+    const event = item.event || item;
+    const imageUri = event.image || event.image_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30';
+    const count = item.attended?.count;
 
     return (
-      <Animated.View
-        key={event.id}
-        style={styles.galleryCard}
-        entering={FadeInDown.delay(index * 50).springify()}
-        layout={Layout.springify()}
+      <TouchableOpacity
+        key={`attended-${event.id}`}
+        style={styles.attendedItem}
+        onPress={() => { Haptics.selectionAsync(); router.push(`/event/${event.id}`); }}
+        onLongPress={() => handleRemoveAttended(event.id)}
+        delayLongPress={500}
       >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push(`/event/${event.id}`)}
-          style={styles.galleryCardTouch}
-        >
-          <LinearGradient
-            colors={gradient}
-            style={styles.galleryGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            {event.image ? (
-              <Image source={{ uri: event.image }} style={styles.savedPosterImage} />
-            ) : (
-              <View style={styles.cardIconContainer}>
-                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
-              </View>
-            )}
-            {hasPrice && !isApproved && !isPending && !isRejected && (
-              <View style={styles.priceBadge}>
-                <Text style={styles.priceBadgeText}>Q{eventPrice.toFixed(2)}</Text>
-              </View>
-            )}
-            {isApproved && (
-              <View style={styles.confirmedBadge}>
-                <Ionicons name="checkmark-circle" size={12} color="#fff" />
-                <Text style={styles.confirmedBadgeText}>Confirmado</Text>
-              </View>
-            )}
-            {isPending && (
-              <View style={styles.pendingBadge}>
-                <Ionicons name="time" size={12} color="#fff" />
-                <Text style={styles.pendingBadgeText}>Pendiente</Text>
-              </View>
-            )}
-            {isRejected && (
-              <View style={styles.rejectedBadge}>
-                <Ionicons name="close-circle" size={12} color="#fff" />
-                <Text style={styles.rejectedBadgeText}>Rechazado</Text>
-              </View>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {event.title}
-          </Text>
-          {event.date && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText}>{event.date}</Text>
-            </View>
-          )}
-          {event.location && (
-            <View style={styles.cardInfo}>
-              <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.cardInfoText} numberOfLines={1}>
-                {event.location}
+        <Image source={{ uri: imageUri }} style={styles.attendedImage} />
+        <View style={styles.attendedInfo}>
+          <Text style={styles.attendedTitle} numberOfLines={1}>{event.title}</Text>
+          <View style={styles.attendedMeta}>
+            <Feather name="calendar" size={12} color="#94A3B8" />
+            {event.date && (
+              <Text style={styles.attendedDate}>
+                {format(new Date(event.date.substring(0, 10) + 'T12:00:00'), 'd MMMM yyyy', { locale: es })}
               </Text>
-            </View>
-          )}
-
-
-          <View style={styles.cardActions}>
-            {isRejected ? (
-              <View style={styles.rejectionContainer}>
-                {registration?.rejection_reason && (
-                  <View style={styles.rejectionReasonBox}>
-                    <Text style={styles.rejectionLabel}>Razón: </Text>
-                    <Text style={styles.rejectionText} numberOfLines={2}>
-                      {registration.rejection_reason}
-                    </Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={styles.resubmitButton}
-                  onPress={() => handleResubmit(event.id)}
-                >
-                  <Ionicons name="refresh" size={16} color="#8B5CF6" />
-                  <Text style={styles.resubmitText}>Reenviar</Text>
-                </TouchableOpacity>
-              </View>
-            ) : hasPrice && event.user_id && !isPending && !isApproved ? (
-              <TouchableOpacity
-                style={styles.reserveButton}
-                onPress={() => setPaymentModal({ visible: true, event })}
-              >
-                <Ionicons name="card" size={18} color="#F59E0B" />
-                <Text style={styles.reserveButtonText}>Reservar</Text>
-              </TouchableOpacity>
-            ) : isPending ? (
-              <View style={styles.pendingButton}>
-                <Ionicons name="time" size={18} color="#F59E0B" />
-                <Text style={styles.pendingButtonText}>En revisión</Text>
-              </View>
-            ) : event.requires_attendance_check ? (
-              <View style={styles.hostManagedAttendance}>
-                <Ionicons name="qr-code" size={18} color="#8B5CF6" />
-                <Text style={styles.hostManagedText}>Asistencia por QR</Text>
-              </View>
-            ) : (isApproved || (!hasPrice && !isPending && !event.user_id)) ? (
-              <TouchableOpacity
-                style={styles.attendButton}
-                onPress={() => handleMarkAttended(event.id, event.title, event.image || undefined, event.category)}
-              >
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.attendButtonText}>Asistí</Text>
-              </TouchableOpacity>
-            ) : null}
-            <Pressable
-              style={({ pressed }) => [
-                styles.removeButton,
-                pressed && { opacity: 0.6 }
-              ]}
-              onPress={() => {
-                console.log('Delete saved pressed:', event.id);
-                handleUnsave(event.id);
-              }}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            >
-              <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            </Pressable>
+            )}
           </View>
         </View>
-      </Animated.View>
+        <View style={styles.attendedStatus}>
+          {count && count > 1 ? (
+            <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+              <Text style={{ color: '#000', fontSize: 10, fontWeight: 'bold' }}>X{count}</Text>
+            </View>
+          ) : (
+            <Text style={styles.statusText}>Asistido</Text>
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
 
-  const renderAttendedItem = (item: AttendedEventData, index: number) => {
-    const { event, attended } = item;
-    const gradient = getCategoryGradient(event.category);
-    const icon = getCategoryIcon(event.category);
+  const renderHostedCard = ({ item }: { item: HostedEventData }) => {
+    const event = item.event as any;
+    const attendees = event.attendee_count || 0;
+    // saves_count: número real de gente interesada (guardados)
+    const saves = event.saves_count || 0;
+    const registrations = event.registrations_count || 0;
+
+    const hasPrice = event.price && parseFloat(String(event.price)) > 0;
+    const hasForm = !!event.registration_form_url;
+    const hasAttendance = !!event.requires_attendance_check;
+    const imageUri = event.image || event.image_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30';
 
     return (
-      <Animated.View
-        key={event.id}
-        style={styles.posterCard}
-        entering={FadeInDown.delay(index * 50).springify()}
-        layout={Layout.springify()}
+      <TouchableOpacity
+        style={styles.hostCard}
+        onPress={() => { Haptics.selectionAsync(); router.push(`/event/${event.id}`); }}
+        activeOpacity={0.95}
       >
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => setReactionsModal({ visible: true, attendedEvent: item })}
-          onLongPress={() => router.push(`/event/${event.id}`)}
-          style={styles.posterCardTouch}
-        >
-          <LinearGradient
-            colors={gradient}
-            style={styles.posterGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+        {/* Header Event Info */}
+        <View style={styles.hostHeader}>
+          <Image source={{ uri: imageUri }} style={styles.hostThumb} />
+          <View style={styles.hostInfo}>
+            <Text style={styles.hostTitle} numberOfLines={1}>{event.title}</Text>
+            <View style={styles.hostMetaRow}>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(event.status || 'draft') + '20' }]}>
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(event.status || 'draft') }]} />
+                <Text style={[styles.statusLabel, { color: getStatusColor(event.status || 'draft') }]}>
+                  {getStatusLabel(event.status || 'draft')}
+                </Text>
+              </View>
+              {event.date && (
+                <Text style={styles.hostDate}>
+                  {format(new Date(event.date.substring(0, 10) + 'T12:00:00'), 'd MMM', { locale: es })}
+                </Text>
+              )}
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.moreBtn}
+            onPress={(e) => { e.stopPropagation(); handleDeleteHosted(event.id); }}
           >
-            {event.image ? (
-              <Image source={{ uri: event.image }} style={styles.posterImage} />
-            ) : (
-              <View style={styles.galleryIconContainer}>
-                <Ionicons name={icon as any} size={40} color="rgba(255,255,255,0.6)" />
-              </View>
-            )}
+            <Feather name="trash-2" size={18} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
 
-            {attended.emoji_rating && (
-              <View style={styles.posterEmojiOverlay}>
-                <Text style={styles.posterEmojiText}>{attended.emoji_rating}</Text>
-              </View>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
+        {/* Dashboard Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{attendees}</Text>
+            <Text style={styles.statLabel}>Asistentes</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{saves}</Text>
+            <Text style={styles.statLabel}>Interesados</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{registrations}</Text>
+            <Text style={styles.statLabel}>Registros</Text>
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.actionRow}>
+          {/* Gestionar - opens proper modal based on event type */}
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              if (hasPrice || hasForm || hasAttendance) {
+                handleShowRegistrations(event.id, event.title, hasPrice || hasForm ? 'payments' : 'attendance');
+              } else {
+                handleShowAttendees(event.id, event.title);
+              }
+            }}
+          >
+            <Feather name="users" size={16} color="#fff" />
+            <Text style={styles.actionText}>Gestionar</Text>
+          </TouchableOpacity>
+
+          {/* Escanear - solo si el evento requiere control de asistencia */}
+          {hasAttendance ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.scanBtn]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenScanner(event.id, event.title);
+              }}
+            >
+              <Ionicons name="qr-code-outline" size={16} color="#000" />
+              <Text style={[styles.actionText, { color: '#000' }]}>Escanear</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#1e293b' }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                router.push({ pathname: '/event/[id]', params: { id: event.id } });
+              }}
+            >
+              <Feather name="edit-2" size={16} color="#94A3B8" />
+              <Text style={[styles.actionText, { color: '#94A3B8' }]}>Ver evento</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
+
+  const renderCollectionTab = () => (
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+    >
+      {savedEvents.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Feather name="bookmark" size={40} color="#334155" />
+          <Text style={styles.emptyText}>No tienes eventos en interesados</Text>
+        </View>
+      ) : (
+        <View style={styles.masonryGrid}>
+          <View style={styles.masonryCol}>
+            {savedEvents.filter((_, i) => i % 2 === 0).map((item, i) => renderSavedCard(item, i))}
+          </View>
+          <View style={styles.masonryCol}>
+            {savedEvents.filter((_, i) => i % 2 !== 0).map((item, i) => renderSavedCard(item, i))}
+          </View>
+        </View>
+      )}
+      <View style={{ height: 100 }} />
+    </ScrollView>
+  );
+
+  const renderAttendedTab = () => (
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+    >
+      {attendedEvents.length === 0 ? (
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="ticket-confirmation-outline" size={40} color="#334155" />
+          <Text style={styles.emptyText}>Tu colección está vacía</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {attendedEvents.map(renderAttendedItem)}
+        </View>
+      )}
+      <View style={{ height: 100 }} />
+    </ScrollView>
+  );
+
+  const renderHostedTab = () => (
+    <View style={{ flex: 1 }}>
+      {hostedEvents.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.emptyIconInfo}>
+            <Feather name="calendar" size={48} color="#334155" />
+          </View>
+          <Text style={styles.emptyTitle}>No has creado eventos</Text>
+          <Text style={styles.emptySubtitle}>
+            Organiza tu primer evento y adminístralo desde aquí.
+          </Text>
+          <TouchableOpacity style={styles.createFirstBtn} onPress={() => router.push('/create')}>
+            <Text style={styles.createFirstText}>Crear Evento</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={hostedEvents}
+          renderItem={renderHostedCard}
+          keyExtractor={item => item.event.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+        />
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      {/* Toast notification */}
-      <AnimatedToast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        duration={2000}
-        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar barStyle="light-content" />
 
-      {/* New data banner */}
-      <FreshDataBanner
-        visible={hasNewSavedData}
-        message="Hay actualizaciones"
-        onPress={handleRefreshFromBanner}
-        onDismiss={clearNewDataFlags}
-      />
+      {renderHeader()}
 
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Text style={styles.title}>Mis Eventos</Text>
-        <Text style={styles.subtitle}>Tu historial personal</Text>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'saved' && styles.tabActive]}
-          onPress={() => setActiveTab('saved')}
-        >
-          <Ionicons
-            name="bookmark"
-            size={20}
-            color={activeTab === 'saved' ? '#8B5CF6' : '#6B7280'}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'saved' && styles.tabTextActive,
-            ]}
-          >
-            Guardados ({savedEvents.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'attended' && styles.tabActive]}
-          onPress={() => setActiveTab('attended')}
-        >
-          <Ionicons
-            name="checkmark-done"
-            size={20}
-            color={activeTab === 'attended' ? '#10B981' : '#6B7280'}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'attended' && styles.tabTextActive,
-              activeTab === 'attended' && { color: '#10B981' },
-            ]}
-          >
-            Asistidos ({attendedEvents.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'hosted' && styles.tabActive]}
-          onPress={() => setActiveTab('hosted')}
-        >
-          <Ionicons
-            name="person-circle"
-            size={20}
-            color={activeTab === 'hosted' ? '#F59E0B' : '#6B7280'}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'hosted' && styles.tabTextActive,
-              activeTab === 'hosted' && { color: '#F59E0B' },
-            ]}
-          >
-            Anfitrión ({hostedEvents.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <GestureScrollView
-        style={styles.content}
-        contentContainerStyle={
-          activeTab === 'attended' && attendedEvents.length > 0
-            ? styles.posterGrid
-            : activeTab === 'saved' && savedEvents.length > 0
-              ? styles.galleryGrid
-              : styles.listContent
-        }
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8B5CF6"
-          />
-        }
-      >
+      <View style={styles.content}>
         {isLoading ? (
-          <EventListSkeleton count={3} />
-        ) : activeTab === 'saved' ? (
-          savedEvents.length === 0 ? (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
-              <Ionicons name="bookmark-outline" size={64} color="#4B5563" />
-              <Text style={styles.emptyTitle}>Sin eventos guardados</Text>
-              <Text style={styles.emptyText}>
-                Los eventos que guardes aparecerán aquí
-              </Text>
-              <TouchableOpacity
-                style={styles.exploreButton}
-                onPress={() => router.push('/')}
-              >
-                <Ionicons name="compass" size={18} color="#fff" />
-                <Text style={styles.exploreButtonText}>Explorar eventos</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ) : (
-            savedEvents.map((item, index) => renderSavedItem(item, index))
-          )
-        ) : activeTab === 'attended' ? (
-          attendedEvents.length === 0 ? (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
-              <Ionicons name="checkmark-done-outline" size={64} color="#4B5563" />
-              <Text style={styles.emptyTitle}>Sin eventos asistidos</Text>
-              <Text style={styles.emptyText}>
-                Marca los eventos a los que has asistido
-              </Text>
-            </Animated.View>
-          ) : (
-            <>
-              {attendedEvents.map((item, index) => renderAttendedItem(item, index))}
-              <View style={{ width: '100%', height: insets.bottom + 20 }} />
-            </>
-          )
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4ADE80" />
+          </View>
         ) : (
-          hostedEvents.length === 0 ? (
-            <Animated.View entering={FadeIn.duration(300)} style={styles.emptyState}>
-              <Ionicons name="person-circle-outline" size={64} color="#4B5563" />
-              <Text style={styles.emptyTitle}>Sin eventos organizados</Text>
-              <Text style={styles.emptyText}>
-                Tus eventos creados aparecerán aquí
-              </Text>
-            </Animated.View>
-          ) : (
-            <>
-              {hostedEvents.map((item, index) => (
-                <Animated.View
-                  key={item.event.id}
-                  entering={FadeInDown.delay(index * 80).duration(400)}
-                  layout={Layout.springify()}
-                >
-                  {renderHostedItem(item)}
-                </Animated.View>
-              ))}
-              <View style={{ height: insets.bottom + 20 }} />
-            </>
-          )
+          activeTab === 'collection' ? renderCollectionTab() :
+            activeTab === 'attended' ? renderAttendedTab() :
+              renderHostedTab()
         )}
+      </View>
 
-        {(activeTab === 'saved' && savedEvents.length > 0) && (
-          <View style={{ height: insets.bottom + 20 }} />
-        )}
-      </GestureScrollView>
-
-      <EmojiRating
-        visible={ratingModal.visible}
-        onClose={() => setRatingModal({ visible: false, eventId: '', eventTitle: '', eventCategory: 'food' })}
-        onSelect={handleSelectEmoji}
-        eventTitle={ratingModal.eventTitle}
+      {/* ---- QR Scanner ---- */}
+      <QRScanner
+        visible={scannerModal.visible}
+        onClose={() => setScannerModal({ visible: false, eventId: '', eventTitle: '' })}
+        onScan={handleQRScanned}
+        eventTitle={scannerModal.eventTitle}
       />
 
-      {/* Collectible Animation */}
-      <CollectibleAnimation
-        visible={collectibleAnimation.visible}
-        eventTitle={collectibleAnimation.eventTitle}
-        eventImage={collectibleAnimation.eventImage}
-        eventCategory={collectibleAnimation.eventCategory}
-        emoji={collectibleAnimation.emoji}
-        onComplete={handleCollectibleAnimationComplete}
-      />
-
-      {/* Event Reactions Modal */}
-      {reactionsModal.attendedEvent && (
-        <EventReactionsModal
-          visible={reactionsModal.visible}
-          onClose={() => setReactionsModal({ visible: false, attendedEvent: null })}
-          event={{
-            id: reactionsModal.attendedEvent.event.id,
-            title: reactionsModal.attendedEvent.event.title,
-            image: reactionsModal.attendedEvent.event.image,
-            category: reactionsModal.attendedEvent.event.category,
-            date: reactionsModal.attendedEvent.event.date ?? undefined,
-          }}
-          currentReaction={{
-            emoji_rating: reactionsModal.attendedEvent.attended.emoji_rating,
-            reaction_sticker: reactionsModal.attendedEvent.attended.reaction_sticker,
-            reaction_gif: reactionsModal.attendedEvent.attended.reaction_gif,
-            reaction_comment: reactionsModal.attendedEvent.attended.reaction_comment,
-          }}
-          onSave={async (reaction) => {
-            await updateEventReaction(reactionsModal.attendedEvent!.event.id, reaction);
-            // Modal now manages its own state and reloads reactions
-          }}
-        />
-      )}
-
-      {/* Attendees Modal */}
-      {attendeesModal.visible && (
+      {/* ---- Attendees Modal ---- */}
+      <Modal
+        visible={attendeesModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAttendeesModal(prev => ({ ...prev, visible: false }))}
+      >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setAttendeesModal(prev => ({ ...prev, visible: false }))}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setAttendeesModal(prev => ({ ...prev, visible: false }))} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Asistentes</Text>
+              <Text style={styles.modalTitle}>Interesados</Text>
               <TouchableOpacity onPress={() => setAttendeesModal(prev => ({ ...prev, visible: false }))}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalSubtitle}>{attendeesModal.eventTitle}</Text>
-
             {attendeesModal.loading ? (
-              <View style={styles.centered}>
-                <ActivityIndicator color="#F59E0B" size="large" />
-              </View>
+              <View style={styles.centered}><ActivityIndicator color="#4ADE80" size="large" /></View>
             ) : attendeesModal.attendees.length === 0 ? (
-              <View style={styles.emptyModal}>
-                <Text style={styles.emptyModalText}>Aún no hay interesados</Text>
-              </View>
+              <View style={styles.emptyModal}><Text style={styles.emptyModalText}>Aún no hay interesados</Text></View>
             ) : (
               <ScrollView style={styles.attendeesList}>
-                {attendeesModal.attendees.map((attendee) => (
+                {attendeesModal.attendees.map((attendee: any) => (
                   <View key={attendee.id} style={styles.attendeeItem}>
                     {attendee.profiles?.avatar_url ? (
                       <Image source={{ uri: attendee.profiles.avatar_url }} style={styles.attendeeAvatar} />
@@ -1225,15 +746,11 @@ export default function MyEventsScreen() {
                       </View>
                     )}
                     <View style={styles.attendeeInfo}>
-                      <Text style={styles.attendeeName}>
-                        {attendee.profiles?.full_name || 'Usuario'}
-                      </Text>
-                      <Text style={styles.attendeeEmail}>
-                        {attendee.profiles?.email || 'Sin email'}
-                      </Text>
+                      <Text style={styles.attendeeName}>{attendee.profiles?.full_name || 'Usuario'}</Text>
+                      <Text style={styles.attendeeEmail}>{attendee.profiles?.email || 'Sin email'}</Text>
                     </View>
                     <Text style={styles.attendeeDate}>
-                      {new Date(attendee.saved_at).toLocaleDateString()}
+                      {attendee.saved_at ? new Date(attendee.saved_at).toLocaleDateString('es-MX') : ''}
                     </Text>
                   </View>
                 ))}
@@ -1241,9 +758,9 @@ export default function MyEventsScreen() {
             )}
           </View>
         </View>
-      )}
+      </Modal>
 
-      {/* Registrations Modal */}
+      {/* ---- Registrations Modal ---- */}
       <Modal
         visible={registrationsModal.visible}
         transparent
@@ -1251,13 +768,10 @@ export default function MyEventsScreen() {
         onRequestClose={() => setRegistrationsModal(prev => ({ ...prev, visible: false }))}
       >
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setRegistrationsModal(prev => ({ ...prev, visible: false }))}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setRegistrationsModal(prev => ({ ...prev, visible: false }))} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Solicitudes de Registro</Text>
+              <Text style={styles.modalTitle}>Gestión</Text>
               <TouchableOpacity onPress={() => setRegistrationsModal(prev => ({ ...prev, visible: false }))}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
@@ -1265,106 +779,77 @@ export default function MyEventsScreen() {
             <Text style={styles.modalSubtitle}>{registrationsModal.eventTitle}</Text>
 
             {/* Tabs dentro del modal */}
-            {(registrationsModal.hasPayments && registrationsModal.hasAttendance) && (
+            {registrationsModal.hasPayments && registrationsModal.hasAttendance && (
               <View style={styles.modalTabsContainer}>
                 <TouchableOpacity
-                  style={[
-                    styles.modalTab,
-                    registrationsModal.activeTab === 'payments' && styles.modalTabActive
-                  ]}
+                  style={[styles.modalTab, registrationsModal.activeTab === 'payments' && styles.modalTabActive]}
                   onPress={() => handleTabChange('payments')}
                 >
                   <Ionicons name="card" size={18} color={registrationsModal.activeTab === 'payments' ? '#F59E0B' : '#6B7280'} />
-                  <Text style={[styles.modalTabText, registrationsModal.activeTab === 'payments' && { color: '#F59E0B' }]}>
-                    Pagos
-                  </Text>
+                  <Text style={[styles.modalTabText, registrationsModal.activeTab === 'payments' && { color: '#F59E0B' }]}>Pagos</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.modalTab,
-                    registrationsModal.activeTab === 'attendance' && styles.modalTabActive
-                  ]}
+                  style={[styles.modalTab, registrationsModal.activeTab === 'attendance' && styles.modalTabActive]}
                   onPress={() => handleTabChange('attendance')}
                 >
                   <Ionicons name="list" size={18} color={registrationsModal.activeTab === 'attendance' ? '#8B5CF6' : '#6B7280'} />
-                  <Text style={[styles.modalTabText, registrationsModal.activeTab === 'attendance' && { color: '#8B5CF6' }]}>
-                    Asistencia
-                  </Text>
+                  <Text style={[styles.modalTabText, registrationsModal.activeTab === 'attendance' && { color: '#8B5CF6' }]}>Asistencia</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {registrationsModal.loading ? (
-              <View style={styles.centered}>
-                <ActivityIndicator color="#F59E0B" size="large" />
-              </View>
+              <View style={styles.centered}><ActivityIndicator color="#F59E0B" size="large" /></View>
             ) : registrationsModal.activeTab === 'payments' ? (
-              // Tab de Pagos
               registrationsModal.registrations.length === 0 ? (
-                <View style={styles.emptyModal}>
-                  <Text style={styles.emptyModalText}>No hay solicitudes pendientes</Text>
-                </View>
+                <View style={styles.emptyModal}><Text style={styles.emptyModalText}>No hay solicitudes</Text></View>
               ) : (
                 <ScrollView style={styles.attendeesList}>
-                  {registrationsModal.registrations.map((registration) => (
-                    <View key={registration.id} style={styles.registrationItem}>
-                      {registration.user?.avatar_url ? (
-                        <Image source={{ uri: registration.user.avatar_url }} style={styles.attendeeAvatar} />
+                  {registrationsModal.registrations.map((reg: any) => (
+                    <View key={reg.id} style={styles.registrationItem}>
+                      {reg.user?.avatar_url ? (
+                        <Image source={{ uri: reg.user.avatar_url }} style={styles.attendeeAvatar} />
                       ) : (
                         <View style={styles.attendeeAvatarPlaceholder}>
                           <Ionicons name="person" size={20} color="#9CA3AF" />
                         </View>
                       )}
                       <View style={styles.registrationInfo}>
-                        <Text style={styles.attendeeName}>
-                          {registration.user?.full_name || 'Usuario'}
-                        </Text>
-                        <Text style={styles.attendeeEmail}>
-                          {registration.user?.email || 'Sin email'}
-                        </Text>
+                        <Text style={styles.attendeeName}>{reg.user?.full_name || 'Usuario'}</Text>
+                        <Text style={styles.attendeeEmail}>{reg.user?.email || 'Sin email'}</Text>
                         <View style={styles.statusBadgeContainer}>
-                          {registration.status === 'pending' && (
-                            <View style={[styles.statusBadge, { backgroundColor: '#F59E0B' }]}>
+                          {reg.status === 'pending' && (
+                            <View style={[styles.statusBadgeSmall, { backgroundColor: '#F59E0B' }]}>
                               <Text style={styles.statusBadgeText}>Pendiente</Text>
                             </View>
                           )}
-                          {registration.status === 'approved' && (
-                            <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
+                          {reg.status === 'approved' && (
+                            <View style={[styles.statusBadgeSmall, { backgroundColor: '#10B981' }]}>
                               <Text style={styles.statusBadgeText}>Aprobado</Text>
                             </View>
                           )}
-                          {registration.status === 'rejected' && (
-                            <View style={[styles.statusBadge, { backgroundColor: '#EF4444' }]}>
+                          {reg.status === 'rejected' && (
+                            <View style={[styles.statusBadgeSmall, { backgroundColor: '#EF4444' }]}>
                               <Text style={styles.statusBadgeText}>Rechazado</Text>
                             </View>
                           )}
                         </View>
-                        {registration.payment_receipt_url && (
+                        {reg.payment_receipt_url && (
                           <TouchableOpacity
                             style={styles.viewReceiptButton}
-                            onPress={() => setReceiptModal({
-                              visible: true,
-                              imageUrl: registration.payment_receipt_url!,
-                              userName: registration.user?.full_name || 'Usuario'
-                            })}
+                            onPress={() => setReceiptModal({ visible: true, imageUrl: reg.payment_receipt_url!, userName: reg.user?.full_name || 'Usuario' })}
                           >
                             <Ionicons name="image" size={14} color="#8B5CF6" />
                             <Text style={styles.viewReceiptText}>Ver comprobante</Text>
                           </TouchableOpacity>
                         )}
                       </View>
-                      {registration.status === 'pending' && (
+                      {reg.status === 'pending' && (
                         <View style={styles.registrationActions}>
-                          <TouchableOpacity
-                            style={styles.approveButton}
-                            onPress={() => handleApprove(registration.id)}
-                          >
+                          <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(reg.id)}>
                             <Ionicons name="checkmark" size={18} color="#10B981" />
                           </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.rejectButton}
-                            onPress={() => handleRejectClick(registration.id, registration.user?.full_name || 'Usuario')}
-                          >
+                          <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectClick(reg.id, reg.user?.full_name || 'Usuario')}>
                             <Ionicons name="close" size={18} color="#EF4444" />
                           </TouchableOpacity>
                         </View>
@@ -1376,13 +861,9 @@ export default function MyEventsScreen() {
             ) : (
               // Tab de Asistencia
               attendanceListModal.loading ? (
-                <View style={styles.centered}>
-                  <ActivityIndicator color="#8B5CF6" size="large" />
-                </View>
+                <View style={styles.centered}><ActivityIndicator color="#8B5CF6" size="large" /></View>
               ) : attendanceListModal.attendees.length === 0 ? (
-                <View style={styles.emptyModal}>
-                  <Text style={styles.emptyModalText}>No hay asistentes registrados</Text>
-                </View>
+                <View style={styles.emptyModal}><Text style={styles.emptyModalText}>No hay asistentes registrados</Text></View>
               ) : (
                 <>
                   <View style={styles.attendanceStats}>
@@ -1408,18 +889,11 @@ export default function MyEventsScreen() {
                           </View>
                         )}
                         <View style={styles.attendeeInfo}>
-                          <Text style={styles.attendeeName}>
-                            {attendee.user_name || 'Usuario'}
-                          </Text>
-                          <Text style={styles.attendeeEmail}>
-                            {attendee.user_email || 'Sin email'}
-                          </Text>
+                          <Text style={styles.attendeeName}>{attendee.user_name || 'Usuario'}</Text>
+                          <Text style={styles.attendeeEmail}>{attendee.user_email || 'Sin email'}</Text>
                           {attendee.scanned_by_host && attendee.scanned_at && (
                             <Text style={styles.scannedTime}>
-                              ✓ Escaneado {new Date(attendee.scanned_at).toLocaleTimeString('es-MX', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
+                              ✓ Escaneado {new Date(attendee.scanned_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                             </Text>
                           )}
                         </View>
@@ -1442,7 +916,7 @@ export default function MyEventsScreen() {
         </View>
       </Modal>
 
-      {/* Reject Reason Modal */}
+      {/* ---- Reject Reason Modal ---- */}
       <Modal
         visible={rejectModal.visible}
         transparent
@@ -1450,10 +924,7 @@ export default function MyEventsScreen() {
         onRequestClose={() => setRejectModal({ visible: false, registrationId: '', userName: '', reason: '' })}
       >
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setRejectModal({ visible: false, registrationId: '', userName: '', reason: '' })}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setRejectModal({ visible: false, registrationId: '', userName: '', reason: '' })} />
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 20 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Rechazar Solicitud</Text>
@@ -1461,12 +932,12 @@ export default function MyEventsScreen() {
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
-
-            <View style={styles.rejectModalBody}>
-              <Text style={styles.rejectModalText}>
-                ¿Estás seguro de rechazar la solicitud de <Text style={styles.rejectModalName}>{rejectModal.userName}</Text>?
+            <View style={{ padding: 16, gap: 12 }}>
+              <Text style={{ color: '#CBD5E1', lineHeight: 22 }}>
+                ¿Estás seguro de rechazar la solicitud de{' '}
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{rejectModal.userName}</Text>?
               </Text>
-              <Text style={styles.rejectModalLabel}>Razón del rechazo:</Text>
+              <Text style={{ color: '#94A3B8', fontSize: 14 }}>Razón del rechazo:</Text>
               <TextInput
                 style={styles.rejectInput}
                 placeholder="Ej: No cumple con los requisitos..."
@@ -1478,7 +949,7 @@ export default function MyEventsScreen() {
                 textAlignVertical="top"
               />
               <TouchableOpacity
-                style={[styles.confirmRejectButton, !rejectModal.reason.trim() && styles.confirmRejectButtonDisabled]}
+                style={[styles.confirmRejectButton, !rejectModal.reason.trim() && { opacity: 0.5 }]}
                 onPress={handleConfirmReject}
                 disabled={!rejectModal.reason.trim()}
               >
@@ -1490,234 +961,32 @@ export default function MyEventsScreen() {
         </View>
       </Modal>
 
-      {/* QR Scanner Modal */}
-      <QRScanner
-        visible={scannerModal.visible}
-        onClose={() => setScannerModal({ visible: false, eventId: '', eventTitle: '' })}
-        onScan={handleQRScanned}
-        eventTitle={scannerModal.eventTitle}
-      />
-
-      {/* Attendance List Modal */}
-      <Modal
-        visible={attendanceListModal.visible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Lista de Asistencia</Text>
-              <TouchableOpacity onPress={() => setAttendanceListModal(prev => ({ ...prev, visible: false }))}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalSubtitle}>{attendanceListModal.eventTitle}</Text>
-
-            {attendanceListModal.loading ? (
-              <View style={styles.centered}>
-                <ActivityIndicator color="#8B5CF6" size="large" />
-              </View>
-            ) : attendanceListModal.attendees.length === 0 ? (
-              <View style={styles.emptyModal}>
-                <Text style={styles.emptyModalText}>No hay asistentes registrados</Text>
-              </View>
-            ) : (
-              <>
-                <View style={styles.attendanceStats}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statNumber}>{attendanceListModal.attendees.filter(a => a.confirmed).length}</Text>
-                    <Text style={styles.statLabel}>Confirmados</Text>
-                  </View>
-                  <View style={[styles.statBox, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
-                    <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>
-                      {attendanceListModal.attendees.filter(a => a.attended || a.scanned_by_host).length}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: '#A78BFA' }]}>Asistieron</Text>
-                  </View>
-                </View>
-                <ScrollView style={styles.attendeesList}>
-                  {attendanceListModal.attendees.map((attendee, index) => (
-                    <View key={`${attendee.user_id}-${index}`} style={styles.attendeeItem}>
-                      {attendee.user_avatar ? (
-                        <Image source={{ uri: attendee.user_avatar }} style={styles.attendeeAvatar} />
-                      ) : (
-                        <View style={styles.attendeeAvatarPlaceholder}>
-                          <Ionicons name="person" size={20} color="#9CA3AF" />
-                        </View>
-                      )}
-                      <View style={styles.attendeeInfo}>
-                        <Text style={styles.attendeeName}>
-                          {attendee.user_name || 'Usuario'}
-                        </Text>
-                        <Text style={styles.attendeeEmail}>
-                          {attendee.user_email || 'Sin email'}
-                        </Text>
-                        {attendee.scanned_by_host && attendee.scanned_at && (
-                          <Text style={styles.scannedTime}>
-                            ✓ Escaneado {new Date(attendee.scanned_at).toLocaleTimeString('es-MX', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </Text>
-                        )}
-                      </View>
-                      {attendee.scanned_by_host || attendee.attended ? (
-                        <View style={styles.attendedBadge}>
-                          <Ionicons name="checkmark-circle" size={20} color="#8B5CF6" />
-                        </View>
-                      ) : attendee.confirmed ? (
-                        <View style={styles.pendingAttendanceBadge}>
-                          <Ionicons name="time-outline" size={20} color="#F59E0B" />
-                        </View>
-                      ) : null}
-                    </View>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Receipt Viewer Modal */}
+      {/* ---- Receipt Viewer Modal ---- */}
       <Modal
         visible={receiptModal.visible}
         transparent
         animationType="fade"
         onRequestClose={() => setReceiptModal({ visible: false, imageUrl: '', userName: '' })}
       >
-        <View style={styles.receiptModalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setReceiptModal({ visible: false, imageUrl: '', userName: '' })}
-          />
-          <View style={styles.receiptModalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Comprobante de Pago</Text>
-                <Text style={styles.modalSubtitle}>{receiptModal.userName}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setReceiptModal({ visible: false, imageUrl: '', userName: '' })}>
-                <Ionicons name="close" size={28} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.receiptImageContainer}>
-              {receiptModal.imageUrl ? (
-                <Image
-                  source={{ uri: receiptModal.imageUrl }}
-                  style={styles.fullReceiptImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.centered}>
-                  <Ionicons name="image-outline" size={64} color="#6B7280" />
-                  <Text style={styles.emptyModalText}>No hay imagen disponible</Text>
-                </View>
-              )}
-            </View>
-
+        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.92)' }]}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setReceiptModal({ visible: false, imageUrl: '', userName: '' })} />
+          <View style={{ padding: 20, alignItems: 'center', gap: 16 }}>
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Comprobante de {receiptModal.userName}</Text>
+            <Image
+              source={{ uri: receiptModal.imageUrl }}
+              style={{ width: width - 40, height: (width - 40) * 1.4, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <TouchableOpacity
-              style={styles.closeReceiptButton}
+              style={[styles.confirmRejectButton, { backgroundColor: '#334155' }]}
               onPress={() => setReceiptModal({ visible: false, imageUrl: '', userName: '' })}
             >
-              <Text style={styles.closeReceiptText}>Cerrar</Text>
+              <Text style={styles.confirmRejectText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Payment Modal */}
-      <Modal
-        visible={paymentModal.visible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPaymentModal({ visible: false, event: null })}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setPaymentModal({ visible: false, event: null })}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Comprobante de Pago</Text>
-              <TouchableOpacity onPress={() => setPaymentModal({ visible: false, event: null })}>
-                <Ionicons name="close" size={28} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.attendeesList}>
-              {paymentModal.event?.price && (
-                <View style={styles.priceCard}>
-                  <Text style={styles.priceLabel}>Precio del Evento</Text>
-                  <Text style={styles.priceAmount}>Q{paymentModal.event.price.toFixed(2)}</Text>
-                </View>
-              )}
-
-              {paymentModal.event?.bank_name && paymentModal.event?.bank_account_number && (
-                <View style={styles.bankInfo}>
-                  <Text style={styles.bankInfoLabel}>Información de Pago</Text>
-                  <View style={styles.bankInfoRow}>
-                    <Ionicons name="business" size={16} color="#9CA3AF" />
-                    <Text style={styles.bankInfoText}>{paymentModal.event.bank_name}</Text>
-                  </View>
-                  <View style={styles.bankInfoRow}>
-                    <Ionicons name="card" size={16} color="#9CA3AF" />
-                    <Text style={styles.bankInfoText}>{paymentModal.event.bank_account_number}</Text>
-                  </View>
-                </View>
-              )}
-
-              <Text style={styles.uploadLabel}>Sube el comprobante de pago</Text>
-
-              {paymentReceiptUrl ? (
-                <View style={styles.receiptPreview}>
-                  <Image source={{ uri: paymentReceiptUrl }} style={styles.receiptImage} />
-                  <TouchableOpacity
-                    style={styles.removeReceipt}
-                    onPress={() => setPaymentReceiptUrl('')}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.uploadButton}
-                  onPress={pickReceipt}
-                >
-                  <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
-                  <Text style={styles.uploadButtonText}>Seleccionar Imagen</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.submitPaymentButton,
-                  (!paymentReceiptUrl || isSubmitting) && styles.submitPaymentButtonDisabled
-                ]}
-                onPress={handleSubmitPayment}
-                disabled={!paymentReceiptUrl || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                    <Text style={styles.submitPaymentText}>Enviar Solicitud</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -1725,437 +994,511 @@ export default function MyEventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: '#000',
   },
   header: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    zIndex: 10,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  tabsContainer: {
+  headerTop: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  tab: {
-    flex: 1,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    gap: 6,
   },
-  tabActive: {
-    backgroundColor: '#2A2A2A',
-  },
-  tabText: {
+  createButtonText: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
   },
-  tabTextActive: {
-    color: '#8B5CF6',
+  tabContainer: {
+    flexDirection: 'row',
+    gap: 24,
+  },
+  tab: {
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeTab: {
+    borderBottomColor: '#4ADE80',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#4ADE80',
+  },
+  badge: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   content: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    padding: 20,
+  },
   listContent: {
     padding: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  sectionCount: {
+    fontSize: 14,
+    color: '#94A3B8',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  // Masonry Grid
+  masonryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  masonryCol: {
+    width: '48%',
     gap: 16,
   },
-  galleryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 20,
-  },
-  posterGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    paddingHorizontal: 12,
-    gap: 6,
-  },
-  eventCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1F1F1F',
+  savedCard: {
+    width: '100%',
+    aspectRatio: 0.75,
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#1E293B',
+    position: 'relative',
   },
-  cardGradient: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardImage: {
-    position: 'absolute',
+  savedImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
-  cardIconContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 100,
-  },
-  emojiOverlay: {
+  savedGradient: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  emojiText: {
-    fontSize: 20,
-  },
-  attendeeBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  attendeeBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  cardContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  cardInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  cardInfoText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    flex: 1,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  attendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  attendButtonText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  rateButton: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  rateButtonText: {
-    color: '#8B5CF6',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  removeButton: {
-    padding: 8,
-    minWidth: 40,
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reserveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  reserveButtonText: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  priceBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.9)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  priceBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  confirmedBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  confirmedBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  pendingBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.9)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  pendingBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  rejectedBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  rejectedBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  pendingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    opacity: 0.7,
-  },
-  pendingButtonText: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  exploreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  exploreButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  viewAttendeesButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  viewAttendeesText: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
+    height: '65%',
     justifyContent: 'flex-end',
-    zIndex: 1000,
+    padding: 12,
+  },
+  unsaveBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 6,
+  },
+  savedContent: {
+    gap: 4,
+  },
+  savedTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  savedDate: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Attended List
+  listContainer: {
+    gap: 12,
+  },
+  attendedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    gap: 12,
+  },
+  attendedImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+  },
+  attendedInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  attendedTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  attendedMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  attendedDate: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  attendedStatus: {
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    color: '#4ADE80',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Hosted Card
+  hostCard: {
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 20,
+    gap: 16,
+  },
+  hostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  hostThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+  },
+  hostInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  hostTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  hostMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  hostDate: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  moreBtn: {
+    padding: 8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    padding: 16,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#1e293b',
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1e293b',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  scanBtn: {
+    backgroundColor: '#4ADE80',
+  },
+  actionText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  // Empty States
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: -40,
+  },
+  emptyIconInfo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    color: '#94A3B8',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  emptyText: {
+    color: '#64748B',
+    fontSize: 14,
+  },
+  createFirstBtn: {
+    backgroundColor: '#4ADE80',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 100,
+  },
+  createFirstText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: '#1F1F1F',
+    backgroundColor: '#1E293B',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '60%',
-    padding: 20,
-    paddingBottom: 40,
+    maxHeight: '80%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
     color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   modalSubtitle: {
+    color: '#94A3B8',
     fontSize: 14,
-    color: '#9CA3AF',
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  modalTabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+    marginHorizontal: 20,
+  },
+  modalTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  modalTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#F59E0B',
+  },
+  modalTabText: {
+    color: '#6B7280',
+    fontWeight: '600',
   },
   centered: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyModal: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 40,
     alignItems: 'center',
   },
   emptyModalText: {
-    color: '#6B7280',
+    color: '#94A3B8',
     fontSize: 16,
   },
   attendeesList: {
-    flex: 1,
+    maxHeight: 400,
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   attendeeItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: '#334155',
+    gap: 12,
   },
   attendeeAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
+    backgroundColor: '#334155',
   },
   attendeeAvatarPlaceholder: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#374151',
+    backgroundColor: '#334155',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   attendeeInfo: {
     flex: 1,
+    gap: 2,
   },
   attendeeName: {
-    fontSize: 16,
-    fontWeight: '500',
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   attendeeEmail: {
-    fontSize: 12,
-    color: '#9CA3AF',
+    color: '#94A3B8',
+    fontSize: 13,
   },
   attendeeDate: {
+    color: '#64748B',
     fontSize: 12,
-    color: '#6B7280',
   },
   registrationItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: '#334155',
+    gap: 12,
   },
   registrationInfo: {
     flex: 1,
+    gap: 4,
   },
   statusBadgeContainer: {
+    flexDirection: 'row',
     marginTop: 4,
   },
-  statusBadge: {
-    alignSelf: 'flex-start',
+  statusBadgeSmall: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    marginTop: 4,
   },
   statusBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '600',
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   viewReceiptButton: {
     flexDirection: 'row',
@@ -2165,12 +1508,11 @@ const styles = StyleSheet.create({
   },
   viewReceiptText: {
     color: '#8B5CF6',
-    fontSize: 12,
+    fontSize: 13,
   },
   registrationActions: {
     flexDirection: 'row',
     gap: 8,
-    marginLeft: 8,
   },
   approveButton: {
     width: 36,
@@ -2188,457 +1530,69 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rejectModalBody: {
-    padding: 20,
-  },
-  rejectModalText: {
-    color: '#D1D5DB',
-    fontSize: 16,
-    marginBottom: 16,
-    lineHeight: 24,
-  },
-  rejectModalName: {
-    color: '#FFF',
-    fontWeight: '600',
-  },
-  rejectModalLabel: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  rejectInput: {
-    backgroundColor: '#2A2A2A',
-    borderWidth: 1,
-    borderColor: '#374151',
-    borderRadius: 12,
-    padding: 12,
-    color: '#FFF',
-    fontSize: 14,
-    minHeight: 100,
-    marginBottom: 16,
-  },
-  confirmRejectButton: {
-    flexDirection: 'row',
-    backgroundColor: '#EF4444',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  confirmRejectButtonDisabled: {
-    backgroundColor: '#4B5563',
-    opacity: 0.5,
-  },
-  confirmRejectText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Payment Modal Styles
-  priceCard: {
-    backgroundColor: '#8B5CF6',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  priceLabel: {
-    color: '#E9D5FF',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  priceAmount: {
-    color: '#FFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  bankInfo: {
-    backgroundColor: '#2A2A2A',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  bankInfoLabel: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  bankInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  bankInfoText: {
-    color: '#FFF',
-    fontSize: 14,
-  },
-  uploadLabel: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  uploadButton: {
-    backgroundColor: '#2A2A2A',
-    borderWidth: 2,
-    borderColor: '#374151',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 32,
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  uploadButtonText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  receiptPreview: {
-    position: 'relative',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  receiptImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-  },
-  removeReceipt: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 12,
-  },
-  submitPaymentButton: {
-    flexDirection: 'row',
-    backgroundColor: '#8B5CF6',
-    padding: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 10,
-  },
-  submitPaymentButtonDisabled: {
-    backgroundColor: '#4B5563',
-    opacity: 0.6,
-  },
-  submitPaymentText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  rejectionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
-  rejectionReasonBox: {
-    flex: 1,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 8,
-    borderRadius: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: '#EF4444',
-  },
-  rejectionLabel: {
-    color: '#EF4444',
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  rejectionText: {
-    color: '#FCA5A5',
-    fontSize: 11,
-  },
-  resubmitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  resubmitText: {
-    color: '#8B5CF6',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  hostActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  scanButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  scanButtonText: {
-    color: '#8B5CF6',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  // Attendance stats
   attendanceStats: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    padding: 16,
   },
   statBox: {
     flex: 1,
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    padding: 12,
     borderRadius: 12,
+    padding: 12,
     alignItems: 'center',
+    gap: 4,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
     color: '#F59E0B',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#FDB022',
-    marginTop: 4,
+    fontSize: 24,
+    fontWeight: '700',
   },
   scannedTime: {
-    fontSize: 11,
-    color: '#8B5CF6',
-    marginTop: 4,
-  },
-  attendedBadge: {
-    padding: 4,
-  },
-  pendingAttendanceBadge: {
-    padding: 4,
-  },
-  hostManagedAttendance: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  hostManagedText: {
     color: '#8B5CF6',
     fontSize: 12,
-    fontWeight: '600',
+    marginTop: 2,
   },
-  // Receipt Modal Styles
-  receiptModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.9)',
-  },
-  receiptModalContent: {
-    width: '90%',
-    maxHeight: '85%',
-    backgroundColor: '#1F1F1F',
-    borderRadius: 24,
-    padding: 20,
-  },
-  receiptImageContainer: {
-    width: '100%',
-    height: 400,
-    backgroundColor: '#0F0F0F',
+  attendedBadge: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    overflow: 'hidden',
-    marginVertical: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullReceiptImage: {
-    width: '100%',
-    height: '100%',
-  },
-  closeReceiptButton: {
-    backgroundColor: '#8B5CF6',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  closeReceiptText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Modal Tabs Styles
-  modalTabsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  modalTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 10,
-  },
-  modalTabActive: {
-    backgroundColor: '#374151',
-  },
-  modalTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  // Gallery styles - 2 columns for saved events
-  galleryCard: {
-    width: '47%', // 2 columns with gap
-    marginBottom: 16,
-    backgroundColor: '#1F1F1F',
+  pendingAttendanceBadge: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    overflow: 'hidden',
-  },
-  galleryCardTouch: {
-    width: '100%',
-  },
-  galleryGradient: {
-    width: '100%',
-    aspectRatio: 3 / 4, // Better poster ratio for saved events
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  // Image style for saved events - fits properly without excessive zoom
-  savedPosterImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  // Letterboxd poster style - 3 columns for attended events
-  posterCard: {
-    width: '31.5%', // ~3 columns with gaps
-    aspectRatio: 2 / 3, // Poster aspect ratio like Letterboxd
-    backgroundColor: '#1A1A1A',
-    borderRadius: 6,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  posterCardTouch: {
-    width: '100%',
-    height: '100%',
-  },
-  posterGradient: {
-    width: '100%',
-    height: '100%',
-  },
-  posterImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  posterEmojiOverlay: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 12,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  posterEmojiText: {
-    fontSize: 14,
-  },
-  galleryImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  galleryIconContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  galleryEmojiOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  galleryEmojiText: {
-    fontSize: 24,
-  },
-  galleryBottomGradient: {
-    padding: 12,
-    paddingTop: 30,
-  },
-  galleryTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  galleryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  galleryInfoText: {
-    fontSize: 11,
-    color: '#D1D5DB',
-  },
-  galleryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 8,
-    paddingHorizontal: 12,
-  },
-  galleryRateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 8,
-    justifyContent: 'center',
-  },
-  galleryRateText: {
-    color: '#F59E0B',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  galleryDeleteButton: {
-    padding: 6,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Reject modal
+  rejectInput: {
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    color: '#fff',
+    padding: 12,
+    fontSize: 15,
+    minHeight: 100,
+  },
+  confirmRejectButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmRejectText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

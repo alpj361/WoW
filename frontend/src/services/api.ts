@@ -17,6 +17,7 @@ export interface Event {
     description: string | null;
     category: string;
     image: string | null;
+    image_url?: string | null;
     date: string | null;
     time: string | null;
     end_time?: string | null;
@@ -36,6 +37,10 @@ export interface Event {
     recurring_dates?: string[] | null;
     // Target audience
     target_audience?: string[] | null;
+    // Subcategory & tags
+    subcategory?: string | null;
+    tags?: string[] | null;
+    event_features?: Record<string, string> | null;
 }
 
 export interface CreateEventData {
@@ -61,6 +66,10 @@ export interface CreateEventData {
     recurring_dates?: string[] | null;
     // Target audience
     target_audience?: string[] | null;
+    // Subcategory & tags
+    subcategory?: string | null;
+    tags?: string[] | null;
+    event_features?: Record<string, string> | null;
 }
 
 export interface EventRegistration {
@@ -152,6 +161,15 @@ export interface AnalysisResult {
         is_recurring?: boolean;
         recurring_pattern?: string | null;
         recurring_dates?: string[];
+        category?: 'music' | 'volunteer' | 'general';
+        subcategory?: string | null;
+        tags?: string[];
+        event_features?: {
+            mood?: string;
+            vibe?: string;
+            timeOfDay?: string;
+            socialSetting?: string;
+        } | null;
         confidence: string;
         extracted_text: string;
     };
@@ -199,6 +217,15 @@ export interface ImageAnalysisResult {
         is_recurring?: boolean;
         recurring_pattern?: string | null;
         recurring_dates?: string[];
+        category?: 'music' | 'volunteer' | 'general';
+        subcategory?: string | null;
+        tags?: string[];
+        event_features?: {
+            mood?: string;
+            vibe?: string;
+            timeOfDay?: string;
+            socialSetting?: string;
+        } | null;
         confidence: string;
         extracted_text: string;
     };
@@ -363,9 +390,9 @@ export async function updateAttendanceRequirement(
  * Backend will update Supabase directly
  */
 export const triggerExtraction = (jobId: string): void => {
-  api.post(`/extraction-jobs/process/${jobId}`).catch((error) => {
-    console.error('[API] Failed to trigger extraction:', error.message);
-  });
+    api.post(`/extraction-jobs/process/${jobId}`).catch((error) => {
+        console.error('[API] Failed to trigger extraction:', error.message);
+    });
 };
 
 /**
@@ -373,9 +400,9 @@ export const triggerExtraction = (jobId: string): void => {
  * Backend will update Supabase directly
  */
 export const triggerAnalysis = (jobId: string, imageUrl: string): void => {
-  api.post(`/extraction-jobs/analyze/${jobId}`, { image_url: imageUrl }).catch((error) => {
-    console.error('[API] Failed to trigger analysis:', error.message);
-  });
+    api.post(`/extraction-jobs/analyze/${jobId}`, { image_url: imageUrl }).catch((error) => {
+        console.error('[API] Failed to trigger analysis:', error.message);
+    });
 };
 
 export default api;

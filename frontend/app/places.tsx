@@ -191,8 +191,8 @@ export default function PlacesScreen() {
           entering={FadeIn.delay(400).duration(600)}
           style={styles.heroContainer}
         >
-          <Text style={styles.heroTitle}>SOON</Text>
-          <Text style={styles.heroTitle}>PLACES</Text>
+          <Text style={styles.heroTitle}>PRONTO</Text>
+          <Text style={styles.heroTitle}>SPOTS</Text>
         </Animated.View>
 
         {/* Bottom scattered bubbles */}
@@ -254,11 +254,11 @@ const styles = StyleSheet.create({
       android: 'sans-serif-condensed',
       default: 'System',
     }),
-    fontSize: Math.min(SCREEN_WIDTH * 0.22, 80),
+    fontSize: Math.min(SCREEN_WIDTH * 0.20, 76),
     fontWeight: '900',
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: Math.min(SCREEN_WIDTH * 0.2, 72),
+    lineHeight: Math.min(SCREEN_WIDTH * 0.24, 90),
     letterSpacing: -2,
     textTransform: 'uppercase',
   },

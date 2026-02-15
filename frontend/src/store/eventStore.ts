@@ -9,6 +9,7 @@ export interface Event {
   description: string | null;
   category: string;
   image: string | null;
+  image_url?: string | null;
   date: string | null;
   time: string | null;
   end_time?: string | null;
@@ -28,6 +29,10 @@ export interface Event {
   recurring_dates?: string[] | null;
   // Target audience
   target_audience?: string[] | null;
+  // Subcategory & tags
+  subcategory?: string | null;
+  tags?: string[] | null;
+  event_features?: { mood?: string; vibe?: string; timeOfDay?: string; socialSetting?: string } | null;
 }
 
 export interface SavedEventData {
@@ -53,6 +58,7 @@ export interface AttendedEventData {
     reaction_gif: string | null;
     reaction_comment: string | null;
     attended_at: string;
+    attendance_date?: string | null;
   };
   event: Event;
 }
@@ -117,8 +123,9 @@ interface EventStore {
   saveEvent: (eventId: string) => Promise<void>;
   unsaveEvent: (eventId: string) => Promise<void>;
   denyEvent: (eventId: string) => Promise<void>;
-  markAttended: (eventId: string, emoji?: string) => Promise<void>;
+  markAttended: (eventId: string, emoji?: string, date?: string) => Promise<void>;
   updateEventReaction: (eventId: string, reaction: { emoji_rating?: string | null; reaction_sticker?: string | null; reaction_gif?: string | null; reaction_comment?: string | null }) => Promise<void>;
+  removeAttendedEvent: (eventId: string) => Promise<void>; // Add this line
   fetchPublicReactions: (eventId: string) => Promise<PublicReaction[]>;
   removeAttended: (eventId: string) => Promise<void>;
   createEvent: (eventData: Partial<Event> & { user_id?: string | null }) => Promise<Event>;
@@ -132,6 +139,9 @@ interface EventStore {
   rejectRegistration: (registrationId: string, rejectionReason?: string) => Promise<void>;
   resubmitRegistration: (eventId: string, paymentReceiptUrl?: string) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
+
+  // Not attended signal
+  markNotAttended: (eventId: string) => Promise<void>;
 
   // Silent refresh (background, no loading indicator)
   silentRefreshFeed: () => Promise<boolean>;
@@ -288,6 +298,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
           event_id,
           emoji_rating,
           attended_at,
+          attendance_date,
           events (
             id,
             title,
@@ -319,6 +330,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
           reaction_gif: item.reaction_gif || null,
           reaction_comment: item.reaction_comment || null,
           attended_at: item.attended_at,
+          attendance_date: item.attendance_date,
         },
         event: item.events,
       }));
@@ -489,7 +501,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
     }
   },
 
-  markAttended: async (eventId: string, emoji?: string) => {
+  markAttended: async (eventId: string, emoji?: string, date?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
@@ -501,35 +513,48 @@ export const useEventStore = create<EventStore>((set, get) => ({
       }
       if (!event) return;
 
-      // Check if already attended - if so, update emoji rating
-      const existingAttended = get().attendedEvents.find(a => a.event.id === eventId);
+      // Check if already attended on this date (or at all if no date provided)
+      const existingAttended = get().attendedEvents.find(a =>
+        a.event.id === eventId &&
+        (date ? a.attended.attendance_date === date : true)
+      );
 
       if (existingAttended) {
         // Update existing
+        // We need to identify WHICH record to update. 
+        // If date is provided, we found the exact one. 
+        // If no date, we update the first one found (legacy behavior) or maybe most recent?
+        // Using existingAttended.attended.id is safest.
+
         const { error } = await supabase
           .from('attended_events')
           .update({ emoji_rating: emoji || null })
           .eq('user_id', user.id)
-          .eq('event_id', eventId);
+          .eq('id', existingAttended.attended.id); // Update by specific ID
 
         if (error) throw error;
 
         set(state => ({
           attendedEvents: state.attendedEvents.map(a =>
-            a.event.id === eventId
+            a.attended.id === existingAttended.attended.id
               ? { ...a, attended: { ...a.attended, emoji_rating: emoji || null } }
               : a
           ),
         }));
       } else {
         // Insert new
+        const insertData: any = {
+          user_id: user.id,
+          event_id: eventId,
+          emoji_rating: emoji || null,
+        };
+        if (date) {
+          insertData.attendance_date = date;
+        }
+
         const { data, error } = await supabase
           .from('attended_events')
-          .insert({
-            user_id: user.id,
-            event_id: eventId,
-            emoji_rating: emoji || null,
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -544,11 +569,13 @@ export const useEventStore = create<EventStore>((set, get) => ({
             reaction_gif: data.reaction_gif || null,
             reaction_comment: data.reaction_comment || null,
             attended_at: data.attended_at,
+            attendance_date: data.attendance_date,
           },
           event,
         };
 
-        // Remove from saved if it was saved
+        // Remove from saved if it was saved (only if it's the first attendance? or always?)
+        // Usually if I attend, I don't need it in saved anymore.
         await supabase
           .from('saved_events')
           .delete()
@@ -601,6 +628,28 @@ export const useEventStore = create<EventStore>((set, get) => ({
       }));
     } catch (error: any) {
       console.error('Error updating reaction:', error);
+      throw error;
+    }
+  },
+
+  removeAttendedEvent: async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('attended_events')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+
+      set(state => ({
+        attendedEvents: state.attendedEvents.filter(ae => ae.attended.event_id !== eventId)
+      }));
+    } catch (error: any) {
+      console.error('Error removing attended event:', error);
       throw error;
     }
   },
@@ -687,6 +736,9 @@ export const useEventStore = create<EventStore>((set, get) => ({
         is_recurring: eventData.is_recurring || undefined,
         recurring_dates: eventData.recurring_dates || undefined,
         target_audience: eventData.target_audience || undefined,
+        subcategory: eventData.subcategory || undefined,
+        tags: eventData.tags || undefined,
+        event_features: eventData.event_features || undefined,
       });
 
       // Refresh events list
@@ -811,6 +863,42 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
+      // 1. Delete denied events
+      const { error: deniedError } = await supabase
+        .from('denied_events')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (deniedError) {
+        console.error('Error deleting denied_events:', deniedError);
+        // Continue anyway, maybe it didn't exist or another issue, but try valid attempts
+      }
+
+      // 2. Delete event registrations
+      const { error: regError } = await supabase
+        .from('event_registrations')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (regError) console.error('Error deleting registrations:', regError);
+
+      // 3. Delete attended events
+      const { error: attError } = await supabase
+        .from('attended_events')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (attError) console.error('Error deleting attended events:', attError);
+
+      // 4. Delete saved events references
+      const { error: savedError } = await supabase
+        .from('saved_events')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (savedError) console.error('Error deleting saved events:', savedError);
+
+      // 5. Finally delete the event
       const { error } = await supabase
         .from('events')
         .delete()
@@ -826,6 +914,24 @@ export const useEventStore = create<EventStore>((set, get) => ({
     } catch (error: any) {
       console.error('Error deleting event:', error);
       throw error;
+    }
+  },
+
+  markNotAttended: async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase
+        .from('not_attended_events')
+        .upsert({ user_id: user.id, event_id: eventId });
+      await supabase
+        .from('saved_events')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+      set(state => ({ savedEvents: state.savedEvents.filter(e => e.event.id !== eventId) }));
+    } catch (error: any) {
+      console.error('Error marking not attended:', error);
     }
   },
 
@@ -850,7 +956,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const currentIds = new Set(currentEvents.map(e => e.id));
       const newIds = new Set(filteredEvents.map(e => e.id));
       const hasNew = filteredEvents.some(e => !currentIds.has(e.id)) ||
-                     currentEvents.some(e => !newIds.has(e.id));
+        currentEvents.some(e => !newIds.has(e.id));
 
       if (hasNew) {
         set({ hasNewFeedData: true });
@@ -880,7 +986,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const newIds = new Set((data || []).map((d: any) => d.event_id));
 
       const hasNew = (data || []).some((d: any) => !currentIds.has(d.event_id)) ||
-                     currentSaved.some(s => !newIds.has(s.saved.event_id));
+        currentSaved.some(s => !newIds.has(s.saved.event_id));
 
       if (hasNew) {
         set({ hasNewSavedData: true });

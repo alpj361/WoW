@@ -2,6 +2,224 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.2] - 2026-02-14
+
+### Improved — UX de Feed & Modales
+
+#### Feed Logic Refinement
+- **Smart End-of-List State**: Al llegar al final del feed:
+  - Si hay nuevos eventos en background (`hasNewFeedData`): Muestra card "¡Nuevos eventos!" con botón "Cargar nuevos"
+  - Si no hay nuevos: Muestra card "¡Has visto todos!" con opción de recargar
+- **Background Refresh Integration**: `silentRefreshFeed` ahora se integra correctamente con la UI de final de lista, permitiendo actualizaciones suaves sin interrumpir la navegación.
+
+#### Modal Layout Fixes
+- **EventForm Modal Header**:
+  - `EventForm` ahora acepta prop `isModal`
+  - Renderiza header nativo con botón "Cancelar" y "Crear Evento" cuando está en modo modal
+  - Ajuste de `paddingTop` fijo (20px) para evitar overlaps con status bar/notch en iOS sheet presentation
+- **Visual Consistency**: El modal de edición de borradores ahora se ve consistente con el resto de la app.
+
+### Fixed — Date Timezone Issues
+
+- 📅 **Fechas mostrando día anterior**:
+  - **Problema**: `new Date('YYYY-MM-DD')` interpretaba la fecha como UTC, causando que usuarios en occidente vieran el día anterior (e.g., 27 Oct -> 26 Oct a las 18:00).
+  - **Solución**: Parsing manual de componentes de fecha (Año, Mes, Día) para construir el objeto `Date` en tiempo local del dispositivo.
+  - Aplicado tanto a fecha principal como a `recurring_dates`.
+
+### Technical Details
+```typescript
+// Fix de fecha para evitar UTC shift
+const dateParts = initialData.date.split(/[-/]/);
+// Manual parsing: new Date(year, month - 1, day)
+// Evita new Date("2023-10-27") -> UTC 00:00 -> Local Oct 26 18:00
+```
+
+---
+
+## [0.0.26] - 2026-02-14
+
+### Added — Eliminar Evento Asistido con Press Sostenido
+
+#### `myevents.tsx` — Tab Asistidos
+
+- **Long press para eliminar**: En el tab "Asistidos", mantener presionado un poster abre confirmación de eliminación
+  - **Press normal** → abre modal de reacciones (comportamiento anterior conservado)
+  - **Press sostenido** → llama `handleRemoveAttended(eventId)` con confirmación nativa
+    - iOS/Android: `Alert.alert` con botón "Eliminar" (destructivo) y "Cancelar"
+    - Web: `window.confirm`
+  - Si el usuario confirma → elimina de `attended_events` en Supabase + actualiza estado local con animación `Layout.springify()`
+
+```tsx
+// Antes
+onLongPress={() => router.push(`/event/${event.id}`)}
+
+// Después
+onLongPress={() => handleRemoveAttended(event.id)}
+```
+
+### Verified — "¿Fuiste?" & not_attended_events
+
+- Confirmado que tabla `not_attended_events` existe en Supabase con estructura correcta:
+  - `id UUID`, `user_id UUID`, `event_id UUID`, `created_at TIMESTAMPTZ`
+  - RLS policy `"Users manage own not_attended"`: `auth.uid() = user_id` (ALL operations)
+- Flujo "No fui" verificado end-to-end:
+  1. `upsert` en `not_attended_events` (señal negativa para algoritmo)
+  2. `DELETE` en `saved_events`
+  3. Estado local actualizado sin refetch
+  4. Toast "Evento quitado de guardados"
+
+### Technical Details
+```
+Modified:
+- frontend/app/myevents.tsx (onLongPress en renderAttendedItem)
+```
+
+---
+
+## [0.0.25] - 2026-02-14
+
+### Added — Subcategorías, Tags, Event Features & "¿Fuiste?"
+
+#### Catálogo de Subcategorías (`docs/SUBCATEGORIAS_CATALOGO.md`)
+- **75+ subcategorías** organizadas por categoría principal (`music`, `volunteer`, `general`)
+- Cada subcategoría tiene: `id`, `label`, `color` hex, `icon` (Ionicons)
+- Bloque especial en `volunteer`: ONGs, causas sociales y comunidades
+  - `lgbt-awareness`, `political-youth`, `university-awareness`, `ong-campaign`
+  - `human-rights`, `womens-rights`, `indigenous-rights`, `migrant-support`
+  - `anti-corruption`, `climate-activism`, `disability-rights`, `animal-rights`
+  - `peace-culture`, `civic-education`, `social-entrepreneurship`
+- Nueva subcategoría `art-music-gathering` → "Velada Arte & Música" para eventos híbridos
+
+#### Nuevos Componentes
+
+**`SubcategorySelector.tsx`** — Bottom sheet modal con buscador
+- Trigger button: muestra selección activa (dot de color + icono + label) o placeholder
+- Bottom sheet al 78% de pantalla con handle visual
+- Searchbar "Buscar tipo de evento..." con filtrado en tiempo real (`useMemo`)
+- Lista con icono en pill de color, checkmark morado en seleccionado
+- Fila "Sin tipo de evento" para limpiar sin cerrar (solo si hay selección)
+- Estado vacío con ícono de lupa si no hay resultados
+- Filtrado automático por `category` activa; resetea al cambiar categoría
+
+**`TagSelector.tsx`** — Chips multi-select con input personalizado
+- Sugerencias predefinidas por categoría (12 tags por categoría)
+- Toggle para agregar/quitar tags sugeridos
+- Input para tags personalizados (normaliza a kebab-case)
+- Tags personalizados se muestran con botón de eliminar separado
+- Botón "Quitar todos los tags"
+
+#### Base de Datos — 2 Migraciones
+
+```sql
+-- Migration: add_subcategory_tags_features
+ALTER TABLE events ADD COLUMN IF NOT EXISTS subcategory TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS tags TEXT[];
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_features JSONB;
+ALTER TABLE event_drafts ADD COLUMN IF NOT EXISTS subcategory TEXT;
+ALTER TABLE event_drafts ADD COLUMN IF NOT EXISTS tags TEXT[];
+ALTER TABLE event_drafts ADD COLUMN IF NOT EXISTS event_features JSONB;
+
+-- Migration: create_not_attended_events
+CREATE TABLE not_attended_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, event_id)
+);
+ALTER TABLE not_attended_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own not_attended"
+  ON not_attended_events FOR ALL
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+```
+
+#### Tipos TypeScript Actualizados
+
+**`eventStore.ts`**
+- `Event` interface: `subcategory?`, `tags?`, `event_features?` (mood/vibe/timeOfDay/socialSetting)
+- Nueva función `markNotAttended(eventId)`:
+  - Inserta en `not_attended_events` (upsert)
+  - Elimina de `saved_events`
+  - Actualiza estado local sin refetch
+- `createEvent()` pasa los tres nuevos campos al API
+
+**`draftStore.ts`**
+- `EventDraft` y `DraftFormData`: `subcategory?`, `tags?`, `event_features?`
+- `saveDraft()` y `publishDraft()` persisten los nuevos campos
+
+**`api.ts`**
+- `Event` y `CreateEventData` interfaces: nuevos campos `subcategory`, `tags`, `event_features`
+
+#### `create.tsx` — Nuevos campos en formulario
+
+Nuevo estado:
+```typescript
+const [subcategory, setSubcategory] = useState<string | null>(null);
+const [tags, setTags] = useState<string[]>([]);
+const [eventFeatures, setEventFeatures] = useState<Record<string, string>>({});
+```
+
+UI insertada después del selector de categoría:
+1. `<SubcategorySelector>` — modal con buscador
+2. `<TagSelector>` — chips + input personalizado
+3. Sección "Características (Alpha)" — solo para usuarios alpha/beta/admin:
+   - **Estado de ánimo**: energético, relajado, romántico, social, íntimo
+   - **Ambiente**: casual, formal, underground, familiar, exclusivo
+   - **Horario**: mañana, tarde, noche, madrugada
+   - **Contexto social**: en pareja, con amigos, solo, en grupo, familiar
+
+Cambiar categoría resetea subcategoría y tags automáticamente.
+
+#### `myevents.tsx` — Prompt "¿Fuiste?" en tab Guardados
+
+Helper `isEventPast()`: compara fecha del evento con hoy (sin timezone issues).
+
+Para cada evento guardado con fecha pasada, se muestra debajo del card:
+```
+¿Fuiste a este evento?
+[✓ Sí, fui]  [✕ No fui]
+```
+- **"Sí, fui"** → abre modal de emoji rating → mueve a tab Asistidos con animación de coleccionable
+- **"No fui"** → registra en `not_attended_events`, elimina de guardados, toast "Evento quitado de guardados"
+
+#### Datos — Enriquecimiento de Eventos Existentes
+
+Todos los eventos existentes (26) fueron actualizados vía SQL con:
+- `subcategory` asignada manualmente según título y contexto
+- `tags` como array (`indoor`, `outdoor`, `18+`, `todo-público`, etc.)
+- `event_features` JSONB con mood, vibe, timeOfDay, socialSetting
+
+Correcciones de categoría principal:
+- `entertainment` → `music` (Concierto Klaudia Ortiz, Bienal Arte Paiz, Metal Masters, Noche Astral, Tributo Juan Gabriel, Expo Latente, Concierto El Clubo)
+- `entertainment` → `general` (Travesía Vías Férreas, Carrera por la Nutrición)
+- `general` → `music` (Igualado en vivo, Los poemas muertos vol. 02)
+- `volunteer` → `general` (Kermés de Halloween, Ascenso Volcán Chicabal)
+
+### Technical Details
+```
+New Files:
+- docs/SUBCATEGORIAS_CATALOGO.md
+- frontend/src/components/SubcategorySelector.tsx
+- frontend/src/components/TagSelector.tsx
+
+Modified:
+- frontend/app/create.tsx (subcategory/tags/features state + UI)
+- frontend/app/myevents.tsx (¿Fuiste? prompt + markNotAttended)
+- frontend/src/store/eventStore.ts (types + markNotAttended function)
+- frontend/src/store/draftStore.ts (types + saveDraft/publishDraft)
+- frontend/src/services/api.ts (Event + CreateEventData types)
+
+Database Migrations:
+- add_subcategory_tags_features
+- create_not_attended_events
+
+Data Migrations (SQL UPDATE):
+- 26 eventos existentes enriquecidos con subcategory, tags, event_features
+- Categorías principales corregidas en 9 eventos
+```
+
+---
+
 ## [0.0.24] - 2026-02-11
 
 ### Added - Event Details & Recurring Dates

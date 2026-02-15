@@ -12,8 +12,7 @@ import {
     Pressable,
     AppState,
     AppStateStatus,
-    TextInput,
-    KeyboardAvoidingView,
+
     Platform,
     ActivityIndicator,
 } from 'react-native';
@@ -25,14 +24,10 @@ import { useDraftStore, EventDraft, DraftFormData } from '../src/store/draftStor
 import { supabase } from '../src/services/supabase';
 import { AnimatedLoader, InlineLoader, MiniSphereLoader } from '../src/components/AnimatedLoader';
 import { useAuth } from '../src/context/AuthContext';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import AudienceSelector from '../src/components/AudienceSelector';
+import EventForm from '../src/components/EventForm';
 
-const categories = [
-    { id: 'music', label: 'Musica', icon: 'musical-notes', color: '#8B5CF6' },
-    { id: 'volunteer', label: 'Voluntariado', icon: 'heart', color: '#EC4899' },
-    { id: 'general', label: 'General', icon: 'fast-food', color: '#F59E0B' },
-];
+
+
 
 /**
  * Process recurring event dates to set the closest future date as main date
@@ -154,6 +149,8 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     // Multi-select mode for images
+    const [lastAnalyzedId, setLastAnalyzedId] = useState<string | null>(null);
+    const [pendingAnalysisQueue, setPendingAnalysisQueue] = useState<{ extractionId: string; imageUrl: string }[]>([]);
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [analysisQueue, setAnalysisQueue] = useState<{ extractionId: string; imageUrl: string }[]>([]);
     const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -169,37 +166,11 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
     // Guard ref to prevent re-calling openCreateModalWithAnalysis when extractions array updates from polling
     const processedAnalysisRef = useRef<string | null>(null);
 
-    // Create event modal state
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [currentDraftData, setCurrentDraftData] = useState<Partial<DraftFormData> | null>(null);
-    const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
-    const [lastAnalyzedId, setLastAnalyzedId] = useState<string | null>(null);
-    const [pendingAnalysisQueue, setPendingAnalysisQueue] = useState<{ extractionId: string; imageUrl: string }[]>([]);
+    // Modal state for editing drafts
+    const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+    const [currentDraft, setCurrentDraft] = useState<any>(null);
 
-    // Form state for create modal
-    const [formTitle, setFormTitle] = useState('');
-    const [formDescription, setFormDescription] = useState('');
-    const [formCategory, setFormCategory] = useState('general');
-    const [formDate, setFormDate] = useState<Date | null>(null);
-    const [formTime, setFormTime] = useState<Date | null>(null);
-    const [formLocation, setFormLocation] = useState('');
-    const [formOrganizer, setFormOrganizer] = useState('');
-    const [formImage, setFormImage] = useState<string | null>(null);
-    const [formPrice, setFormPrice] = useState('');
-    const [formRegistrationUrl, setFormRegistrationUrl] = useState('');
-    const [formTargetAudience, setFormTargetAudience] = useState<string[]>(['audiencia:general']);
-    const [formEndTime, setFormEndTime] = useState<Date | null>(null);
-    const [formIsRecurring, setFormIsRecurring] = useState(false);
-    const [formRecurringDates, setFormRecurringDates] = useState<Date[]>([]);
 
-    // Picker visibility
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [showTimePicker, setShowTimePicker] = useState(false);
-    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-    const [showRecurringDatePicker, setShowRecurringDatePicker] = useState(false);
-
-    // Submitting state
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Track app state for foreground refresh
     const appState = useRef(AppState.currentState);
@@ -331,171 +302,106 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
         }
     }, [extractions, isProcessingQueue, pendingAnalysisQueue, isBatchMode]);
 
-    const openCreateModalWithAnalysis = (extraction: Extraction) => {
-        const analysis = extraction.analysis;
-        if (!analysis) return;
+    const buildDraftDataFromAnalysis = (extraction: Extraction, userId: string): DraftFormData => {
+        const analysis = extraction.analysis!;
 
-        // Process all dates - for recurring events, ONLY use recurring_dates (ignore main date)
         const { mainDate, recurringDates, isRecurring } = processRecurringDates(
             analysis.date,
             analysis.recurring_dates,
             analysis.is_recurring || false
         );
 
-        // Parse time
-        let parsedTime: Date | null = null;
-        if (analysis.time && analysis.time !== 'No especificado') {
-            const timeParts = analysis.time.split(':');
-            if (timeParts.length >= 2) {
-                parsedTime = new Date();
-                parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-            }
-        }
+        const dateStr = mainDate ? mainDate.toISOString().split('T')[0] : null;
+        const recurringDatesStr: string[] | null = recurringDates.length > 0
+            ? recurringDates.map(d => d.toISOString().split('T')[0])
+            : null;
 
-        setFormTitle(analysis.event_name || '');
-        setFormDescription(analysis.description || '');
-        setFormLocation(analysis.location || '');
-        setFormOrganizer(analysis.organizer || '');
-        setFormDate(mainDate);
-        setFormTime(parsedTime);
-        setFormImage(extraction.selectedImage || null);
-        setFormCategory('general');
-        // Parse price from analysis
-        let priceValue = '';
+        const timeStr = (analysis.time && analysis.time !== 'No especificado') ? analysis.time : null;
+        const endTimeStr = (analysis.end_time && analysis.end_time !== 'No especificado') ? analysis.end_time : null;
+
+        let priceValue: number | null = null;
         if (analysis.price && analysis.price !== 'No especificado' && analysis.price !== 'Gratis') {
-            // Extract numeric value from price string (e.g., "Q50", "50 GTQ", "50")
-            const priceMatch = analysis.price.match(/[\d.]+/);
-            if (priceMatch) {
-                priceValue = priceMatch[0];
-            }
+            const match = analysis.price.match(/[\d.]+/);
+            if (match) priceValue = parseFloat(match[0]);
         }
-        setFormPrice(priceValue);
-        setFormRegistrationUrl(analysis.registration_url || '');
-        setFormTargetAudience(['audiencia:general']);
 
-        // Parse end time
-        let parsedEndTime: Date | null = null;
-        if (analysis.end_time && analysis.end_time !== 'No especificado') {
-            const endTimeParts = analysis.end_time.split(':');
-            if (endTimeParts.length >= 2) {
-                parsedEndTime = new Date();
-                parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
-            }
-        }
-        setFormEndTime(parsedEndTime);
-
-        // Set recurring dates (already processed - only future dates after the main date)
-        setFormIsRecurring(isRecurring);
-        setFormRecurringDates(recurringDates);
-
-        setEditingDraftId(null);
-
-        setCurrentDraftData({
+        return {
+            user_id: userId,
             extraction_job_id: extraction.id,
-            source_image_url: extraction.selectedImage,
-        });
+            title: analysis.event_name || 'Evento sin título',
+            description: analysis.description || null,
+            category: analysis.category || 'general',
+            image: extraction.selectedImage || null,
+            date: dateStr,
+            time: timeStr,
+            location: analysis.location || null,
+            organizer: analysis.organizer || null,
+            price: priceValue,
+            registration_form_url: analysis.registration_url || null,
+            source_image_url: extraction.selectedImage || null,
+            target_audience: ['audiencia:general'],
+            end_time: endTimeStr,
+            is_recurring: isRecurring,
+            recurring_dates: recurringDatesStr,
+            subcategory: analysis.subcategory || null,
+            tags: analysis.tags?.length ? analysis.tags : null,
+            event_features: analysis.event_features || null,
+        };
+    };
 
-        setShowCreateModal(true);
+    const openCreateModalWithAnalysis = async (extraction: Extraction) => {
+        if (!extraction.analysis || !user?.id) return;
+        const draftData = buildDraftDataFromAnalysis(extraction, user.id);
+        const draftId = await saveDraft(draftData);
+        if (draftId) {
+            Alert.alert(
+                'Borrador creado',
+                'Se ha creado un borrador con la información analizada. Puedes editarlo en la pestaña "Borradores".',
+                [{ text: 'OK' }]
+            );
+            await resetExtractionToReady(extraction.id);
+        } else {
+            Alert.alert('Error', 'No se pudo crear el borrador.');
+        }
     };
 
     const openCreateModalForEdit = (draft: EventDraft) => {
-        // Parse date - manually to avoid timezone issues
-        let parsedDate: Date | null = null;
-        if (draft.date) {
-            const dateParts = draft.date.split('-').map(Number);
-            if (dateParts.length === 3) {
-                const [year, month, day] = dateParts;
-                parsedDate = new Date(year, month - 1, day);
-            }
-            if (parsedDate && isNaN(parsedDate.getTime())) parsedDate = null;
-        }
+        const draftData = {
+            draftId: draft.id,
+            extraction_job_id: draft.extraction_job_id || undefined,
+            title: draft.title,
+            description: draft.description || '',
+            category: draft.category || 'general',
+            image: draft.image || '',
+            date: draft.date || '',
+            time: draft.time || '',
+            end_time: draft.end_time || '',
+            location: draft.location || '',
+            organizer: draft.organizer || '',
+            price: draft.price ? String(draft.price) : '',
+            registration_form_url: draft.registration_form_url || '',
+            source_image_url: draft.source_image_url || '',
+            target_audience: draft.target_audience || [],
+            is_recurring: draft.is_recurring,
+            recurring_dates: draft.recurring_dates || [],
+            subcategory: draft.subcategory || null,
+            tags: draft.tags || [],
+            event_features: draft.event_features || null,
+        };
 
-        // Parse time
-        let parsedTime: Date | null = null;
-        if (draft.time) {
-            const timeParts = draft.time.split(':');
-            if (timeParts.length >= 2) {
-                parsedTime = new Date();
-                parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-            }
-        }
-
-        setFormTitle(draft.title || '');
-        setFormDescription(draft.description || '');
-        setFormLocation(draft.location || '');
-        setFormOrganizer(draft.organizer || '');
-        setFormDate(parsedDate);
-        setFormTime(parsedTime);
-        setFormImage(draft.image || null);
-        setFormCategory(draft.category || 'general');
-        setFormPrice(draft.price ? String(draft.price) : '');
-        setFormRegistrationUrl(draft.registration_form_url || '');
-        setFormTargetAudience(draft.target_audience || ['audiencia:general']);
-
-        // Parse end time from draft
-        let parsedEndTime: Date | null = null;
-        if (draft.end_time) {
-            const endTimeParts = draft.end_time.split(':');
-            if (endTimeParts.length >= 2) {
-                parsedEndTime = new Date();
-                parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
-            }
-        }
-        setFormEndTime(parsedEndTime);
-
-        // Load recurring data from draft
-        setFormIsRecurring(draft.is_recurring || false);
-        if (draft.recurring_dates && Array.isArray(draft.recurring_dates)) {
-            const parsedRecurringDates: Date[] = [];
-            for (const dateStr of draft.recurring_dates) {
-                const dateParts = dateStr.split('-').map(Number);
-                if (dateParts.length === 3) {
-                    const [year, month, day] = dateParts;
-                    const date = new Date(year, month - 1, day);
-                    if (!isNaN(date.getTime())) {
-                        parsedRecurringDates.push(date);
-                    }
-                }
-            }
-            setFormRecurringDates(parsedRecurringDates.sort((a, b) => a.getTime() - b.getTime()));
-        } else {
-            setFormRecurringDates([]);
-        }
-
-        setEditingDraftId(draft.id);
-
-        setCurrentDraftData({
-            extraction_job_id: draft.extraction_job_id,
-            source_image_url: draft.source_image_url,
-        });
-
-        setShowCreateModal(true);
-    };
-
-    const resetForm = () => {
-        setFormTitle('');
-        setFormDescription('');
-        setFormCategory('general');
-        setFormDate(null);
-        setFormTime(null);
-        setFormLocation('');
-        setFormOrganizer('');
-        setFormImage(null);
-        setFormPrice('');
-        setFormRegistrationUrl('');
-        setFormTargetAudience(['audiencia:general']);
-        setFormEndTime(null);
-        setFormIsRecurring(false);
-        setFormRecurringDates([]);
-        setEditingDraftId(null);
-        setCurrentDraftData(null);
+        setCurrentDraft(draftData);
+        setIsCreateModalVisible(true);
     };
 
     const closeCreateModal = () => {
-        setShowCreateModal(false);
-        resetForm();
-        processedAnalysisRef.current = null; // Allow next analysis to open modal
+        setIsCreateModalVisible(false);
+        setCurrentDraft(null);
+        if (user?.id) {
+            fetchDrafts(user.id);
+        }
     };
+
+
 
     const formatDateForStorage = (date: Date): string => {
         return date.toISOString().split('T')[0];
@@ -531,67 +437,7 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
     const autoCreateDraftFromAnalysis = async (extraction: Extraction) => {
         if (!user?.id || !extraction.analysis) return;
 
-        const analysis = extraction.analysis;
-
-        // Process all dates - for recurring events, ONLY use recurring_dates (ignore main date)
-        const { mainDate, recurringDates, isRecurring } = processRecurringDates(
-            analysis.date,
-            analysis.recurring_dates,
-            analysis.is_recurring || false
-        );
-
-        // Convert main date to string format YYYY-MM-DD
-        let dateStr: string | null = null;
-        if (mainDate) {
-            dateStr = mainDate.toISOString().split('T')[0];
-        }
-
-        // Convert recurring dates to string array
-        const recurringDatesStr: string[] | null = recurringDates.length > 0
-            ? recurringDates.map(d => d.toISOString().split('T')[0])
-            : null;
-
-        // Parse time
-        let timeStr: string | null = null;
-        if (analysis.time && analysis.time !== 'No especificado') {
-            timeStr = analysis.time;
-        }
-
-        // Parse end time
-        let endTimeStr: string | null = null;
-        if (analysis.end_time && analysis.end_time !== 'No especificado') {
-            endTimeStr = analysis.end_time;
-        }
-
-        // Parse price
-        let priceValue: number | null = null;
-        if (analysis.price && analysis.price !== 'No especificado' && analysis.price !== 'Gratis') {
-            const priceMatch = analysis.price.match(/[\d.]+/);
-            if (priceMatch) {
-                priceValue = parseFloat(priceMatch[0]);
-            }
-        }
-
-        const draftData: DraftFormData = {
-            user_id: user.id,
-            extraction_job_id: extraction.id,
-            title: analysis.event_name || 'Evento sin título',
-            description: analysis.description || null,
-            category: 'general',
-            image: extraction.selectedImage || null,
-            date: dateStr,
-            time: timeStr,
-            location: analysis.location || null,
-            organizer: analysis.organizer || null,
-            price: priceValue,
-            registration_form_url: analysis.registration_url || null,
-            source_image_url: extraction.selectedImage || null,
-            target_audience: ['audiencia:general'],
-            end_time: endTimeStr,
-            is_recurring: isRecurring,
-            recurring_dates: recurringDatesStr,
-        };
-
+        const draftData = buildDraftDataFromAnalysis(extraction, user.id);
         const draftId = await saveDraft(draftData);
 
         if (draftId) {
@@ -626,79 +472,7 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
         }
     };
 
-    const handleSaveDraft = async () => {
-        if (!formTitle.trim()) {
-            Alert.alert('Error', 'Por favor ingresa un titulo para el evento.');
-            return;
-        }
 
-        if (!user?.id) {
-            Alert.alert('Error', 'Debes iniciar sesion para guardar borradores.');
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        const draftData: DraftFormData = {
-            user_id: user.id,
-            extraction_job_id: currentDraftData?.extraction_job_id || null,
-            title: formTitle.trim(),
-            description: formDescription.trim() || null,
-            category: formCategory,
-            image: formImage,
-            date: formDate ? formatDateForStorage(formDate) : null,
-            time: formTime ? formatTimeForStorage(formTime) : null,
-            location: formLocation.trim() || null,
-            organizer: formOrganizer.trim() || null,
-            price: formPrice ? parseFloat(formPrice) : null,
-            registration_form_url: formRegistrationUrl.trim() || null,
-            source_image_url: currentDraftData?.source_image_url || formImage,
-            target_audience: formTargetAudience.length > 0 ? formTargetAudience : ['audiencia:general'],
-            end_time: formEndTime ? formatTimeForStorage(formEndTime) : null,
-            is_recurring: formIsRecurring,
-            recurring_dates: formIsRecurring && formRecurringDates.length > 0
-                ? formRecurringDates.map(d => formatDateForStorage(d))
-                : null,
-        };
-
-        let success: boolean;
-
-        if (editingDraftId) {
-            success = await updateDraft(editingDraftId, draftData);
-        } else {
-            const draftId = await saveDraft(draftData);
-            success = !!draftId;
-        }
-
-        setIsSubmitting(false);
-
-        if (success) {
-            // Reset extraction to 'ready' so user can select more images
-            const extractionJobId = currentDraftData?.extraction_job_id;
-            if (extractionJobId) {
-                await resetExtractionToReady(extractionJobId);
-            }
-
-            closeCreateModal();
-
-            // Check if there are more images in the queue
-            if (pendingAnalysisQueue.length > 0) {
-                Alert.alert(
-                    'Borrador guardado',
-                    `Borrador guardado. Procesando ${pendingAnalysisQueue.length} imagen(es) restante(s)...`,
-                    [{ text: 'OK' }]
-                );
-            } else {
-                Alert.alert(
-                    'Borrador guardado',
-                    'Tu borrador se ha guardado. Puedes publicarlo cuando quieras.',
-                    [{ text: 'OK' }]
-                );
-            }
-        } else {
-            Alert.alert('Error', 'No se pudo guardar el borrador. Intenta de nuevo.');
-        }
-    };
 
     // Reset extraction to ready status
     const resetExtractionToReady = async (extractionId: string): Promise<boolean> => {
@@ -957,51 +731,6 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
         } catch {
             return dateString;
         }
-    };
-
-    const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowDatePicker(false);
-        }
-        if (event.type === 'set' && date) {
-            setFormDate(date);
-        }
-    };
-
-    const onTimeChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowTimePicker(false);
-        }
-        if (event.type === 'set' && date) {
-            setFormTime(date);
-        }
-    };
-
-    const onEndTimeChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowEndTimePicker(false);
-        }
-        if (event.type === 'set' && date) {
-            setFormEndTime(date);
-        }
-    };
-
-    const onRecurringDateChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowRecurringDatePicker(false);
-        }
-        if (event.type === 'set' && date) {
-            const dateStr = formatDateForStorage(date);
-            const exists = formRecurringDates.some(d => formatDateForStorage(d) === dateStr);
-            if (!exists) {
-                setFormRecurringDates(prev => [...prev, date].sort((a, b) => a.getTime() - b.getTime()));
-            }
-        }
-    };
-
-    const removeRecurringDate = (dateToRemove: Date) => {
-        const dateStr = formatDateForStorage(dateToRemove);
-        setFormRecurringDates(prev => prev.filter(d => formatDateForStorage(d) !== dateStr));
     };
 
     const renderExtraction = ({ item }: { item: Extraction }) => {
@@ -1297,666 +1026,82 @@ export default function ExtractionsScreen({ embedded = false }: { embedded?: boo
                                     </TouchableOpacity>
                                 </View>
 
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.imageScrollContent}
-                                >
-                                    {selectedExtraction?.images?.map((imgUrl, index) => {
-                                        const isSelected = selectedImages.includes(imgUrl);
+                                <FlatList
+                                    data={selectedExtraction?.images || []}
+                                    keyExtractor={(item, index) => `${index}`}
+                                    numColumns={3}
+                                    contentContainerStyle={styles.imageGrid}
+                                    renderItem={({ item }) => {
+                                        const isSelected = selectedImages.includes(item);
                                         return (
-                                            <View key={index} style={styles.imageOptionContainer}>
-                                                <TouchableOpacity
-                                                    onPress={() => handleSelectImage(imgUrl)}
-                                                    style={[
-                                                        styles.imageOption,
-                                                        isSelected && styles.imageOptionSelected,
-                                                    ]}
-                                                    activeOpacity={0.8}
-                                                >
-                                                    <Image
-                                                        source={{ uri: imgUrl }}
-                                                        style={styles.imageOptionImage}
-                                                        resizeMode="cover"
-                                                    />
-                                                    <View style={styles.imageOptionBadge}>
-                                                        <Text style={styles.imageOptionBadgeText}>
-                                                            {index + 1} / {selectedExtraction.images?.length}
-                                                        </Text>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.imageItem,
+                                                    isSelected && styles.imageItemSelected
+                                                ]}
+                                                onPress={() => toggleImageSelection(item)}
+                                                onLongPress={() => handleSelectImage(item)}
+                                            >
+                                                <Image source={{ uri: item }} style={styles.gridImage} />
+                                                {isSelected && (
+                                                    <View style={styles.checkOverlay}>
+                                                        <Ionicons name="checkmark-circle" size={24} color="#fff" />
                                                     </View>
-                                                    {isSelected && (
-                                                        <View style={styles.selectedOverlay}>
-                                                            <Ionicons name="checkmark-circle" size={32} color="#8B5CF6" />
-                                                        </View>
-                                                    )}
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.selectImageButton,
-                                                        isSelected && styles.selectImageButtonActive,
-                                                    ]}
-                                                    onPress={() => toggleImageSelection(imgUrl)}
-                                                >
-                                                    <Ionicons
-                                                        name={isSelected ? "checkbox" : "square-outline"}
-                                                        size={18}
-                                                        color={isSelected ? "#fff" : "#8B5CF6"}
-                                                    />
-                                                    <Text style={[
-                                                        styles.selectImageButtonText,
-                                                        isSelected && styles.selectImageButtonTextActive,
-                                                    ]}>
-                                                        {isSelected ? 'Seleccionada' : 'Seleccionar'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
+                                                )}
+                                            </TouchableOpacity>
                                         );
-                                    })}
-                                </ScrollView>
+                                    }}
+                                />
 
-                                {/* Analyze selected button */}
-                                {selectedImages.length > 0 && (
-                                    <View style={styles.analyzeSelectedContainer}>
-                                        <TouchableOpacity
-                                            style={styles.analyzeSelectedButton}
-                                            onPress={handleAnalyzeSelected}
-                                        >
-                                            <Ionicons name="sparkles" size={20} color="#fff" />
-                                            <Text style={styles.analyzeSelectedText}>
-                                                Analizar {selectedImages.length} imagen{selectedImages.length > 1 ? 'es' : ''}
-                                            </Text>
-                                        </TouchableOpacity>
-                                        <Text style={styles.analyzeHint}>
-                                            Se procesaran una por una para evitar errores
+                                <View style={styles.modalFooter}>
+                                    <TouchableOpacity
+                                        style={styles.selectAllButton}
+                                        onPress={handleSelectAll}
+                                    >
+                                        <Text style={styles.selectAllText}>
+                                            {selectedImages.length === (selectedExtraction?.images?.length || 0)
+                                                ? 'Deseleccionar todo'
+                                                : 'Seleccionar todo'}
                                         </Text>
-                                    </View>
-                                )}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.analyzeButton,
+                                            selectedImages.length === 0 && styles.analyzeButtonDisabled
+                                        ]}
+                                        onPress={handleAnalyzeSelected}
+                                        disabled={selectedImages.length === 0}
+                                    >
+                                        <Text style={styles.analyzeButtonText}>
+                                            {selectedImages.length > 1
+                                                ? `Analizar (${selectedImages.length})`
+                                                : 'Analizar imagen'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </>
                         )}
                     </View>
                 </View>
             </Modal>
 
-            {/* Create Event Modal */}
+            {/* Event Form Modal for Editing Drafts */}
             <Modal
-                visible={showCreateModal}
-                transparent
+                visible={isCreateModalVisible}
                 animationType="slide"
+                presentationStyle="pageSheet"
                 onRequestClose={closeCreateModal}
             >
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={{ flex: 1 }}
-                    keyboardVerticalOffset={0}
-                >
-                    <View style={styles.createModalOverlay}>
-                        <Pressable
-                            style={styles.modalDismiss}
-                            onPress={closeCreateModal}
-                        />
-                        <View style={styles.createModalContent}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>
-                                    {editingDraftId ? 'Editar Borrador' : 'Crear Borrador'}
-                                </Text>
-                                <TouchableOpacity onPress={closeCreateModal}>
-                                    <Text style={styles.modalCancel}>Cancelar</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView
-                                style={{ flex: 1 }}
-                                contentContainerStyle={styles.createForm}
-                                showsVerticalScrollIndicator={true}
-                                keyboardShouldPersistTaps="handled"
-                                bounces={true}
-                                nestedScrollEnabled={true}
-                            >
-                                {/* Image Preview */}
-                                {formImage && (
-                                    <View style={styles.formImagePreview}>
-                                        <Image
-                                            source={{ uri: formImage }}
-                                            style={styles.formPreviewImage}
-                                            resizeMode="cover"
-                                        />
-                                    </View>
-                                )}
-
-                                {/* Category Selection */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Categoria</Text>
-                                    <View style={styles.categoryGrid}>
-                                        {categories.map((cat) => (
-                                            <TouchableOpacity
-                                                key={cat.id}
-                                                style={[
-                                                    styles.categoryButton,
-                                                    formCategory === cat.id && { backgroundColor: cat.color },
-                                                ]}
-                                                onPress={() => setFormCategory(cat.id)}
-                                            >
-                                                <Ionicons
-                                                    name={cat.icon as any}
-                                                    size={20}
-                                                    color={formCategory === cat.id ? '#fff' : cat.color}
-                                                />
-                                                <Text
-                                                    style={[
-                                                        styles.categoryLabel,
-                                                        formCategory === cat.id && styles.categoryLabelActive,
-                                                    ]}
-                                                >
-                                                    {cat.label}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                </View>
-
-                                {/* Title */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Titulo *</Text>
-                                    <TextInput
-                                        style={styles.formInput}
-                                        placeholder="Nombre del evento"
-                                        placeholderTextColor="#6B7280"
-                                        value={formTitle}
-                                        onChangeText={setFormTitle}
-                                    />
-                                </View>
-
-                                {/* Description */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Descripcion</Text>
-                                    <TextInput
-                                        style={[styles.formInput, styles.textArea]}
-                                        placeholder="Detalles del evento"
-                                        placeholderTextColor="#6B7280"
-                                        value={formDescription}
-                                        onChangeText={setFormDescription}
-                                        multiline
-                                        numberOfLines={3}
-                                        textAlignVertical="top"
-                                    />
-                                </View>
-
-                                {/* Date & Time */}
-                                <View style={styles.formRow}>
-                                    <View style={[styles.formSection, { flex: 1 }]}>
-                                        <Text style={styles.formLabel}>Fecha</Text>
-                                        {Platform.OS === 'web' ? (
-                                            <View style={styles.pickerButton}>
-                                                <Ionicons name="calendar" size={18} color="#8B5CF6" />
-                                                <input
-                                                    type="date"
-                                                    value={formDate ? formatDateForStorage(formDate) : ''}
-                                                    onChange={(e: any) => {
-                                                        if (e.target.value) {
-                                                            setFormDate(new Date(e.target.value + 'T12:00:00'));
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        flex: 1,
-                                                        backgroundColor: 'transparent',
-                                                        border: 'none',
-                                                        color: formDate ? '#fff' : '#6B7280',
-                                                        fontSize: 14,
-                                                        outline: 'none',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                    min={new Date().toISOString().split('T')[0]}
-                                                />
-                                            </View>
-                                        ) : (
-                                            <TouchableOpacity
-                                                style={styles.pickerButton}
-                                                onPress={() => setShowDatePicker(true)}
-                                            >
-                                                <Ionicons name="calendar" size={18} color="#8B5CF6" />
-                                                <Text style={formDate ? styles.pickerText : styles.pickerPlaceholder}>
-                                                    {formDate ? formatDate(formDate) : 'Seleccionar'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                    <View style={[styles.formSection, { flex: 1 }]}>
-                                        <Text style={styles.formLabel}>Hora Inicio</Text>
-                                        {Platform.OS === 'web' ? (
-                                            <View style={styles.pickerButton}>
-                                                <Ionicons name="time" size={18} color="#8B5CF6" />
-                                                <input
-                                                    type="time"
-                                                    value={formTime ? formatTimeForStorage(formTime) : ''}
-                                                    onChange={(e: any) => {
-                                                        if (e.target.value) {
-                                                            const [hours, minutes] = e.target.value.split(':');
-                                                            const date = new Date();
-                                                            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                                                            setFormTime(date);
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        flex: 1,
-                                                        backgroundColor: 'transparent',
-                                                        border: 'none',
-                                                        color: formTime ? '#fff' : '#6B7280',
-                                                        fontSize: 14,
-                                                        outline: 'none',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                />
-                                            </View>
-                                        ) : (
-                                            <TouchableOpacity
-                                                style={styles.pickerButton}
-                                                onPress={() => setShowTimePicker(true)}
-                                            >
-                                                <Ionicons name="time" size={18} color="#8B5CF6" />
-                                                <Text style={formTime ? styles.pickerText : styles.pickerPlaceholder}>
-                                                    {formTime ? formatTime(formTime) : 'Seleccionar'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                    <View style={[styles.formSection, { flex: 1 }]}>
-                                        <Text style={styles.formLabel}>Hora Fin</Text>
-                                        {Platform.OS === 'web' ? (
-                                            <View style={styles.pickerButton}>
-                                                <Ionicons name="time-outline" size={18} color="#F59E0B" />
-                                                <input
-                                                    type="time"
-                                                    value={formEndTime ? formatTimeForStorage(formEndTime) : ''}
-                                                    onChange={(e: any) => {
-                                                        if (e.target.value) {
-                                                            const [hours, minutes] = e.target.value.split(':');
-                                                            const date = new Date();
-                                                            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                                                            setFormEndTime(date);
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        flex: 1,
-                                                        backgroundColor: 'transparent',
-                                                        border: 'none',
-                                                        color: formEndTime ? '#fff' : '#6B7280',
-                                                        fontSize: 14,
-                                                        outline: 'none',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                />
-                                            </View>
-                                        ) : (
-                                            <TouchableOpacity
-                                                style={styles.pickerButton}
-                                                onPress={() => setShowEndTimePicker(true)}
-                                            >
-                                                <Ionicons name="time-outline" size={18} color="#F59E0B" />
-                                                <Text style={formEndTime ? styles.pickerText : styles.pickerPlaceholder}>
-                                                    {formEndTime ? formatTime(formEndTime) : 'Opcional'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                </View>
-
-                                {/* Recurring Event Toggle */}
-                                <View style={styles.formSection}>
-                                    <TouchableOpacity
-                                        style={styles.recurringToggle}
-                                        onPress={() => {
-                                            setFormIsRecurring(!formIsRecurring);
-                                            if (formIsRecurring) {
-                                                setFormRecurringDates([]);
-                                            }
-                                        }}
-                                    >
-                                        <View style={[styles.checkbox, formIsRecurring && styles.checkboxChecked]}>
-                                            {formIsRecurring && <Ionicons name="checkmark" size={14} color="#fff" />}
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.recurringLabel}>Evento Recurrente</Text>
-                                            <Text style={styles.recurringHint}>Agregar fechas adicionales</Text>
-                                        </View>
-                                    </TouchableOpacity>
-
-                                    {formIsRecurring && (
-                                        <View style={styles.recurringDatesContainer}>
-                                            {Platform.OS === 'web' ? (
-                                                <View style={styles.addDateButton}>
-                                                    <Ionicons name="add-circle" size={18} color="#8B5CF6" />
-                                                    <input
-                                                        type="date"
-                                                        onChange={(e: any) => {
-                                                            if (e.target.value) {
-                                                                const newDate = new Date(e.target.value + 'T12:00:00');
-                                                                const dateStr = formatDateForStorage(newDate);
-                                                                const exists = formRecurringDates.some(d => formatDateForStorage(d) === dateStr);
-                                                                if (!exists) {
-                                                                    setFormRecurringDates(prev => [...prev, newDate].sort((a, b) => a.getTime() - b.getTime()));
-                                                                }
-                                                                e.target.value = '';
-                                                            }
-                                                        }}
-                                                        style={{
-                                                            flex: 1,
-                                                            backgroundColor: 'transparent',
-                                                            border: 'none',
-                                                            color: '#8B5CF6',
-                                                            fontSize: 14,
-                                                            outline: 'none',
-                                                            cursor: 'pointer',
-                                                        }}
-                                                        min={new Date().toISOString().split('T')[0]}
-                                                    />
-                                                    <Text style={styles.addDateText}>Agregar fecha</Text>
-                                                </View>
-                                            ) : (
-                                                <TouchableOpacity
-                                                    style={styles.addDateButton}
-                                                    onPress={() => setShowRecurringDatePicker(true)}
-                                                >
-                                                    <Ionicons name="add-circle" size={18} color="#8B5CF6" />
-                                                    <Text style={styles.addDateText}>Agregar fecha</Text>
-                                                </TouchableOpacity>
-                                            )}
-
-                                            {formRecurringDates.length > 0 && (
-                                                <View style={styles.recurringDatesList}>
-                                                    {formRecurringDates.map((date, index) => (
-                                                        <View key={index} style={styles.recurringDateChip}>
-                                                            <Text style={styles.recurringDateText}>
-                                                                {formatDate(date)}
-                                                            </Text>
-                                                            <TouchableOpacity onPress={() => removeRecurringDate(date)}>
-                                                                <Ionicons name="close-circle" size={18} color="#EF4444" />
-                                                            </TouchableOpacity>
-                                                        </View>
-                                                    ))}
-                                                </View>
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-
-                                {/* Location */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Ubicacion</Text>
-                                    <TextInput
-                                        style={styles.formInput}
-                                        placeholder="Donde sera el evento"
-                                        placeholderTextColor="#6B7280"
-                                        value={formLocation}
-                                        onChangeText={setFormLocation}
-                                    />
-                                </View>
-
-                                {/* Organizer */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Organizador</Text>
-                                    <TextInput
-                                        style={styles.formInput}
-                                        placeholder="@instagram_del_organizador"
-                                        placeholderTextColor="#6B7280"
-                                        value={formOrganizer}
-                                        onChangeText={(text) => {
-                                            if (text && !text.startsWith('@')) {
-                                                setFormOrganizer('@' + text);
-                                            } else {
-                                                setFormOrganizer(text);
-                                            }
-                                        }}
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                    />
-                                </View>
-
-                                {/* Target Audience */}
-                                <View style={styles.formSection}>
-                                    <AudienceSelector
-                                        value={formTargetAudience}
-                                        onChange={setFormTargetAudience}
-                                        label="Organizado para"
-                                    />
-                                </View>
-
-                                {/* Price */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>Precio (Q)</Text>
-                                    <TextInput
-                                        style={styles.formInput}
-                                        placeholder="0.00 (Gratis)"
-                                        placeholderTextColor="#6B7280"
-                                        value={formPrice}
-                                        onChangeText={(text) => {
-                                            const cleaned = text.replace(/[^0-9.]/g, '');
-                                            const parts = cleaned.split('.');
-                                            if (parts.length <= 2) setFormPrice(cleaned);
-                                        }}
-                                        keyboardType="decimal-pad"
-                                    />
-                                </View>
-
-                                {/* Registration URL */}
-                                <View style={styles.formSection}>
-                                    <Text style={styles.formLabel}>URL de registro (opcional)</Text>
-                                    <TextInput
-                                        style={styles.formInput}
-                                        placeholder="https://forms.google.com/..."
-                                        placeholderTextColor="#6B7280"
-                                        value={formRegistrationUrl}
-                                        onChangeText={setFormRegistrationUrl}
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        keyboardType="url"
-                                    />
-                                </View>
-
-                                {/* Save Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.saveButton,
-                                        (!formTitle.trim() || isSubmitting) && styles.saveButtonDisabled,
-                                    ]}
-                                    onPress={handleSaveDraft}
-                                    disabled={!formTitle.trim() || isSubmitting}
-                                >
-                                    {isSubmitting ? (
-                                        <ActivityIndicator color="#fff" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="save" size={20} color="#fff" />
-                                            <Text style={styles.saveButtonText}>
-                                                {editingDraftId ? 'Actualizar Borrador' : 'Guardar Borrador'}
-                                            </Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-
-                                <View style={{ height: 40 }} />
-                            </ScrollView>
-                        </View>
-                    </View>
-                </KeyboardAvoidingView>
+                <View style={{ flex: 1 }}>
+                    <EventForm
+                        initialData={currentDraft}
+                        onSuccess={closeCreateModal}
+                        onCancel={closeCreateModal}
+                        isModal={true}
+                    />
+                </View>
             </Modal>
-
-            {/* iOS Date Picker Modal */}
-            {Platform.OS === 'ios' && showDatePicker && (
-                <Modal
-                    transparent
-                    animationType="slide"
-                    visible={showDatePicker}
-                    onRequestClose={() => setShowDatePicker(false)}
-                >
-                    <View style={styles.pickerModalOverlay}>
-                        <Pressable
-                            style={styles.modalDismiss}
-                            onPress={() => setShowDatePicker(false)}
-                        />
-                        <View style={styles.pickerModalContent}>
-                            <View style={styles.pickerModalHeader}>
-                                <Text style={styles.pickerModalTitle}>Seleccionar Fecha</Text>
-                                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                                    <Text style={styles.pickerModalDone}>Listo</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <DateTimePicker
-                                value={formDate || new Date()}
-                                mode="date"
-                                display="spinner"
-                                onChange={onDateChange}
-                                minimumDate={new Date()}
-                                locale="es-MX"
-                                textColor="#fff"
-                            />
-                        </View>
-                    </View>
-                </Modal>
-            )}
-
-            {/* iOS Time Picker Modal */}
-            {Platform.OS === 'ios' && showTimePicker && (
-                <Modal
-                    transparent
-                    animationType="slide"
-                    visible={showTimePicker}
-                    onRequestClose={() => setShowTimePicker(false)}
-                >
-                    <View style={styles.pickerModalOverlay}>
-                        <Pressable
-                            style={styles.modalDismiss}
-                            onPress={() => setShowTimePicker(false)}
-                        />
-                        <View style={styles.pickerModalContent}>
-                            <View style={styles.pickerModalHeader}>
-                                <Text style={styles.pickerModalTitle}>Seleccionar Hora</Text>
-                                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                                    <Text style={styles.pickerModalDone}>Listo</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <DateTimePicker
-                                value={formTime || new Date()}
-                                mode="time"
-                                display="spinner"
-                                onChange={onTimeChange}
-                                locale="es-MX"
-                                textColor="#fff"
-                            />
-                        </View>
-                    </View>
-                </Modal>
-            )}
-
-            {/* Android Date Picker */}
-            {Platform.OS === 'android' && showDatePicker && (
-                <DateTimePicker
-                    value={formDate || new Date()}
-                    mode="date"
-                    display="default"
-                    onChange={onDateChange}
-                    minimumDate={new Date()}
-                />
-            )}
-
-            {/* Android Time Picker */}
-            {Platform.OS === 'android' && showTimePicker && (
-                <DateTimePicker
-                    value={formTime || new Date()}
-                    mode="time"
-                    display="default"
-                    onChange={onTimeChange}
-                    is24Hour={false}
-                />
-            )}
-
-            {/* iOS End Time Picker Modal */}
-            {Platform.OS === 'ios' && showEndTimePicker && (
-                <Modal
-                    transparent
-                    animationType="slide"
-                    visible={showEndTimePicker}
-                    onRequestClose={() => setShowEndTimePicker(false)}
-                >
-                    <View style={styles.pickerModalOverlay}>
-                        <Pressable
-                            style={styles.modalDismiss}
-                            onPress={() => setShowEndTimePicker(false)}
-                        />
-                        <View style={styles.pickerModalContent}>
-                            <View style={styles.pickerModalHeader}>
-                                <Text style={styles.pickerModalTitle}>Hora de Fin</Text>
-                                <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                                    <Text style={styles.pickerModalDone}>Listo</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <DateTimePicker
-                                value={formEndTime || new Date()}
-                                mode="time"
-                                display="spinner"
-                                onChange={onEndTimeChange}
-                                locale="es-MX"
-                                textColor="#fff"
-                            />
-                        </View>
-                    </View>
-                </Modal>
-            )}
-
-            {/* Android End Time Picker */}
-            {Platform.OS === 'android' && showEndTimePicker && (
-                <DateTimePicker
-                    value={formEndTime || new Date()}
-                    mode="time"
-                    display="default"
-                    onChange={onEndTimeChange}
-                    is24Hour={false}
-                />
-            )}
-
-            {/* iOS Recurring Date Picker Modal */}
-            {Platform.OS === 'ios' && showRecurringDatePicker && (
-                <Modal
-                    transparent
-                    animationType="slide"
-                    visible={showRecurringDatePicker}
-                    onRequestClose={() => setShowRecurringDatePicker(false)}
-                >
-                    <View style={styles.pickerModalOverlay}>
-                        <Pressable
-                            style={styles.modalDismiss}
-                            onPress={() => setShowRecurringDatePicker(false)}
-                        />
-                        <View style={styles.pickerModalContent}>
-                            <View style={styles.pickerModalHeader}>
-                                <Text style={styles.pickerModalTitle}>Agregar Fecha</Text>
-                                <TouchableOpacity onPress={() => setShowRecurringDatePicker(false)}>
-                                    <Text style={styles.pickerModalDone}>Listo</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <DateTimePicker
-                                value={new Date()}
-                                mode="date"
-                                display="spinner"
-                                onChange={onRecurringDateChange}
-                                minimumDate={new Date()}
-                                locale="es-MX"
-                                textColor="#fff"
-                            />
-                        </View>
-                    </View>
-                </Modal>
-            )}
-
-            {/* Android Recurring Date Picker */}
-            {Platform.OS === 'android' && showRecurringDatePicker && (
-                <DateTimePicker
-                    value={new Date()}
-                    mode="date"
-                    display="default"
-                    onChange={onRecurringDateChange}
-                    minimumDate={new Date()}
-                />
-            )}
         </View>
     );
 }
@@ -1967,81 +1112,117 @@ const styles = StyleSheet.create({
         backgroundColor: '#0F0F0F',
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        backgroundColor: '#0F0F0F',
         borderBottomWidth: 1,
-        borderBottomColor: '#1F1F1F',
-        gap: 12,
-    },
-    backButton: {
-        padding: 4,
+        borderBottomColor: '#1F2937',
     },
     title: {
-        fontSize: 20,
+        fontSize: 28,
         fontWeight: 'bold',
         color: '#fff',
+        marginBottom: 5,
     },
     subtitle: {
-        fontSize: 12,
+        fontSize: 16,
         color: '#9CA3AF',
     },
-    clearButton: {
-        marginLeft: 'auto',
-        padding: 8,
-    },
-    scrollContainer: {
-        flex: 1,
+    backButton: {
+        marginBottom: 10,
     },
     section: {
-        padding: 16,
+        marginTop: 24,
+        paddingHorizontal: 20,
+        marginBottom: 16,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
         marginBottom: 12,
+        gap: 8,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
         color: '#fff',
     },
     badge: {
-        backgroundColor: '#F59E0B',
-        borderRadius: 10,
+        backgroundColor: '#4B3F1B',
         paddingHorizontal: 8,
         paddingVertical: 2,
+        borderRadius: 12,
     },
     badgeText: {
+        color: '#FCD34D',
         fontSize: 12,
         fontWeight: '600',
-        color: '#000',
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        marginTop: 40,
+    },
+    emptyTitle: {
+        marginTop: 16,
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    emptyText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#9CA3AF',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    createButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#8B5CF6',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 24,
+        gap: 8,
+    },
+    createButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
     extractionCard: {
-        flexDirection: 'row',
         backgroundColor: '#1F1F1F',
-        borderRadius: 12,
-        padding: 12,
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
+        borderRadius: 16,
+        marginBottom: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#333',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
     },
     thumbnail: {
         width: 60,
         height: 60,
         borderRadius: 8,
+        backgroundColor: '#2A2A2A',
+        marginRight: 12,
         overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     thumbnailImage: {
         width: '100%',
         height: '100%',
     },
     thumbnailPlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#2A2A2A',
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -2049,10 +1230,10 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 4,
         right: 4,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        borderRadius: 10,
         paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 8,
     },
     imageCountText: {
         color: '#fff',
@@ -2061,121 +1242,104 @@ const styles = StyleSheet.create({
     },
     extractionContent: {
         flex: 1,
-        gap: 4,
     },
     extractionUrl: {
         fontSize: 14,
         fontWeight: '500',
         color: '#fff',
+        marginBottom: 4,
     },
     statusRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        marginBottom: 4,
+        gap: 4,
     },
     statusText: {
         fontSize: 12,
+        fontWeight: '500',
+        marginRight: 8,
     },
     timeText: {
-        fontSize: 11,
-        color: '#6B7280',
-        marginLeft: 'auto',
+        fontSize: 12,
+        color: '#9CA3AF',
     },
     errorText: {
-        fontSize: 11,
+        fontSize: 12,
         color: '#EF4444',
+        marginTop: 4,
     },
     deleteButton: {
-        padding: 8,
+        padding: 4,
+        marginLeft: 8,
     },
-    // Draft card styles
     draftCard: {
-        flexDirection: 'row',
         backgroundColor: '#1F1F1F',
-        borderRadius: 12,
+        borderRadius: 16,
+        marginBottom: 16,
         padding: 12,
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 2,
         borderWidth: 1,
-        borderColor: '#F59E0B33',
+        borderColor: '#333',
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     draftCardProcessing: {
-        opacity: 0.6,
-    },
-    draftLoadingContainer: {
-        paddingHorizontal: 16,
+        opacity: 0.7,
     },
     draftThumbnail: {
         width: 50,
         height: 50,
         borderRadius: 8,
+        backgroundColor: '#2A2A2A',
+        marginRight: 12,
         overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     draftContent: {
         flex: 1,
-        gap: 2,
+        marginRight: 8,
     },
     draftTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#fff',
-    },
-    draftMeta: {
-        fontSize: 12,
-        color: '#9CA3AF',
-    },
-    draftActions: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    draftActionButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#2A2A2A',
-    },
-    publishButton: {
-        backgroundColor: '#10B98133',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-        paddingVertical: 60,
-        gap: 12,
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#fff',
-        marginTop: 8,
-    },
-    emptyText: {
-        fontSize: 14,
-        color: '#9CA3AF',
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    createButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#8B5CF6',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 8,
-        marginTop: 16,
-    },
-    createButtonText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+        marginBottom: 2,
     },
-    // Modal styles
+    draftMeta: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    draftLoadingContainer: {
+        padding: 8,
+    },
+    draftActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    draftActionButton: {
+        padding: 6,
+        borderRadius: 6,
+        backgroundColor: '#2A2A2A',
+    },
+    publishButton: {
+        backgroundColor: '#064E3B',
+    },
+    clearButton: {
+        padding: 8,
+    },
+    scrollContainer: {
+        flex: 1,
+    },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalDismiss: {
@@ -2185,7 +1349,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#1F1F1F',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        maxHeight: '70%',
+        maxHeight: '80%',
+        paddingBottom: 20,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -2193,7 +1358,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#2A2A2A',
+        borderBottomColor: '#333',
     },
     modalTitle: {
         fontSize: 18,
@@ -2201,63 +1366,33 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     modalCancel: {
-        fontSize: 16,
-        color: '#8B5CF6',
-    },
-    modalSubtitle: {
-        fontSize: 14,
         color: '#9CA3AF',
-        flex: 1,
-    },
-    imageScrollContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 32,
-        gap: 12,
-    },
-    imageOption: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: '#2A2A2A',
-        marginRight: 12,
-    },
-    imageOptionImage: {
-        width: 180,
-        height: 240,
-    },
-    imageOptionBadge: {
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    imageOptionBadgeText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 12,
+        fontSize: 16,
     },
     analyzingContainer: {
-        padding: 24,
-        paddingVertical: 48,
+        padding: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 280,
     },
     queueProgressText: {
-        color: '#9CA3AF',
         fontSize: 14,
-        marginTop: 12,
+        color: '#6B7280',
+        marginTop: 16,
     },
     modalSubtitleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 8,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        flex: 1,
+        marginRight: 16,
     },
     selectAllButton: {
         flexDirection: 'row',
@@ -2272,6 +1407,57 @@ const styles = StyleSheet.create({
         color: '#8B5CF6',
         fontSize: 12,
         fontWeight: '500',
+    },
+    imageGrid: {
+        padding: 2,
+    },
+    imageItem: {
+        flex: 1 / 3,
+        aspectRatio: 1,
+        margin: 2,
+        position: 'relative',
+    },
+    imageItemSelected: {
+        opacity: 0.8,
+        transform: [{ scale: 0.95 }],
+    },
+    gridImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 4,
+    },
+    checkOverlay: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 12,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#333',
+        backgroundColor: '#1F1F1F',
+    },
+    analyzeButton: {
+        backgroundColor: '#8B5CF6',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    analyzeButtonDisabled: {
+        backgroundColor: '#374151',
+    },
+    analyzeButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
     imageOptionContainer: {
         marginRight: 12,
@@ -2333,225 +1519,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     analyzeHint: {
-        color: '#6B7280',
+        color: '#9CA3AF',
         fontSize: 12,
         textAlign: 'center',
-    },
-    // Create Modal styles
-    createModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        justifyContent: 'flex-end',
-    },
-    createModalContent: {
-        backgroundColor: '#1F1F1F',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        height: '85%',
-        overflow: 'hidden',
-    },
-    createForm: {
-        padding: 16,
-        paddingBottom: 40,
-    },
-    formImagePreview: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginBottom: 16,
-    },
-    formPreviewImage: {
-        width: '100%',
-        height: 150,
-    },
-    formSection: {
-        marginBottom: 16,
-    },
-    formLabel: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#9CA3AF',
-        marginBottom: 8,
-    },
-    formInput: {
-        backgroundColor: '#2A2A2A',
-        borderRadius: 10,
-        padding: 14,
-        fontSize: 15,
-        color: '#fff',
-        borderWidth: 1,
-        borderColor: '#3A3A3A',
-    },
-    textArea: {
-        height: 80,
-        paddingTop: 14,
-    },
-    formRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    categoryGrid: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    categoryButton: {
-        flex: 1,
-        padding: 10,
-        backgroundColor: '#2A2A2A',
-        borderRadius: 10,
-        alignItems: 'center',
-        gap: 4,
-    },
-    categoryLabel: {
-        fontSize: 10,
-        color: '#9CA3AF',
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    categoryLabelActive: {
-        color: '#fff',
-    },
-    pickerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#2A2A2A',
-        borderRadius: 10,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#3A3A3A',
-    },
-    pickerText: {
-        color: '#fff',
-        fontSize: 14,
-        flex: 1,
-    },
-    pickerPlaceholder: {
-        color: '#6B7280',
-        fontSize: 14,
-        flex: 1,
-    },
-    saveButton: {
-        flexDirection: 'row',
-        backgroundColor: '#F59E0B',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        marginTop: 8,
-    },
-    saveButtonDisabled: {
-        backgroundColor: '#4B5563',
-        opacity: 0.6,
-    },
-    saveButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    // Picker Modal styles
-    pickerModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'flex-end',
-    },
-    pickerModalContent: {
-        backgroundColor: '#1F1F1F',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingBottom: 34,
-    },
-    pickerModalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2A2A2A',
-    },
-    pickerModalTitle: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    pickerModalDone: {
-        color: '#8B5CF6',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    // Recurring event styles
-    recurringToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: '#1F1F1F',
-        padding: 14,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#2A2A2A',
-    },
-    checkbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 6,
-        borderWidth: 2,
-        borderColor: '#6B7280',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    checkboxChecked: {
-        backgroundColor: '#8B5CF6',
-        borderColor: '#8B5CF6',
-    },
-    recurringLabel: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#fff',
-    },
-    recurringHint: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    recurringDatesContainer: {
-        marginTop: 12,
-    },
-    addDateButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#1F1F1F',
-        padding: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#2A2A2A',
-        borderStyle: 'dashed',
-    },
-    addDateText: {
-        color: '#8B5CF6',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    recurringDatesList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginTop: 12,
-    },
-    recurringDateChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: '#2A2A2A',
-        paddingVertical: 8,
-        paddingLeft: 12,
-        paddingRight: 8,
-        borderRadius: 20,
-    },
-    recurringDateText: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '500',
     },
     // Batch analysis progress styles
     batchProgressBanner: {

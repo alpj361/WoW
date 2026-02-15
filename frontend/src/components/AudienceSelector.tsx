@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -46,6 +47,7 @@ export default function AudienceSelector({
   // Sync local state when modal opens
   useEffect(() => {
     if (modalVisible) {
+      console.log('AudienceSelector: Model opened. Syncing localValue with value prop:', value);
       setLocalValue(value);
       // Parse existing members value
       const memberValue = value.find(v => v.startsWith('miembros:'));
@@ -60,6 +62,7 @@ export default function AudienceSelector({
   }, [modalVisible, value]);
 
   const toggleSection = (section: SectionType) => {
+    console.log('AudienceSelector: toggling section', section);
     setExpandedSections(prev => {
       const next = new Set(prev);
       if (next.has(section)) {
@@ -72,6 +75,7 @@ export default function AudienceSelector({
   };
 
   const toggleUniversity = (uniId: string) => {
+    console.log('AudienceSelector: toggling university', uniId);
     setExpandedUniversities(prev => {
       const next = new Set(prev);
       if (next.has(uniId)) {
@@ -84,6 +88,7 @@ export default function AudienceSelector({
   };
 
   const toggleAudience = (audienceId: string) => {
+    console.log('AudienceSelector: toggling audience', audienceId);
     const key = `audiencia:${audienceId}`;
     setLocalValue(prev => {
       if (prev.includes(key)) {
@@ -94,6 +99,7 @@ export default function AudienceSelector({
   };
 
   const toggleAnyUniversity = () => {
+    console.log('AudienceSelector: toggling any university');
     const key = 'universidad:cualquier';
     setLocalValue(prev => {
       if (prev.includes(key)) {
@@ -106,6 +112,7 @@ export default function AudienceSelector({
   };
 
   const toggleUniversityAll = (uniId: string) => {
+    console.log('AudienceSelector: toggling university all', uniId);
     const key = `universidad:${uniId}`;
     setLocalValue(prev => {
       // Remove "cualquier" if selecting specific university
@@ -123,6 +130,7 @@ export default function AudienceSelector({
   };
 
   const toggleFaculty = (uniId: string, facultyId: string) => {
+    console.log('AudienceSelector: toggling faculty', uniId, facultyId);
     const key = `universidad:${uniId}:${facultyId}`;
     const uniKey = `universidad:${uniId}`;
 
@@ -159,6 +167,7 @@ export default function AudienceSelector({
       finalValue.push(`miembros:${membersOrg.trim()}`);
     }
 
+    console.log('AudienceSelector: Confirming with finalValue:', finalValue);
     onChange(finalValue);
     setModalVisible(false);
   };
@@ -177,7 +186,7 @@ export default function AudienceSelector({
 
   const isFacultySelected = (uniId: string, facultyId: string) => {
     return localValue.includes(`universidad:${uniId}:${facultyId}`) ||
-           localValue.includes(`universidad:${uniId}`);
+      localValue.includes(`universidad:${uniId}`);
   };
 
   const getUniversityFacultyCount = (uniId: string) => {
@@ -194,12 +203,17 @@ export default function AudienceSelector({
   const counts = countAudienceSelections(localValue);
   const displayText = formatAudienceDisplay(value);
 
+  console.log('AudienceSelector: Render, value:', value);
+
   return (
     <>
       {/* Trigger Button */}
       <TouchableOpacity
         style={styles.triggerButton}
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          console.log('AudienceSelector: Button Pressed');
+          setModalVisible(true);
+        }}
       >
         <View style={styles.triggerContent}>
           <Ionicons name="people-outline" size={20} color="#9CA3AF" />
@@ -226,7 +240,14 @@ export default function AudienceSelector({
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>{label}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('AudienceSelector: Closing modal via X button');
+                  setModalVisible(false);
+                }}
+                style={styles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close" size={24} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
@@ -507,7 +528,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F0F0F',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    height: '80%', // Fixed height to ensure children with flex: 1 work correctly
+    zIndex: 10,
   },
 
   // Header

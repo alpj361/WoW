@@ -10,6 +10,7 @@ import {
   Image,
   LayoutChangeEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -86,6 +87,7 @@ const generateMemberId = (memberNumber?: number): string => {
 };
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { savedEvents, attendedEvents, fetchEvents } = useEventStore();
   const { profile, user, signOut, refreshProfile } = useAuth();
   const [cardDesign, setCardDesign] = useState<CardDesign>('classic');
@@ -187,9 +189,13 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
           {/* Demo Banner */}
           <View style={styles.demoBanner}>
             <Ionicons name="flask" size={16} color="#F59E0B" />
@@ -476,7 +482,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: 24,
-    paddingTop: 40,
   },
   demoBanner: {
     flexDirection: 'row',

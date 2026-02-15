@@ -236,8 +236,8 @@ export const GlassSphere: React.FC<GlassSphereProps> = ({
               style={styles.labelGradient}
             >
               <Text
-                style={[styles.labelText, { fontSize: Math.max(9, sphereSize * 0.1) }]}
-                numberOfLines={1}
+                style={[styles.labelText, { fontSize: Math.max(9, sphereSize * 0.11) }]}
+                numberOfLines={2}
                 adjustsFontSizeToFit
               >
                 {placeName}
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '45%',
+    height: '55%',
     justifyContent: 'flex-end',
     borderBottomLeftRadius: 9999,
     borderBottomRightRadius: 9999,
@@ -373,9 +373,9 @@ const styles = StyleSheet.create({
   },
   labelGradient: {
     width: '100%',
-    paddingBottom: '18%',
-    paddingTop: '15%',
-    paddingHorizontal: '12%',
+    paddingBottom: '20%',
+    paddingTop: '12%',
+    paddingHorizontal: '8%',
     alignItems: 'center',
     borderBottomLeftRadius: 9999,
     borderBottomRightRadius: 9999,

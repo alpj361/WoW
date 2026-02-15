@@ -23,6 +23,9 @@ export interface EventDraft {
   is_recurring?: boolean | null;
   recurring_dates?: string[] | null;
   target_audience?: string[] | null;
+  subcategory?: string | null;
+  tags?: string[] | null;
+  event_features?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -102,6 +105,9 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
           is_recurring: draft.is_recurring || null,
           recurring_dates: draft.recurring_dates || null,
           target_audience: draft.target_audience || null,
+          subcategory: draft.subcategory || null,
+          tags: draft.tags || null,
+          event_features: draft.event_features || null,
         })
         .select()
         .single();
@@ -220,6 +226,9 @@ export const useDraftStore = create<DraftStore>()((set, get) => ({
           is_recurring: draft.is_recurring,
           recurring_dates: draft.recurring_dates,
           target_audience: draft.target_audience,
+          subcategory: draft.subcategory || null,
+          tags: draft.tags || null,
+          event_features: draft.event_features || null,
           user_id: null, // Not a hosted event by default
         })
         .select()

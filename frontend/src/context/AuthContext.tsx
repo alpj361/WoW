@@ -207,84 +207,150 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Quick restore from cache when already initialized (prevents loading stuck)
     const restoreFromCache = async () => {
+        const startTime = Date.now();
+        if (Platform.OS === 'ios') {
+            console.log('🍎 [iOS] Starting cache restore');
+        }
+
         try {
-            const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-            if (cachedProfileStr) {
-                const cachedProfile = JSON.parse(cachedProfileStr);
-                const { data: { session: currentSession } } = await supabase.auth.getSession();
-                if (currentSession?.user && cachedProfile.id === currentSession.user.id) {
-                    console.log('🔄 Restored from cache after re-mount');
-                    const merged = mergeAvatarFromMetadata(cachedProfile, currentSession.user);
-                    setSession(currentSession);
-                    setUser(currentSession.user);
-                    setProfile(merged);
-                    if (merged !== cachedProfile) {
-                        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+            // Timeout protection: 5 seconds max for cache operations
+            const timeoutPromise = new Promise<void>((_, reject) =>
+                setTimeout(() => reject(new Error('Cache restore timeout')), 5000)
+            );
+
+            const restorePromise = (async () => {
+                const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+                if (Platform.OS === 'ios') {
+                    console.log(`🍎 [iOS] AsyncStorage read took ${Date.now() - startTime}ms`);
+                }
+
+                if (cachedProfileStr) {
+                    const cachedProfile = JSON.parse(cachedProfileStr);
+                    const sessionStart = Date.now();
+                    const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+                    if (Platform.OS === 'ios') {
+                        console.log(`🍎 [iOS] Session fetch took ${Date.now() - sessionStart}ms`);
+                    }
+
+                    if (currentSession?.user && cachedProfile.id === currentSession.user.id) {
+                        console.log('🔄 Restored from cache after re-mount');
+                        const merged = mergeAvatarFromMetadata(cachedProfile, currentSession.user);
+                        setSession(currentSession);
+                        setUser(currentSession.user);
+                        setProfile(merged);
+                        if (merged !== cachedProfile) {
+                            await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                        }
                     }
                 }
+            })();
+
+            await Promise.race([restorePromise, timeoutPromise]);
+        } catch (e: any) {
+            if (Platform.OS === 'ios') {
+                console.error(`🍎 [iOS] Cache restore error after ${Date.now() - startTime}ms:`, e.message);
+            } else {
+                console.error('Error restoring from cache:', e);
             }
-        } catch (e) {
-            console.error('Error restoring from cache:', e);
         } finally {
+            // CRITICAL: Always set loading to false, even on timeout/error
             setLoading(false);
+            if (Platform.OS === 'ios') {
+                console.log(`🍎 [iOS] Cache restore completed in ${Date.now() - startTime}ms`);
+            }
         }
     };
 
     const initializeAuth = async () => {
+        const startTime = Date.now();
+        if (Platform.OS === 'ios') {
+            console.log('🍎 [iOS] Starting auth initialization');
+        }
+
         try {
-            // Step 1: Try to load from cache first for instant UI
-            const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-            let cachedProfile = null;
-            if (cachedProfileStr) {
-                try {
-                    cachedProfile = JSON.parse(cachedProfileStr);
-                    console.log('📦 Loaded cached profile:', cachedProfile.email);
-                } catch (e) {
-                    console.error('Failed to parse cached profile', e);
-                }
-            }
+            // Timeout protection: 10 seconds max for entire initialization
+            const timeoutPromise = new Promise<void>((_, reject) =>
+                setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+            );
 
-            const { data: { session } } = await supabase.auth.getSession();
-            console.log('🔍 Initial session:', session?.user?.email);
+            const initPromise = (async () => {
+                // Step 1: Try to load from cache first for instant UI
+                const cacheStart = Date.now();
+                const cachedProfileStr = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+                let cachedProfile = null;
 
-            if (session?.user) {
-                setSession(session);
-
-                // If we have a cached profile and it matches the current user, use it immediately
-                // and DO NOT fetch - the cache is sufficient for loading the app
-                if (cachedProfile && cachedProfile.id === session.user.id) {
-                    console.log('🚀 Using cached profile for instant load');
-                    const merged = mergeAvatarFromMetadata(cachedProfile, session.user);
-                    setUser(session.user);
-                    setProfile(merged);
-                    if (merged !== cachedProfile) {
-                        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                if (cachedProfileStr) {
+                    try {
+                        cachedProfile = JSON.parse(cachedProfileStr);
+                        console.log('📦 Loaded cached profile:', cachedProfile.email);
+                    } catch (e) {
+                        console.error('Failed to parse cached profile', e);
                     }
-                    authState.reset(); // Clean state after successful load
-                    setLoading(false);
-                    return; // NO fetch - cache is sufficient
                 }
 
-                // Solo fetch si NO hay cache válido
-                const profileData = await fetchProfile(session.user.id);
-                if (profileData) {
-                    setUser(session.user);
-                    setProfile(profileData);
-                    authState.reset(); // Clean state after successful load
-                } else {
-                    // No cache AND fetch failed - treat as no profile
-                    console.log('❌ No profile on init (and no cache)');
-                    setUser(null);
-                    authState.reset();
+                if (Platform.OS === 'ios') {
+                    console.log(`🍎 [iOS] Cache load took ${Date.now() - cacheStart}ms`);
                 }
-            }
+
+                const sessionStart = Date.now();
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (Platform.OS === 'ios') {
+                    console.log(`🍎 [iOS] Session fetch took ${Date.now() - sessionStart}ms`);
+                }
+
+                console.log('🔍 Initial session:', session?.user?.email);
+
+                if (session?.user) {
+                    setSession(session);
+
+                    // If we have a cached profile and it matches the current user, use it immediately
+                    // and DO NOT fetch - the cache is sufficient for loading the app
+                    if (cachedProfile && cachedProfile.id === session.user.id) {
+                        console.log('🚀 Using cached profile for instant load');
+                        const merged = mergeAvatarFromMetadata(cachedProfile, session.user);
+                        setUser(session.user);
+                        setProfile(merged);
+                        if (merged !== cachedProfile) {
+                            await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+                        }
+                        authState.reset(); // Clean state after successful load
+                        setLoading(false);
+                        return; // NO fetch - cache is sufficient
+                    }
+
+                    // Solo fetch si NO hay cache válido
+                    const profileData = await fetchProfile(session.user.id);
+                    if (profileData) {
+                        setUser(session.user);
+                        setProfile(profileData);
+                        authState.reset(); // Clean state after successful load
+                    } else {
+                        // No cache AND fetch failed - treat as no profile
+                        console.log('❌ No profile on init (and no cache)');
+                        setUser(null);
+                        authState.reset();
+                    }
+                }
+            })();
+
+            await Promise.race([initPromise, timeoutPromise]);
         } catch (error: any) {
             // Ignore abort errors which happen on hot reload or fast navigation
             if (error.name !== 'AbortError' && !error?.message?.includes('aborted')) {
-                console.error('Init auth error:', error);
+                if (Platform.OS === 'ios') {
+                    console.error(`🍎 [iOS] Init auth error after ${Date.now() - startTime}ms:`, error.message);
+                } else {
+                    console.error('Init auth error:', error);
+                }
             }
         } finally {
+            // CRITICAL: Always set loading to false, even on timeout/error
             setLoading(false);
+            if (Platform.OS === 'ios') {
+                console.log(`🍎 [iOS] Auth initialization completed in ${Date.now() - startTime}ms`);
+            }
         }
     };
 

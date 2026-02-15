@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from 'react';
 import { Tabs, Slot, useSegments, useRouter, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebViewport } from '../src/components/WebViewport';
@@ -49,9 +49,13 @@ function RootLayoutNav() {
     }
 
     const timeout = setTimeout(() => {
-      console.log('⚠️ _layout: Auth loading timed out after 30s, forcing redirect');
+      if (Platform.OS === 'ios') {
+        console.log('🍎 [iOS] _layout: Auth loading timed out after 10s, forcing redirect');
+      } else {
+        console.log('⚠️ _layout: Auth loading timed out after 10s, forcing redirect');
+      }
       setHasTimedOut(true);
-    }, 30000); // 30 second timeout (increased for slower networks)
+    }, 10000); // 10 second timeout (reduced from 30s for better UX)
 
     return () => clearTimeout(timeout);
   }, [loading]);
@@ -105,11 +109,20 @@ function RootLayoutNav() {
 
   // While loading auth state, show loading indicator (not just black screen)
   if (loading && !hasTimedOut) {
+    if (Platform.OS === 'ios') {
+      console.log('🍎 [iOS] _layout: Showing loading indicator');
+    }
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#8B5CF6" />
       </View>
     );
+  }
+
+  // If timed out, force redirect to auth
+  if (hasTimedOut) {
+    console.log('⚠️ _layout: Timeout reached, forcing redirect to /auth');
+    return <Redirect href="/auth" />;
   }
 
   // If not authenticated and not on auth route, redirect to auth
@@ -161,7 +174,7 @@ function RootLayoutNav() {
           <Tabs.Screen
             name="places"
             options={{
-              title: 'Places',
+              title: 'Spots',
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="globe" size={size} color={color} />
               ),

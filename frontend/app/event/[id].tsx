@@ -8,6 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { useEventStore } from '../../src/store/eventStore';
+import { parseISO, isPast, isFuture, isToday, parse, format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Event {
     id: string;
@@ -31,11 +33,42 @@ interface Event {
     target_audience?: string[] | null;
 }
 
+/** Parse a date string (YYYY-MM-DD or ISO) as local noon to avoid UTC day-shift */
+const toLocalDate = (dateStr: string): Date => new Date(dateStr.substring(0, 10) + 'T12:00:00');
+
+/** Returns the end datetime of an event (uses end_time if available, else 23:59 of event date) */
+const getEventEndDateTime = (evt: Event): Date => {
+    if (evt.end_time && evt.end_time !== 'No especificado') {
+        const d = new Date(`${evt.date}T${evt.end_time}`);
+        if (!isNaN(d.getTime())) return d;
+    }
+    const d = new Date(`${evt.date}T23:59:59`);
+    return isNaN(d.getTime()) ? new Date(evt.date) : d;
+};
+
+/** True when the event has fully ended. For recurring: at least one date has fully passed. */
+const isEventFullyPast = (evt: Event): boolean => {
+    if (evt.is_recurring && evt.recurring_dates && evt.recurring_dates.length > 0) {
+        const allDates = [evt.date, ...evt.recurring_dates];
+        return allDates.some(d => new Date(`${d}T23:59:59`) < new Date());
+    }
+    return getEventEndDateTime(evt) < new Date();
+};
+
+/** True when the event is currently happening (started but not yet ended). Not applied to recurring. */
+const isEventLive = (evt: Event): boolean => {
+    if (evt.is_recurring) return false;
+    const start = new Date(`${evt.date}T${evt.time || '00:00'}`);
+    const end = getEventEndDateTime(evt);
+    const now = new Date();
+    return !isNaN(start.getTime()) && start <= now && end >= now;
+};
+
 export default function EventDetails() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const { user } = useAuth();
-    const { registerForEvent } = useEventStore();
+    const { registerForEvent, markAttended } = useEventStore();
     const [event, setEvent] = useState<Event | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -45,6 +78,11 @@ export default function EventDetails() {
     const [paymentReceiptUrl, setPaymentReceiptUrl] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Attendance modal
+    const [showDateSelectionModal, setShowDateSelectionModal] = useState(false);
+    const [pastDates, setPastDates] = useState<string[]>([]);
+    const [selectedDates, setSelectedDates] = useState<string[]>([]);
 
     useEffect(() => {
         if (id && id !== 'undefined') {
@@ -72,71 +110,90 @@ export default function EventDetails() {
     };
 
     const handleAttendClick = () => {
-        console.log('🎯 BUTTON CLICKED - handleAttendClick called');
-        console.log('🔍 User exists:', !!user);
-
         if (!user) {
-            Alert.alert('Inicia sesión', 'Debes iniciar sesión para registrarte a este evento');
+            Alert.alert('Inicia sesión', 'Debes iniciar sesión para interactuar');
             return;
         }
 
-        console.log('📊 RAW Event data:', JSON.stringify({
-            price: event?.price,
-            priceType: typeof event?.price,
-            registration_form_url: event?.registration_form_url,
-            bank_name: event?.bank_name,
-            bank_account_number: event?.bank_account_number,
-            user_id: event?.user_id
-        }, null, 2));
+        if (event && isEventFullyPast(event)) {
+            handleMarkAttendance();
+        } else {
+            startRegistrationFlow();
+        }
+    };
+
+    const startRegistrationFlow = () => {
+        console.log('✅ Starting Registration Flow');
 
         const eventPrice = event?.price ? parseFloat(String(event.price)) : 0;
         const hasPrice = eventPrice > 0;
         const hasForm = !!event?.registration_form_url;
         const isHostEvent = !!event?.user_id;
 
-        console.log('💰 Parsed values:', {
-            originalPrice: event?.price,
-            parsedPrice: eventPrice,
-            hasPrice,
-            hasForm,
-            bankName: event?.bank_name,
-            isHostEvent
-        });
-
-        console.log('🚪 Decision: hasForm=', hasForm, ', hasPrice=', hasPrice, ', isHostEvent=', isHostEvent);
-
-        // If event has registration form, open it first
         if (hasForm) {
-            console.log('✅ Opening registration modal');
             setShowRegistrationModal(true);
-        }
-        // If event has price AND is a host event, show payment modal
-        else if (hasPrice && isHostEvent) {
-            console.log('✅ Opening payment modal');
+        } else if (hasPrice && isHostEvent) {
             setShowPaymentModal(true);
-        }
-        // Public event with price (informational only)
-        else if (hasPrice && !isHostEvent) {
-            console.log('✅ Public event with price -> Informational alert then Direct registration');
+        } else if (hasPrice && !isHostEvent) {
             Alert.alert(
                 'Evento con Costo',
                 `Este evento tiene un costo de Q${eventPrice.toFixed(2)}. Contacta al organizador o revisa la descripción para pagar.`,
                 [
-                    {
-                        text: 'Cancelar',
-                        style: 'cancel'
-                    },
-                    {
-                        text: 'Entendido, Asistir',
-                        onPress: () => handleDirectRegistration()
-                    }
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Entendido, Registrarme', onPress: () => handleDirectRegistration() }
                 ]
             );
-        }
-        // Free event with no form, register directly
-        else {
-            console.log('✅ Direct registration (free event)');
+        } else {
             handleDirectRegistration();
+        }
+    };
+
+    const handleMarkAttendance = () => {
+        if (event?.is_recurring && event.recurring_dates) {
+            const allDates = [event.date, ...event.recurring_dates];
+            // Use local-time end-of-day to avoid UTC offset shifting dates
+            const validDates = allDates.filter(d => new Date(`${d}T23:59:59`) < new Date());
+
+            if (validDates.length > 0) {
+                setPastDates(validDates);
+                setSelectedDates([]);
+                setShowDateSelectionModal(true);
+                return;
+            }
+            confirmAttendance([event.date]);
+        } else {
+            confirmAttendance([event?.date || '']);
+        }
+    };
+
+    const toggleDateSelection = (dateStr: string) => {
+        if (selectedDates.includes(dateStr)) {
+            setSelectedDates(selectedDates.filter(d => d !== dateStr));
+        } else {
+            setSelectedDates([...selectedDates, dateStr]);
+        }
+    };
+
+    const confirmAttendance = async (dates: string[]) => {
+        if (!event || dates.length === 0) return;
+        setIsSubmitting(true);
+        try {
+            // Mark for each selected date
+            // We use Promise.all to do it in parallel
+            await Promise.all(dates.map(dateStr => markAttended(event.id, undefined, dateStr)));
+
+            Alert.alert(
+                '¡Asistencia registrada!',
+                dates.length > 1
+                    ? `Has marcado asistencia en ${dates.length} fechas.`
+                    : `Has marcado tu asistencia para el ${dates[0]}`
+            );
+            router.back();
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo registrar la asistencia');
+        } finally {
+            setIsSubmitting(false);
+            setShowDateSelectionModal(false);
         }
     };
 
@@ -219,6 +276,27 @@ export default function EventDetails() {
         }
     };
 
+    const getActionButtonLabel = (): string | null => {
+        if (!event) return null;
+
+        // "Asistir" only when the event has fully ended
+        if (isEventFullyPast(event)) {
+            return 'Asistir';
+        }
+
+        // Future / ongoing: only show button if there's a registration flow
+        const hasForm = !!event.registration_form_url;
+        const hasPrice = !!(event.price && event.price > 0);
+        const isHostEvent = !!event.user_id;
+
+        if (hasForm || (hasPrice && isHostEvent)) {
+            return 'Registrarse';
+        }
+
+        // Free public future event → no action needed
+        return null;
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -258,8 +336,16 @@ export default function EventDetails() {
 
                 <View style={styles.content}>
                     <View style={styles.header}>
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{event.category}</Text>
+                        <View style={styles.badgeRow}>
+                            <View style={styles.badge}>
+                                <Text style={styles.badgeText}>{event.category}</Text>
+                            </View>
+                            {isEventLive(event) && (
+                                <View style={styles.liveBadge}>
+                                    <View style={styles.liveDot} />
+                                    <Text style={styles.liveBadgeText}>EN VIVO</Text>
+                                </View>
+                            )}
                         </View>
                         <Text style={styles.title}>{event.title}</Text>
                     </View>
@@ -278,13 +364,13 @@ export default function EventDetails() {
                                     {/* Fecha principal */}
                                     <View style={[styles.recurringChip, styles.mainDateChip]}>
                                         <Ionicons name="calendar" size={14} color="#8B5CF6" />
-                                        <Text style={styles.recurringChipText}>{event.date}</Text>
+                                        <Text style={styles.recurringChipText}>{format(toLocalDate(event.date), 'd MMM yyyy', { locale: es })}</Text>
                                     </View>
                                     {/* Fechas adicionales */}
                                     {event.recurring_dates.map((dateStr, index) => (
                                         <View key={index} style={styles.recurringChip}>
                                             <Ionicons name="calendar" size={14} color="#8B5CF6" />
-                                            <Text style={styles.recurringChipText}>{dateStr}</Text>
+                                            <Text style={styles.recurringChipText}>{format(toLocalDate(dateStr), 'd MMM yyyy', { locale: es })}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -292,30 +378,46 @@ export default function EventDetails() {
                         ) : (
                             <View style={styles.metaRow}>
                                 <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
-                                <Text style={styles.metaText}>{event.date}</Text>
+                                <Text style={styles.metaText}>{format(toLocalDate(event.date), "EEEE d 'de' MMMM yyyy", { locale: es })}</Text>
                             </View>
                         )}
 
                         {/* Hora inicio - fin */}
-                        <View style={styles.metaRow}>
-                            <Ionicons name="time-outline" size={20} color="#9CA3AF" />
-                            <Text style={styles.metaText}>
-                                {event.time}{event.end_time ? ` - ${event.end_time}` : ''}
-                            </Text>
-                        </View>
+                        {!!event.time && event.time !== 'No especificado' && (
+                            <View style={styles.metaRow}>
+                                <Ionicons name="time-outline" size={20} color="#9CA3AF" />
+                                <Text style={styles.metaText}>
+                                    {event.time}{event.end_time && event.end_time !== 'No especificado' ? ` - ${event.end_time}` : ''}
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Ubicación */}
-                        <View style={styles.metaRow}>
-                            <Ionicons name="location-outline" size={20} color="#9CA3AF" />
-                            <Text style={styles.metaText}>{event.location}</Text>
-                        </View>
-
-                        {/* Organizador */}
-                        {event.organizer && (
+                        {!!event.location && (
                             <View style={styles.metaRow}>
-                                <Ionicons name="person-outline" size={20} color="#9CA3AF" />
-                                <Text style={styles.metaText}>{event.organizer}</Text>
+                                <Ionicons name="location-outline" size={20} color="#9CA3AF" />
+                                <Text style={styles.metaText}>{event.location}</Text>
                             </View>
+                        )}
+
+                        {/* Organizador — Instagram */}
+                        {!!event.organizer && (
+                            <TouchableOpacity
+                                style={styles.instagramRow}
+                                onPress={() => {
+                                    const handle = event.organizer!.replace(/^@/, '');
+                                    Linking.openURL(`https://instagram.com/${handle}`);
+                                }}
+                                activeOpacity={0.75}
+                            >
+                                <View style={styles.instagramIconWrap}>
+                                    <Ionicons name="logo-instagram" size={18} color="#fff" />
+                                </View>
+                                <Text style={styles.instagramHandle}>
+                                    {event.organizer.startsWith('@') ? event.organizer : `@${event.organizer}`}
+                                </Text>
+                                <Ionicons name="open-outline" size={14} color="#E1306C" style={{ marginLeft: 'auto' }} />
+                            </TouchableOpacity>
                         )}
 
                         {/* Precio */}
@@ -372,27 +474,94 @@ export default function EventDetails() {
                         </>
                     )}
 
-                    <View style={styles.divider} />
-
-                    <Text style={styles.sectionTitle}>Acerca del evento</Text>
-                    <Text style={styles.description}>{event.description}</Text>
+                    {!!event.description && (
+                        <>
+                            <View style={styles.divider} />
+                            <Text style={styles.sectionTitle}>Acerca del evento</Text>
+                            <Text style={styles.description}>{event.description}</Text>
+                        </>
+                    )}
                 </View>
             </ScrollView>
 
-            {/* Action Bar */}
-            <View style={styles.actionBar}>
-                <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={handleAttendClick}
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Text style={styles.primaryButtonText}>Asistir</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
+            {/* Action Bar — only shown when there's an action to take */}
+            {getActionButtonLabel() !== null && (
+                <View style={styles.actionBar}>
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={handleAttendClick}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <Text style={styles.primaryButtonText}>
+                                {getActionButtonLabel()}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Date Selection Modal */}
+            <Modal
+                visible={showDateSelectionModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowDateSelectionModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Pressable style={styles.modalDismiss} onPress={() => setShowDateSelectionModal(false)} />
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>¿A cuáles fechas asististe?</Text>
+                            <TouchableOpacity onPress={() => setShowDateSelectionModal(false)}>
+                                <Ionicons name="close" size={24} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalBody}>
+                            <Text style={[styles.modalText, { marginBottom: 16, textAlign: 'left' }]}>
+                                Selecciona todas las fechas a las que asististe:
+                            </Text>
+                            {pastDates.map((dateStr, idx) => {
+                                const isSelected = selectedDates.includes(dateStr);
+                                let displayDate = dateStr;
+                                try {
+                                    displayDate = format(new Date(`${dateStr}T12:00:00`), "EEEE d 'de' MMMM yyyy", { locale: es });
+                                } catch {}
+                                return (
+                                    <TouchableOpacity
+                                        key={idx}
+                                        style={[styles.modalButton, isSelected && styles.modalButtonSelected]}
+                                        onPress={() => toggleDateSelection(dateStr)}
+                                    >
+                                        <Ionicons
+                                            name={isSelected ? "checkbox" : "square-outline"}
+                                            size={24}
+                                            color={isSelected ? '#8B5CF6' : '#9CA3AF'}
+                                        />
+                                        <Text style={[styles.modalButtonText, isSelected && { color: '#C4B5FD' }]}>
+                                            {displayDate}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.modalButton,
+                                { backgroundColor: '#8B5CF6', marginTop: 16, justifyContent: 'center' },
+                                selectedDates.length === 0 && { opacity: 0.5 }
+                            ]}
+                            onPress={() => confirmAttendance(selectedDates)}
+                            disabled={selectedDates.length === 0}
+                        >
+                            <Text style={[styles.modalButtonText, { fontWeight: 'bold' }]}>Confirmar Asistencia</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Registration Form Modal */}
             <Modal
@@ -576,19 +745,48 @@ const styles = StyleSheet.create({
     header: {
         marginBottom: 20,
     },
+    badgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+        flexWrap: 'wrap',
+    },
     badge: {
         alignSelf: 'flex-start',
         backgroundColor: '#8B5CF6',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
-        marginBottom: 12,
     },
     badgeText: {
         color: '#FFF',
         fontSize: 12,
         fontWeight: '600',
         textTransform: 'capitalize',
+    },
+    liveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    liveDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: '#EF4444',
+    },
+    liveBadgeText: {
+        color: '#EF4444',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.8,
     },
     title: {
         color: '#FFF',
@@ -765,14 +963,19 @@ const styles = StyleSheet.create({
     },
     modalButton: {
         flexDirection: 'row',
-        backgroundColor: '#8B5CF6',
+        backgroundColor: '#1E1E1E', // Dark background for unselected
         padding: 18,
         borderRadius: 16,
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        marginHorizontal: 20,
-        marginTop: 16,
+        justifyContent: 'flex-start', // Align left for list items
+        gap: 12,
+        marginBottom: 8, // Space between items
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    modalButtonSelected: {
+        backgroundColor: 'rgba(139, 92, 246, 0.2)', // Light purple bg
+        borderColor: '#8B5CF6',
     },
     modalButtonDisabled: {
         backgroundColor: '#4B5563',
@@ -860,5 +1063,31 @@ const styles = StyleSheet.create({
         right: 8,
         backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 12,
+    },
+    instagramRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: 'rgba(225, 48, 108, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(225, 48, 108, 0.3)',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        alignSelf: 'flex-start',
+        minWidth: 180,
+    },
+    instagramIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: '#E1306C',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    instagramHandle: {
+        color: '#F9A8D4',
+        fontSize: 15,
+        fontWeight: '600',
     },
 });

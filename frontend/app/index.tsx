@@ -125,7 +125,7 @@ export default function ExploreScreen() {
       } else {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Show toast helper
@@ -136,7 +136,7 @@ export default function ExploreScreen() {
   const handleSwipeRight = useCallback(async () => {
     console.log('🎯 handleSwipeRight called');
     triggerHaptic('success');
-    
+
     if (currentEvent) {
       console.log('📋 Current event:', {
         id: currentEvent.id,
@@ -224,6 +224,25 @@ export default function ExploreScreen() {
     }
 
     if (currentIndex >= events.length) {
+      if (hasNewFeedData) {
+        return (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="sparkles" size={64} color="#8B5CF6" />
+            <Text style={styles.emptyTitle}>¡Nuevos eventos!</Text>
+            <Text style={styles.emptyText}>
+              Hemos encontrado eventos recientes.
+            </Text>
+            <TouchableOpacity
+              style={[styles.resetButton, { backgroundColor: '#8B5CF6' }]}
+              onPress={handleRefreshFromBanner}
+            >
+              <Ionicons name="refresh" size={20} color="#fff" />
+              <Text style={styles.resetButtonText}>Cargar nuevos</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="checkmark-circle" size={64} color="#10B981" />
