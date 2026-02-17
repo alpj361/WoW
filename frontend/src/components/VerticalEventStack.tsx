@@ -146,6 +146,7 @@ interface VerticalEventStackProps {
   onIndexChange: (index: number) => void;
   onSave: (event: Event) => void;
   onSkip: (event: Event) => void;
+  readOnly?: boolean;
 }
 
 export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
@@ -154,6 +155,7 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
   onIndexChange,
   onSave,
   onSkip,
+  readOnly = false,
 }) => {
   const translateY = useSharedValue(0);
   const lastNavTime = useRef(0);
@@ -269,9 +271,9 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
           event={event}
           diff={diff}
           translateY={translateY}
-          onSave={isCurrent ? () => onSave(event) : undefined}
-          onSkip={isCurrent ? () => onSkip(event) : undefined}
-          showActions={isCurrent}
+          onSave={isCurrent && !readOnly ? () => onSave(event) : undefined}
+          onSkip={isCurrent && !readOnly ? () => onSkip(event) : undefined}
+          showActions={isCurrent && !readOnly}
         />
       );
     }

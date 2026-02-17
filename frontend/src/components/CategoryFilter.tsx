@@ -18,7 +18,7 @@ const categories: Category[] = [
   { id: 'all', label: 'Todos', icon: 'grid', color: '#6B7280' },
   { id: 'music', label: 'Entretenimiento', icon: 'musical-notes', color: '#8B5CF6' },
   { id: 'volunteer', label: 'Voluntariado', icon: 'heart', color: '#EC4899' },
-  { id: 'general', label: 'General', icon: 'fast-food', color: '#F59E0B' },
+  { id: 'general', label: 'General', icon: 'cafe', color: '#F59E0B' },
 ];
 
 interface CategoryFilterProps {
@@ -45,8 +45,8 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
               style={[
                 styles.iconCircle,
                 {
-                  backgroundColor: isSelected ? '#8B5CF6' : '#1E1E1E',
-                  borderColor: isSelected ? '#8B5CF6' : '#333',
+                  backgroundColor: isSelected ? category.color : '#1E1E1E',
+                  borderColor: isSelected ? category.color : '#333',
                 },
               ]}
             >
@@ -59,7 +59,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             <Text
               style={[
                 styles.label,
-                isSelected && { color: '#8B5CF6', fontWeight: '600' },
+                isSelected && { color: category.color, fontWeight: '600' },
               ]}
             >
               {category.label}

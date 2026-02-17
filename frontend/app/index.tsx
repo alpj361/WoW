@@ -17,8 +17,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../src/context/AuthContext';
 import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
@@ -29,9 +30,14 @@ import { AnimatedToast } from '../src/components/AnimatedToast';
 import { SwipeCardSkeleton } from '../src/components/SkeletonLoader';
 import { VerticalEventStack } from '../src/components/VerticalEventStack';
 import { FreshDataBanner } from '../src/components/FreshDataBanner';
+import { ProcessionesListView } from '../src/components/ProcessionesListView';
+import { FeedModeToggle, type FeedMode } from '../src/components/FeedModeToggle';
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const router = useRouter();
+  const isGuest = !user;
   const {
     events,
     isLoading,
@@ -63,13 +69,16 @@ export default function ExploreScreen() {
   // Initial load
   useEffect(() => {
     const init = async () => {
-      await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+      // Guests don't need saved/denied events
+      if (!isGuest) {
+        await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+      }
       await fetchEvents();
       setIsInitialized(true);
       isFirstLoad.current = false;
     };
     init();
-  }, []);
+  }, [isGuest]);
 
   // Silent refresh when tab is focused (after first load)
   useFocusEffect(
@@ -96,12 +105,14 @@ export default function ExploreScreen() {
   // Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+    if (!isGuest) {
+      await Promise.all([fetchSavedEvents(), fetchDeniedEvents()]);
+    }
     await fetchEvents();
     setCurrentIndex(0);
     clearNewDataFlags();
     setRefreshing(false);
-  }, [fetchEvents, fetchSavedEvents, fetchDeniedEvents, clearNewDataFlags]);
+  }, [fetchEvents, fetchSavedEvents, fetchDeniedEvents, clearNewDataFlags, isGuest]);
 
   // Handler for "new data available" banner
   const handleRefreshFromBanner = useCallback(async () => {
@@ -136,6 +147,12 @@ export default function ExploreScreen() {
   const handleSwipeRight = useCallback(async () => {
     console.log('🎯 handleSwipeRight called');
     triggerHaptic('success');
+
+    // Guest mode: just navigate to next card, no save action
+    if (isGuest) {
+      goToNextCard();
+      return;
+    }
 
     if (currentEvent) {
       console.log('📋 Current event:', {
@@ -185,17 +202,22 @@ export default function ExploreScreen() {
       console.log('⚠️ No current event');
       goToNextCard();
     }
-  }, [currentEvent, saveEvent, goToNextCard, triggerHaptic, showToast]);
+  }, [currentEvent, saveEvent, goToNextCard, triggerHaptic, showToast, isGuest]);
 
   const handleSwipeLeft = useCallback(async () => {
     triggerHaptic('medium');
+    // Guest mode: just navigate to next card, no deny action
+    if (isGuest) {
+      goToNextCard();
+      return;
+    }
     if (currentEvent) {
       console.log('🚫 Denying event:', currentEvent.id);
       denyEvent(currentEvent.id);
       showToast('Pasado', 'skip');
     }
     goToNextCard();
-  }, [goToNextCard, currentEvent, denyEvent, triggerHaptic, showToast]);
+  }, [goToNextCard, currentEvent, denyEvent, triggerHaptic, showToast, isGuest]);
 
   const handleSaveEvent = useCallback(async (event: Event) => {
     handleSwipeRight();
@@ -316,8 +338,12 @@ export default function ExploreScreen() {
     }
   };
 
+  // Feed mode toggle (Eventos | Cuaresma)
+  const [feedMode, setFeedMode] = useState<FeedMode>('eventos');
+  const isCuaresmaMode = feedMode === 'cuaresma';
+
   // Determine if we should show the vertical stack (gestures) or scrollable content
-  const showVerticalStack = isInitialized && events.length > 0 && currentIndex < events.length;
+  const showVerticalStack = !isCuaresmaMode && isInitialized && events.length > 0 && currentIndex < events.length;
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -339,17 +365,28 @@ export default function ExploreScreen() {
       />
 
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
-        <WowLogo width={100} height={32} />
-        <Text style={styles.tagline}>Descubre y Vive Eventos</Text>
+        <WowLogo width={100} height={32} variant={isCuaresmaMode ? 'cuaresma' : 'default'} />
+        <Text style={[styles.tagline, isCuaresmaMode && { color: '#C4B5FD' }]}>
+          {isCuaresmaMode ? 'Cuaresma 2026' : 'Descubre y Vive Eventos'}
+        </Text>
       </View>
 
-      <CategoryFilter
-        selectedCategory={currentCategory}
-        onSelectCategory={setCategory}
-      />
+      <FeedModeToggle mode={feedMode} onModeChange={setFeedMode} />
 
-      {/* Vertical stack with gesture handling - rendered outside ScrollView */}
-      {showVerticalStack ? (
+      {/* Category filters only in Eventos mode */}
+      {!isCuaresmaMode && (
+        <CategoryFilter
+          selectedCategory={currentCategory}
+          onSelectCategory={setCategory}
+        />
+      )}
+
+      {/* Procesiones view */}
+      {isCuaresmaMode ? (
+        <View style={styles.stackContainer}>
+          <ProcessionesListView />
+        </View>
+      ) : showVerticalStack ? (
         <View style={styles.stackContainer}>
           <VerticalEventStack
             events={events}
@@ -357,6 +394,7 @@ export default function ExploreScreen() {
             onIndexChange={setCurrentIndex}
             onSave={handleSaveEvent}
             onSkip={handleSkipEvent}
+            readOnly={isGuest}
           />
         </View>
       ) : (

@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -81,6 +83,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   const cardHeight = Math.min(screenHeight * 0.62, 520);
 
   const router = useRouter();
+  const { user } = useAuth();
+  const isGuest = !user;
 
   // Animation values for buttons
   const skipScale = useSharedValue(1);
@@ -89,6 +93,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   const saveRotation = useSharedValue(0);
 
   const handlePress = () => {
+    // Guest mode: do nothing on tap
+    if (isGuest) return;
     if (event.id) {
       router.push(`/event/${event.id}`);
     }
@@ -102,7 +108,7 @@ export const EventCard: React.FC<EventCardProps> = ({
       } else {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Skip button gesture

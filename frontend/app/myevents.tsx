@@ -28,6 +28,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { useEventStore, HostedEventData } from '../src/store/eventStore';
+import { useProcesionStore, ProcesionDB, mapDBToProcesion, isProcessionLive } from '../src/store/procesionStore';
+import { ProcessionDetailModal } from '../src/components/ProcessionDetailModal';
 import { useAuth } from '../src/context/AuthContext';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
@@ -74,6 +76,12 @@ export default function MyEventsScreen() {
     removeAttended,
     deleteEvent,
   } = useEventStore();
+
+  const {
+    savedProcesiones,
+    fetchSavedProcesiones,
+    unsaveProcesion,
+  } = useProcesionStore();
 
   // -- State --
   const [activeTab, setActiveTab] = useState<'collection' | 'attended' | 'hosted'>('collection');
@@ -133,6 +141,12 @@ export default function MyEventsScreen() {
     userName: string;
   }>({ visible: false, imageUrl: '', userName: '' });
 
+  // Procession Modal
+  const [procesionModal, setProcesionModal] = useState<{
+    visible: boolean;
+    procesion: any | null;
+  }>({ visible: false, procesion: null });
+
   // -- Load Data --
   const loadData = useCallback(async () => {
     try {
@@ -140,6 +154,7 @@ export default function MyEventsScreen() {
         fetchSavedEvents(),
         fetchAttendedEvents(),
         fetchHostedEvents(),
+        fetchSavedProcesiones(),
       ]);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -148,7 +163,7 @@ export default function MyEventsScreen() {
       setRefreshing(false);
       isFirstLoad.current = false;
     }
-  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents]);
+  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents, fetchSavedProcesiones]);
 
   useFocusEffect(
     useCallback(() => {
@@ -200,6 +215,28 @@ export default function MyEventsScreen() {
           onPress: async () => {
             try {
               await unsaveEvent(eventId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo eliminar de guardados');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUnsaveProcesion = async (procesionId: string) => {
+    Alert.alert(
+      'Eliminar de guardados',
+      '¿Seguro que quieres quitar esta procesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await unsaveProcesion(procesionId);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (e) {
               Alert.alert('Error', 'No se pudo eliminar de guardados');
@@ -373,6 +410,12 @@ export default function MyEventsScreen() {
     }
   };
 
+  const handleOpenProcesion = (proc: ProcesionDB) => {
+    const mapped = mapDBToProcesion(proc);
+    setProcesionModal({ visible: true, procesion: mapped });
+  };
+
+
   // -- Renders --
 
   const renderHeader = () => (
@@ -396,8 +439,8 @@ export default function MyEventsScreen() {
           <Text style={[styles.tabText, activeTab === 'collection' && styles.activeTabText]}>
             Interesados
           </Text>
-          {savedEvents.length > 0 && (
-            <View style={styles.badge}><Text style={styles.badgeText}>{savedEvents.length}</Text></View>
+          {(savedEvents.length + savedProcesiones.length) > 0 && (
+            <View style={styles.badge}><Text style={styles.badgeText}>{savedEvents.length + savedProcesiones.length}</Text></View>
           )}
         </TouchableOpacity>
 
@@ -427,6 +470,8 @@ export default function MyEventsScreen() {
       </View>
     </View>
   );
+
+
 
   const renderSavedCard = (item: any, index: number) => {
     const event = item.event || item;
@@ -613,30 +658,136 @@ export default function MyEventsScreen() {
     );
   };
 
-  const renderCollectionTab = () => (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
-    >
-      {savedEvents.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Feather name="bookmark" size={40} color="#334155" />
-          <Text style={styles.emptyText}>No tienes eventos en interesados</Text>
-        </View>
-      ) : (
-        <View style={styles.masonryGrid}>
-          <View style={styles.masonryCol}>
-            {savedEvents.filter((_, i) => i % 2 === 0).map((item, i) => renderSavedCard(item, i))}
+  const renderSavedProcesionCard = (proc: ProcesionDB) => {
+    const imageUri = proc.imagenes_procesion?.[0] || proc.imagenes_recorrido?.[0] || null;
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+    const [y, m, d] = proc.fecha.split('-').map(Number);
+    const dateStr = `${d} ${months[m - 1]}`;
+    const isLive = isProcessionLive(proc);
+
+    return (
+      <TouchableOpacity
+        key={`proc-${proc.id}`}
+        style={[styles.savedCard, { borderColor: '#7C3AED33', borderWidth: 1 }]}
+        onPress={() => { Haptics.selectionAsync(); handleOpenProcesion(proc); }}
+        onLongPress={() => handleUnsaveProcesion(proc.id)}
+        delayLongPress={500}
+        activeOpacity={0.9}
+      >
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.savedImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.savedImage, { backgroundColor: '#1E1040', justifyContent: 'center', alignItems: 'center' }]}>
+            <MaterialCommunityIcons name="cross-outline" size={40} color="#7C3AED" />
           </View>
-          <View style={styles.masonryCol}>
-            {savedEvents.filter((_, i) => i % 2 !== 0).map((item, i) => renderSavedCard(item, i))}
+        )}
+        {isLive && (
+          <View style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            backgroundColor: '#EF4444',
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 4,
+            zIndex: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4
+          }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>
+              EN VIVO
+            </Text>
           </View>
+        )}
+        <LinearGradient
+          colors={['transparent', 'rgba(30,16,64,0.95)']}
+          style={styles.savedGradient}
+        >
+          <View style={styles.savedContent}>
+            <Text style={styles.savedTitle} numberOfLines={2}>{proc.nombre}</Text>
+            <Text style={[styles.savedDate, { color: '#C4B5FD' }]}>{dateStr}</Text>
+          </View>
+        </LinearGradient>
+        <View style={[styles.unsaveBtn, { backgroundColor: '#7C3AED20' }]}>
+          <MaterialCommunityIcons name="cross-outline" size={16} color="#A78BFA" />
         </View>
-      )}
-      <View style={{ height: 100 }} />
-    </ScrollView>
-  );
+      </TouchableOpacity>
+    );
+  };
+
+  const renderCollectionTab = () => {
+    const hasProc = savedProcesiones.length > 0;
+    const hasEvents = savedEvents.length > 0;
+    const isEmpty = !hasProc && !hasEvents;
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+      >
+        {isEmpty ? (
+          <View style={styles.emptyState}>
+            <Feather name="bookmark" size={40} color="#334155" />
+            <Text style={styles.emptyText}>No tienes eventos en interesados</Text>
+          </View>
+        ) : (
+          <>
+            {/* ── Saved Processions ── */}
+            {hasProc && (
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 }}>
+                  <MaterialCommunityIcons name="cross-outline" size={18} color="#A78BFA" />
+                  <Text style={{ color: '#A78BFA', fontSize: 14, fontWeight: '600', marginLeft: 6 }}>
+                    Procesiones
+                  </Text>
+                  <View style={{ backgroundColor: '#7C3AED33', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 }}>
+                    <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: 'bold' }}>{savedProcesiones.length}</Text>
+                  </View>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
+                  {savedProcesiones.map(proc => (
+                    <View key={`proc-scroll-${proc.id}`} style={{ width: (width - 48) / 2, marginHorizontal: 4 }}>
+                      {renderSavedProcesionCard(proc)}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* ── Saved Events ── */}
+            {hasEvents && (
+              <>
+                {hasProc && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 }}>
+                    <Feather name="calendar" size={15} color="#4ADE80" />
+                    <Text style={{ color: '#4ADE80', fontSize: 14, fontWeight: '600', marginLeft: 6 }}>
+                      Eventos
+                    </Text>
+                    <View style={{ backgroundColor: '#4ADE8033', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 }}>
+                      <Text style={{ color: '#86EFAC', fontSize: 11, fontWeight: 'bold' }}>{savedEvents.length}</Text>
+                    </View>
+                  </View>
+                )}
+                <View style={styles.masonryGrid}>
+                  <View style={styles.masonryCol}>
+                    {savedEvents.filter((_, i) => i % 2 === 0).map((item, i) => renderSavedCard(item, i))}
+                  </View>
+                  <View style={styles.masonryCol}>
+                    {savedEvents.filter((_, i) => i % 2 !== 0).map((item, i) => renderSavedCard(item, i))}
+                  </View>
+                </View>
+              </>
+            )}
+          </>
+        )}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    );
+  };
 
   const renderAttendedTab = () => (
     <ScrollView
@@ -987,6 +1138,12 @@ export default function MyEventsScreen() {
         </View>
       </Modal>
 
+      {/* Procession Detail Modal */}
+      <ProcessionDetailModal
+        visible={procesionModal.visible}
+        procesion={procesionModal.procesion}
+        onClose={() => setProcesionModal({ visible: false, procesion: null })}
+      />
     </View>
   );
 }

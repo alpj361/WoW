@@ -6,12 +6,14 @@ interface WowLogoProps {
     width?: number;
     height?: number;
     glowIntensity?: 'low' | 'medium' | 'high';
+    variant?: 'default' | 'cuaresma';
 }
 
 export const WowLogo: React.FC<WowLogoProps> = ({
     width = 120,
     height = 40,
-    glowIntensity = 'medium'
+    glowIntensity = 'medium',
+    variant = 'default',
 }) => {
     // Glow opacity based on intensity
     const glowOpacity = {
@@ -20,24 +22,26 @@ export const WowLogo: React.FC<WowLogoProps> = ({
         high: { outer: 0.3, middle: 0.45, inner: 0.6 },
     }[glowIntensity];
 
+    const isCuaresma = variant === 'cuaresma';
+
     return (
         <View style={styles.container}>
             <Svg width={width} height={height} viewBox="0 0 1400 450">
                 <Defs>
-                    {/* Main gradient - vibrant purple to pink/red */}
+                    {/* Main gradient */}
                     <LinearGradient id="mainGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-                        <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
-                        <Stop offset="25%" stopColor="#A855F7" stopOpacity="1" />
-                        <Stop offset="50%" stopColor="#D946EF" stopOpacity="1" />
-                        <Stop offset="75%" stopColor="#EC4899" stopOpacity="1" />
-                        <Stop offset="100%" stopColor="#F43F5E" stopOpacity="1" />
+                        <Stop offset="0%" stopColor={isCuaresma ? '#6D28D9' : '#8B5CF6'} stopOpacity="1" />
+                        <Stop offset="25%" stopColor={isCuaresma ? '#7C3AED' : '#A855F7'} stopOpacity="1" />
+                        <Stop offset="50%" stopColor={isCuaresma ? '#8B5CF6' : '#D946EF'} stopOpacity="1" />
+                        <Stop offset="75%" stopColor={isCuaresma ? '#A78BFA' : '#EC4899'} stopOpacity="1" />
+                        <Stop offset="100%" stopColor={isCuaresma ? '#C4B5FD' : '#F43F5E'} stopOpacity="1" />
                     </LinearGradient>
 
-                    {/* Neon glow gradient - for outer glow layers */}
+                    {/* Neon glow gradient */}
                     <LinearGradient id="glowGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-                        <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
-                        <Stop offset="50%" stopColor="#D946EF" stopOpacity="1" />
-                        <Stop offset="100%" stopColor="#F43F5E" stopOpacity="1" />
+                        <Stop offset="0%" stopColor={isCuaresma ? '#6D28D9' : '#8B5CF6'} stopOpacity="1" />
+                        <Stop offset="50%" stopColor={isCuaresma ? '#7C3AED' : '#D946EF'} stopOpacity="1" />
+                        <Stop offset="100%" stopColor={isCuaresma ? '#A78BFA' : '#F43F5E'} stopOpacity="1" />
                     </LinearGradient>
                 </Defs>
 

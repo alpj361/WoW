@@ -9,6 +9,8 @@ import {
   Modal,
   Image,
   LayoutChangeEvent,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -404,8 +406,25 @@ export default function ProfileScreen() {
             <SettingItem
               icon="document-text"
               title="Terminos y Condiciones"
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  router.push('/terminos');
+                } else {
+                  Linking.openURL('https://wo-w-nu.vercel.app/terminos');
+                }
+              }}
             />
-            <SettingItem icon="shield" title="Privacidad" />
+            <SettingItem
+              icon="shield"
+              title="Privacidad"
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  router.push('/privacidad');
+                } else {
+                  Linking.openURL('https://wo-w-nu.vercel.app/privacidad');
+                }
+              }}
+            />
             <SettingItem
               icon="information-circle"
               title="Version"
@@ -424,6 +443,31 @@ export default function ProfileScreen() {
             Desarrollado con amor para conectar personas con experiencias
             inolvidables
           </Text>
+        </View>
+
+        {/* Cerrar Sesión */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => {
+              Alert.alert(
+                'Cerrar Sesión',
+                '¿Estás seguro que deseas cerrar sesión?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Cerrar Sesión',
+                    style: 'destructive',
+                    onPress: () => signOut(),
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#F87171" />
+            <Text style={styles.logoutText}>Cerrar Sesión</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Bottom spacing */}
@@ -470,6 +514,7 @@ export default function ProfileScreen() {
         userId={user?.id || ''}
         userName={userName}
       />
+
     </>
   );
 }
@@ -783,6 +828,26 @@ const styles = StyleSheet.create({
   tapHintText: {
     fontSize: 11,
     color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  logoutSection: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.2)',
+  },
+  logoutText: {
+    color: '#F87171',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

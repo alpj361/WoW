@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #0A0A0A;
+  --foreground: #F5F5F5;
+  --card: #1A1A2E;
+  --card-foreground: #F5F5F5;
+  --popover: #1A1A2E;
+  --popover-foreground: #F5F5F5;
+  --primary: #7C3AED;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E1E32;
+  --secondary-foreground: #E0E0E0;
+  --muted: #2A2A3E;
+  --muted-foreground: #9CA3AF;
+  --accent: #7C3AED;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #2A2A3E;
+  --input: #2A2A3E;
+  --ring: #7C3AED;
+  --chart-1: #7C3AED;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #3B82F6;
+  --radius: 0.75rem;
+  --sidebar: #0F0F1A;
+  --sidebar-foreground: #F5F5F5;
+  --sidebar-primary: #7C3AED;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1E1E32;
+  --sidebar-accent-foreground: #F5F5F5;
+  --sidebar-border: #2A2A3E;
+  --sidebar-ring: #7C3AED;
+
+  --seasonal: #6B21A8;
+  --seasonal-foreground: #FFFFFF;
+  --seasonal-muted: #581C87;
+  --seasonal-glow: #A855F7;
+  --seasonal-bg: #0F061A;
+}
+
+.dark {
+  --background: #0A0A0A;
+  --foreground: #F5F5F5;
+  --card: #1A1A2E;
+  --card-foreground: #F5F5F5;
+  --popover: #1A1A2E;
+  --popover-foreground: #F5F5F5;
+  --primary: #7C3AED;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E1E32;
+  --secondary-foreground: #E0E0E0;
+  --muted: #2A2A3E;
+  --muted-foreground: #9CA3AF;
+  --accent: #7C3AED;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #2A2A3E;
+  --input: #2A2A3E;
+  --ring: #7C3AED;
+  --chart-1: #7C3AED;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #3B82F6;
+  --sidebar: #0F0F1A;
+  --sidebar-foreground: #F5F5F5;
+  --sidebar-primary: #7C3AED;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1E1E32;
+  --sidebar-accent-foreground: #F5F5F5;
+  --sidebar-border: #2A2A3E;
+  --sidebar-ring: #7C3AED;
+
+  --seasonal: #6B21A8;
+  --seasonal-foreground: #FFFFFF;
+  --seasonal-muted: #581C87;
+  --seasonal-glow: #A855F7;
+  --seasonal-bg: #0F061A;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-heading: var(--font-poppins), 'Poppins', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-seasonal: var(--seasonal);
+  --color-seasonal-foreground: var(--seasonal-foreground);
+  --color-seasonal-muted: var(--seasonal-muted);
+  --color-seasonal-glow: var(--seasonal-glow);
+  --color-seasonal-bg: var(--seasonal-bg);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

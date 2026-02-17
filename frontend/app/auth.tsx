@@ -10,6 +10,7 @@ import {
     Platform,
     Image,
     Dimensions,
+    Linking,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -242,6 +243,11 @@ export default function AuthScreen() {
     const formSlideAnim = useSharedValue(30);
 
     useEffect(() => {
+        console.log('✅ AuthScreen mounted');
+        return () => console.log('👋 AuthScreen unmounted');
+    }, []);
+
+    useEffect(() => {
         // Entrance animations - logo first
         fadeAnim.value = withTiming(1, { duration: 800 });
         slideAnim.value = withTiming(0, { duration: 800 });
@@ -423,6 +429,22 @@ export default function AuthScreen() {
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 >
                     <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+                        {/* Home button to return to read-only feed */}
+                        <TouchableOpacity
+                            style={styles.homeButton}
+                            onPress={() => {
+                                if (Platform.OS === 'web') {
+                                    window.location.href = '/';
+                                } else {
+                                    router.replace('/');
+                                }
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="arrow-back" size={22} color="#fff" />
+                            <Text style={styles.homeButtonText}>Explorar</Text>
+                        </TouchableOpacity>
+
                         {/* Logo Section */}
                         <Animated.View
                             style={[
@@ -531,14 +553,38 @@ export default function AuthScreen() {
                         </Animated.View>
 
                         {/* Footer */}
-                        <Animated.Text
-                            style={[
-                                styles.footerText,
-                                footerAnimatedStyle,
-                            ]}
-                        >
-                            Solicita tu código de invitación al administrador
-                        </Animated.Text>
+                        <View style={styles.footerContainer}>
+                            <Text style={styles.footerText}>
+                                Al continuar, aceptas nuestros
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (Platform.OS === 'web') {
+                                        router.push('/terminos');
+                                    } else {
+                                        Linking.openURL('https://wo-w-nu.vercel.app/terminos');
+                                    }
+                                }}
+                                hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                                style={styles.footerLink}
+                            >
+                                <Text style={[styles.footerText, styles.linkHighlight]}> términos</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.footerText}> y </Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (Platform.OS === 'web') {
+                                        router.push('/privacidad');
+                                    } else {
+                                        Linking.openURL('https://wo-w-nu.vercel.app/privacidad');
+                                    }
+                                }}
+                                hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                                style={styles.footerLink}
+                            >
+                                <Text style={[styles.footerText, styles.linkHighlight]}>privacidad</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </KeyboardAvoidingView>
             </View>
@@ -630,9 +676,38 @@ export default function AuthScreen() {
                 </Animated.View>
 
                 {/* Footer */}
-                <Text style={styles.footerText}>
-                    Al continuar, aceptas nuestros términos y condiciones
-                </Text>
+                <View style={styles.footerContainer}>
+                    <Text style={styles.footerText}>
+                        Al continuar, aceptas nuestros
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (Platform.OS === 'web') {
+                                router.push('/terminos');
+                            } else {
+                                Linking.openURL('https://wo-w-nu.vercel.app/terminos');
+                            }
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                        style={styles.footerLink}
+                    >
+                        <Text style={[styles.footerText, styles.linkHighlight]}> términos</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.footerText}> y </Text>
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (Platform.OS === 'web') {
+                                router.push('/privacidad');
+                            } else {
+                                Linking.openURL('https://wo-w-nu.vercel.app/privacidad');
+                            }
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                        style={styles.footerLink}
+                    >
+                        <Text style={[styles.footerText, styles.linkHighlight]}>privacidad</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -886,5 +961,31 @@ const styles = StyleSheet.create({
         color: 'rgba(107, 114, 128, 0.8)',
         fontSize: 13,
         marginTop: 16,
+    },
+    footerContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    footerLink: {
+        paddingVertical: 4,
+        paddingHorizontal: 2,
+    },
+    homeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 20,
+        marginBottom: 12,
+    },
+    homeButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '500',
     },
 });

@@ -57,6 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Using authState.isInitialized which persists across module reloads
         if (authState.getState().isInitialized) {
             console.log('⚠️ Already initialized once, restoring from cache');
+            // Clear any stale verified/processing state from previous auth flows
+            // This prevents _layout from entering the isVerifiedAuth wait gate
+            authState.reset();
             // Still need to restore state and set loading=false
             restoreFromCache();
             return;
@@ -242,6 +245,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         if (merged !== cachedProfile) {
                             await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
                         }
+                    } else if (currentSession?.user) {
+                        // Session exists but cache miss/mismatch — fetch from network
+                        console.log('🔄 Session exists but cache miss, fetching profile');
+                        const profileData = await fetchProfile(currentSession.user.id);
+                        if (profileData) {
+                            setSession(currentSession);
+                            setUser(currentSession.user);
+                            setProfile(profileData);
+                        }
                     }
                 }
             })();
@@ -263,6 +275,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const initializeAuth = async () => {
+        // Clear any stale verified state from previous sessions
+        if (authState.getState().isVerified) {
+            console.log('🧹 Clearing stale isVerified state on fresh init');
+            authState.reset();
+        }
+
         const startTime = Date.now();
         if (Platform.OS === 'ios') {
             console.log('🍎 [iOS] Starting auth initialization');

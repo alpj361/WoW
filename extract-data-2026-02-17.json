@@ -1,0 +1,254 @@
+{
+  "procesiones": [
+    {
+      "nombre_procesion": "Procesión del Beaterio de Belén",
+      "fecha": "17 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "14 calle, 9-30 de la Zona 1 (Salida)",
+          "hora": "18:00"
+        },
+        {
+          "lugar": "9a. Avenida",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "13 calle",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "10a. Avenida",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "14 calle A",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Retorno al templo (Entrada)",
+          "hora": "19:30"
+        }
+      ],
+      "imagenes_recorrido": [
+        {
+          "value": "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-17-de-febrero-2026.webp"
+        }
+      ],
+      "imagenes_procesion": [
+        "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-17-de-febrero-2026.webp"
+      ],
+      "horarios": {
+        "salida": "18:00",
+        "entrada": "19:30"
+      }
+    },
+    {
+      "nombre_procesion": "Traslado de pasos del Templo de Santo Domingo",
+      "fecha": "17 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Templo de Santo Domingo, 12 Avenida y 10a. Calle, 10-09, Zona 1",
+          "hora": "20:00"
+        }
+      ],
+      "imagenes_recorrido": [
+        {
+          "value": "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-17-de-febrero-2026-Templo-de-Santo-Domingo.webp"
+        }
+      ],
+      "imagenes_procesion": [
+        "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-17-de-febrero-2026-Templo-de-Santo-Domingo.webp"
+      ],
+      "horarios": {
+        "salida": "20:00",
+        "entrada": "N/A"
+      }
+    },
+    {
+      "nombre_procesion": "Viacrucis Penitencial de Miércoles de Ceniza con la Imagen de Jesús Nazareno de la Justicia del Templo El Calvario",
+      "fecha": "18 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Templo San Francisco",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Portal Bicentenario",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Catedral Metropolitana",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Arco de Correos",
+          "hora": "N/A"
+        }
+      ],
+      "imagenes_recorrido": [
+        {
+          "value": "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-18-de-febrero-2026-Templo-El-Calvario.webp"
+        }
+      ],
+      "imagenes_procesion": [
+        "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-18-de-febrero-2026-Templo-El-Calvario.webp"
+      ],
+      "horarios": {
+        "salida": "16:00",
+        "entrada": "22:00"
+      }
+    },
+    {
+      "nombre_procesion": "Procesión de Jesús de la Justicia «El Nazareno Franciscano»",
+      "fecha": "18 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Templo Histórico de San Francisco",
+          "hora": "N/A"
+        }
+      ],
+      "imagenes_recorrido": [],
+      "imagenes_procesion": [],
+      "horarios": {
+        "salida": "Pendiente de confirmar",
+        "entrada": "Pendiente de confirmar"
+      }
+    },
+    {
+      "nombre_procesion": "Procesión de Jesús Nazareno de los Milagros del Santuario de San José",
+      "fecha": "19 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Santuario de San José (Salida)",
+          "hora": "14:30"
+        },
+        {
+          "lugar": "Parque Colón",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Parroquia La Merced",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Palacio Arzobispal",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Iglesia de Santa Teresa",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Parque Isabel La Católica",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Cerrito del Carmen",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Parroquia de Candelaria",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "3a. Calle y Avenida de los Árboles",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "17 Avenida y 4a. Calle",
+          "hora": "N/A"
+        },
+        {
+          "lugar": "Retorno al Santuario (Entrada)",
+          "hora": "00:30"
+        }
+      ],
+      "imagenes_recorrido": [
+        {
+          "value": "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-19-de-febrero-2026-Templo-de-San-Jose.webp"
+        }
+      ],
+      "imagenes_procesion": [
+        "https://www.guatemala.com/fotos/2026/02/Cuaresma-2026-procesion-19-de-febrero-2026-Templo-de-San-Jose.webp"
+      ],
+      "horarios": {
+        "salida": "14:30",
+        "entrada": "00:30"
+      }
+    },
+    {
+      "nombre_procesion": "Bodas de Plata de Consagración de Jesús Nazareno de Santa Ana",
+      "fecha": "21 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Templo de Santa Ana (Salida)",
+          "hora": "13:00"
+        },
+        {
+          "lugar": "Escuela de Cristo",
+          "hora": "15:30"
+        },
+        {
+          "lugar": "Mercado del Carmen",
+          "hora": "17:00"
+        },
+        {
+          "lugar": "Alameda Santa Rosa",
+          "hora": "17:50"
+        },
+        {
+          "lugar": "Calle del Arco",
+          "hora": "18:30"
+        },
+        {
+          "lugar": "San José Catedral",
+          "hora": "19:30"
+        },
+        {
+          "lugar": "Tanque de la Unión",
+          "hora": "20:30"
+        },
+        {
+          "lugar": "Escuela de Cristo (regreso)",
+          "hora": "21:30"
+        },
+        {
+          "lugar": "Puente de Belén",
+          "hora": "22:00"
+        },
+        {
+          "lugar": "Retorno al Templo (Entrada)",
+          "hora": "23:00"
+        }
+      ],
+      "imagenes_recorrido": [
+        {
+          "value": "https://www.guatemala.com/fotos/2026/02/Procesion-Antigua-Guatemala-Bodas-de-Plata-de-Consagracion-de-Jesus-Nazareno-de-Santa-Ana-2026.webp"
+        }
+      ],
+      "imagenes_procesion": [
+        "https://www.guatemala.com/fotos/2026/02/Procesion-Antigua-Guatemala-Bodas-de-Plata-de-Consagracion-de-Jesus-Nazareno-de-Santa-Ana-2026.webp"
+      ],
+      "horarios": {
+        "salida": "13:00",
+        "entrada": "23:00"
+      }
+    },
+    {
+      "nombre_procesion": "Jesús Nazareno de la Salvación",
+      "fecha": "22 de febrero 2026",
+      "puntos_referencia": [
+        {
+          "lugar": "Aldea Santa Catarina Bobadilla",
+          "hora": "N/A"
+        }
+      ],
+      "imagenes_recorrido": [],
+      "imagenes_procesion": [],
+      "horarios": {
+        "salida": "Por confirmar",
+        "entrada": "Por confirmar"
+      }
+    }
+  ]
+}

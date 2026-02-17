@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform, Linking } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 
 interface TabItemProps {
   route: any;
@@ -73,9 +75,15 @@ function getIconName(routeName: string, focused: boolean): string {
 
 export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const router = useRouter();
 
-  // Filter out hidden routes - only show main 5 tabs
-  const mainRoutes = ['index', 'create', 'places', 'myevents', 'profile'];
+  // Filter out hidden routes
+  // Guest mode: only show Explorar tab
+  // Authenticated: show all 5 main tabs
+  const mainRoutes = user
+    ? ['index', 'create', 'places', 'myevents', 'profile']
+    : ['index'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 
   const content = (
@@ -102,6 +110,30 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
             />
           );
         })}
+
+        {/* Guest mode: Login tab */}
+        {!user && (
+          <TouchableOpacity
+            style={styles.tabItem}
+            onPress={() => {
+              console.log('🔘 Guest Login button pressed - attempting push to /auth');
+              if (Platform.OS === 'web') {
+                // On web, direct URL change bypasses Tabs navigator conflicts
+                window.location.href = '/auth';
+              } else {
+                // Use push instead of replace to ensure we add to stack and potentially trigger layout re-eval
+                router.push('/auth');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.glowContainer}>
+              <View style={[styles.glow, { backgroundColor: '#10B981' }]} />
+            </View>
+            <Ionicons name="log-in" size={24} color="#10B981" />
+            <Text style={[styles.label, { color: '#10B981' }]}>Login</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </>
   );

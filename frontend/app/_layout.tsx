@@ -20,10 +20,13 @@ function RootLayoutNav() {
   const [isProcessingAuth, setIsProcessingAuth] = useState(false);
   const [isVerifiedAuth, setIsVerifiedAuth] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
+  const [verifiedTimedOut, setVerifiedTimedOut] = useState(false);
   const navigationRef = useRef(false);
 
   // Check if we're on an auth route
-  const isAuthRoute = segments[0] === 'auth' || segments[0] === 'auth-callback' || segments[0] === 'auth-verify';
+  const isAuthRoute = segments[0] === 'auth' || segments[0] === 'auth-callback' || segments[0] === 'auth-verify' || segments[0] === 'terminos' || segments[0] === 'privacidad';
+
+  console.log(`🧭 _layout rendering: segments=${JSON.stringify(segments)}, isAuthRoute=${isAuthRoute}, user=${!!user}`);
 
   // Check if auth callback is processing or verified
   useEffect(() => {
@@ -40,6 +43,20 @@ function RootLayoutNav() {
 
     return () => unsubscribe();
   }, []);
+
+  // Timeout protection for isVerifiedAuth gate - prevent infinite spinner
+  useEffect(() => {
+    if (!isVerifiedAuth || user) {
+      setVerifiedTimedOut(false);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      console.warn('⚠️ _layout: isVerifiedAuth timed out after 5s, resetting');
+      authState.reset();
+      setVerifiedTimedOut(true);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [isVerifiedAuth, user]);
 
   // Timeout protection: if loading takes too long, force redirect
   useEffect(() => {
@@ -97,15 +114,7 @@ function RootLayoutNav() {
   // If on auth route, render just that screen (let it handle its flow)
   // CRITICAL: Check this BEFORE loading state, otherwise auth-callback is blocked
   // by the session check it is supposed to resolve!
-  if (isAuthRoute) {
-    return (
-      <WebViewport>
-        <View style={styles.container}>
-          <Slot />
-        </View>
-      </WebViewport>
-    );
-  }
+  // if (isAuthRoute) block removed to keep Tabs mounted
 
   // While loading auth state, show loading indicator (not just black screen)
   if (loading && !hasTimedOut) {
@@ -119,17 +128,19 @@ function RootLayoutNav() {
     );
   }
 
-  // If timed out, force redirect to auth
+  // If timed out, allow guest access to feed (no longer force /auth)
   if (hasTimedOut) {
-    console.log('⚠️ _layout: Timeout reached, forcing redirect to /auth');
-    return <Redirect href="/auth" />;
+    console.log('⚠️ _layout: Timeout reached, allowing guest access to feed');
   }
 
-  // If not authenticated and not on auth route, redirect to auth
-  // Using Redirect component instead of router.replace() to avoid infinite loop
-  if (!user && !isAuthRoute) {
+  // Guest mode: allow access to feed (index) and event detail without auth
+  const currentSegment = segments[0] as string | undefined;
+  const isGuestAllowed = currentSegment === undefined || currentSegment === 'index' || currentSegment === 'event';
+
+  // If not authenticated and not on auth or guest-allowed route, redirect to auth
+  if (!user && !isAuthRoute && !isGuestAllowed) {
     // If auth-callback marked user as verified, wait for state update
-    if (isVerifiedAuth) {
+    if (isVerifiedAuth && !verifiedTimedOut) {
       console.log('🔍 _layout: Waiting for user state after verification');
       return (
         <View style={styles.loadingContainer}>
@@ -137,7 +148,7 @@ function RootLayoutNav() {
         </View>
       );
     }
-    console.log('🔍 _layout: No user, using Redirect to /auth');
+    console.log('🔍 _layout: No user, redirecting to /auth');
     return <Redirect href="/auth" />;
   }
 
@@ -146,7 +157,7 @@ function RootLayoutNav() {
     <WebViewport>
       <View style={styles.container}>
         <Tabs
-          tabBar={(props) => <GlassTabBar {...props} />}
+          tabBar={(props) => isAuthRoute ? null : <GlassTabBar {...props} />}
           screenOptions={{
             headerShown: false,
             tabBarActiveTintColor: '#8B5CF6',
@@ -204,23 +215,26 @@ function RootLayoutNav() {
               ),
             }}
           />
-          {/* Hide auth screens from tabs */}
+          {/* Auth screens - kept in Tabs to preserve navigation state */}
           <Tabs.Screen
             name="auth"
             options={{
               href: null,
+              tabBarStyle: { display: 'none' },
             }}
           />
           <Tabs.Screen
             name="auth-callback"
             options={{
               href: null,
+              tabBarStyle: { display: 'none' },
             }}
           />
           <Tabs.Screen
             name="auth-verify"
             options={{
               href: null,
+              tabBarStyle: { display: 'none' },
             }}
           />
           <Tabs.Screen
@@ -233,6 +247,21 @@ function RootLayoutNav() {
             name="radial-demo"
             options={{
               href: null,
+            }}
+          />
+          {/* Legal screens */}
+          <Tabs.Screen
+            name="terminos"
+            options={{
+              href: null,
+              tabBarStyle: { display: 'none' },
+            }}
+          />
+          <Tabs.Screen
+            name="privacidad"
+            options={{
+              href: null,
+              tabBarStyle: { display: 'none' },
             }}
           />
         </Tabs>
