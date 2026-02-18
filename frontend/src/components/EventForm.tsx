@@ -41,6 +41,7 @@ import TagSelector from './TagSelector';
 // Define the interface for the component props
 export interface EventFormProps {
     initialData?: any;
+    eventId?: string; // If provided, form is in edit mode
     onSuccess?: () => void;
     onCancel?: () => void;
     isModal?: boolean; // To adjust styles/behavior if needed
@@ -52,9 +53,10 @@ export const categories = [
     { id: 'general', label: 'General', icon: 'fast-food', color: '#F59E0B' },
 ];
 
-export default function EventForm({ initialData, onSuccess, onCancel, isModal = false }: EventFormProps) {
+export default function EventForm({ initialData, eventId, onSuccess, onCancel, isModal = false }: EventFormProps) {
     const insets = useSafeAreaInsets();
-    const { createEvent } = useEventStore();
+    const { createEvent, updateEvent } = useEventStore();
+    const isEditMode = !!eventId;
     const { user, profile } = useAuth();
     const { queueExtraction } = useExtractionStore();
     const { saveDraft, updateDraft } = useDraftStore();
@@ -651,7 +653,7 @@ export default function EventForm({ initialData, onSuccess, onCancel, isModal = 
 
         setIsSubmitting(true);
         try {
-            await createEvent({
+            const eventPayload = {
                 title: title.trim(),
                 description: description.trim(),
                 category,
@@ -661,7 +663,6 @@ export default function EventForm({ initialData, onSuccess, onCancel, isModal = 
                 location: location.trim() || null,
                 organizer: organizer.trim() || null,
                 image,
-                user_id: isHost ? user?.id : null,
                 price: price && priceNum > 0 ? priceNum : null,
                 registration_form_url: registrationFormUrl.trim() ? registrationFormUrl.trim() : null,
                 bank_name: priceNum > 0 && bankName.trim() ? bankName.trim() : null,
@@ -673,40 +674,48 @@ export default function EventForm({ initialData, onSuccess, onCancel, isModal = 
                 subcategory: subcategory || null,
                 tags: tags.length > 0 ? tags : null,
                 event_features: showUrlOption && Object.keys(eventFeatures).length > 0 ? eventFeatures : null,
-            });
+            };
 
-            // Clear form
-            setTitle('');
-            setDescription('');
-            setCategory('general');
-            setSelectedDate(null);
-            setSelectedTime(null);
-            setSelectedEndTime(null);
-            setLocation('');
-            setOrganizer('');
-            setImage(null);
-            setIsHost(false);
-            setPrice('');
-            setRegistrationFormUrl('');
-            setBankName('');
-            setBankAccountNumber('');
-            setRequiresAttendance(false);
-            setIsRecurring(false);
-            setRecurringDates([]);
-            setTargetAudience(['audiencia:general']);
-            setSubcategory(null);
-            setTags([]);
-            setEventFeatures({});
+            if (isEditMode) {
+                await updateEvent(eventId!, eventPayload);
+            } else {
+                await createEvent({ ...eventPayload, user_id: isHost ? user?.id : null });
+            }
 
-            if (onSuccess) onSuccess();
-            // If we are solely a component, routing might be handled by parent or onSuccess
-            // But standard behavior is to go to feed
-            if (!isModal) {
-                router.replace('/');
+            if (isEditMode) {
+                if (onSuccess) onSuccess();
+            } else {
+                // Clear form after create
+                setTitle('');
+                setDescription('');
+                setCategory('general');
+                setSelectedDate(null);
+                setSelectedTime(null);
+                setSelectedEndTime(null);
+                setLocation('');
+                setOrganizer('');
+                setImage(null);
+                setIsHost(false);
+                setPrice('');
+                setRegistrationFormUrl('');
+                setBankName('');
+                setBankAccountNumber('');
+                setRequiresAttendance(false);
+                setIsRecurring(false);
+                setRecurringDates([]);
+                setTargetAudience(['audiencia:general']);
+                setSubcategory(null);
+                setTags([]);
+                setEventFeatures({});
+
+                if (onSuccess) onSuccess();
+                if (!isModal) {
+                    router.replace('/');
+                }
             }
 
         } catch (error) {
-            Alert.alert('Error', 'No se pudo crear el evento. Intenta de nuevo.');
+            Alert.alert('Error', isEditMode ? 'No se pudo actualizar el evento.' : 'No se pudo crear el evento. Intenta de nuevo.');
         }
         setIsSubmitting(false);
     };

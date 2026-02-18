@@ -138,6 +138,7 @@ interface EventStore {
   approveRegistration: (registrationId: string) => Promise<void>;
   rejectRegistration: (registrationId: string, rejectionReason?: string) => Promise<void>;
   resubmitRegistration: (eventId: string, paymentReceiptUrl?: string) => Promise<void>;
+  updateEvent: (eventId: string, eventData: Partial<Event>) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
 
   // Not attended signal
@@ -190,9 +191,34 @@ export const useEventStore = create<EventStore>((set, get) => ({
       // Filter out ALL denied events permanently (no 48hr window)
       const deniedEventIds = new Set(deniedEvents.map(d => d.event_id));
 
-      const filteredEvents = events.filter(event =>
-        !savedEventIds.has(event.id) && !deniedEventIds.has(event.id)
-      );
+      // Filter out expired events (past date, considering recurring dates)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const filteredEvents = events.filter(event => {
+        // Date filtering: remove expired events
+        if (event.date) {
+          const eventDate = new Date(event.date);
+          eventDate.setHours(0, 0, 0, 0);
+          const isExpired = eventDate < today;
+
+          if (isExpired) {
+            // Check if any recurring date is still valid
+            if (event.is_recurring && event.recurring_dates && event.recurring_dates.length > 0) {
+              const hasUpcoming = event.recurring_dates.some(d => {
+                const rd = new Date(d);
+                rd.setHours(0, 0, 0, 0);
+                return rd >= today;
+              });
+              if (!hasUpcoming) return false;
+            } else {
+              return false;
+            }
+          }
+        }
+
+        return !savedEventIds.has(event.id) && !deniedEventIds.has(event.id);
+      });
 
       set({
         events: filteredEvents,
@@ -854,6 +880,47 @@ export const useEventStore = create<EventStore>((set, get) => ({
       await get().fetchUserRegistrations();
     } catch (error: any) {
       console.error('Error resubmitting registration:', error);
+      throw error;
+    }
+  },
+
+  updateEvent: async (eventId: string, eventData: Partial<Event>) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('events')
+        .update({
+          title: eventData.title,
+          description: eventData.description,
+          category: eventData.category,
+          image: eventData.image,
+          date: eventData.date,
+          time: eventData.time,
+          end_time: eventData.end_time,
+          location: eventData.location,
+          organizer: eventData.organizer,
+          price: eventData.price,
+          registration_form_url: eventData.registration_form_url,
+          bank_name: eventData.bank_name,
+          bank_account_number: eventData.bank_account_number,
+          requires_attendance_check: eventData.requires_attendance_check,
+          is_recurring: eventData.is_recurring,
+          recurring_dates: eventData.recurring_dates,
+          target_audience: eventData.target_audience,
+          subcategory: eventData.subcategory,
+          tags: eventData.tags,
+          event_features: eventData.event_features,
+        })
+        .eq('id', eventId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await get().fetchHostedEvents();
+    } catch (error: any) {
+      console.error('Error updating event:', error);
       throw error;
     }
   },

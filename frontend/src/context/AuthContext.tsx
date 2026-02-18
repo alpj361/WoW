@@ -287,9 +287,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Timeout protection: 10 seconds max for entire initialization
+            // Timeout protection: 20 seconds max for entire initialization
             const timeoutPromise = new Promise<void>((_, reject) =>
-                setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+                setTimeout(() => reject(new Error('Auth initialization timeout')), 20000)
             );
 
             const initPromise = (async () => {
@@ -399,9 +399,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
                 console.log(`🔍 Fetching profile for: ${userId}`);
 
-                // Timeout de 10s (tenemos cache como fallback)
-                const timeoutPromise = new Promise<null>((_, reject) =>
-                    setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+                // Timeout de 15s (tenemos cache como fallback)
+                // Resolvemos con error en lugar de reject para manejarlo gracefully
+                const timeoutPromise = new Promise((resolve) =>
+                    setTimeout(() => resolve({
+                        data: null,
+                        error: { message: 'Profile fetch timeout', code: 'TIMEOUT' }
+                    }), 15000)
                 );
 
                 const { data, error } = await Promise.race([

@@ -21,12 +21,39 @@ export interface ProcesionDB {
     imagenes_recorrido: string[];
     source_url: string | null;
     created_at: string;
+    tipo_procesion: string | null;
+    live_tracking_url: string | null;
+    recorrido_maps_url: string | null;
+    facebook_url: string | null;
+    ciudad: string | null;
     // Optional computed fields for compatibility
     horarios?: {
         salida: string;
         entrada: string;
     };
 }
+
+export const buildGoogleMapsUrl = (puntos: PuntoReferencia[]): string | null => {
+    if (!puntos || puntos.length === 0) return null;
+
+    if (puntos.length === 1) {
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(puntos[0].lugar)}`;
+    }
+
+    const origin = encodeURIComponent(puntos[0].lugar);
+    const destination = encodeURIComponent(puntos[puntos.length - 1].lugar);
+
+    if (puntos.length === 2) {
+        return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    }
+
+    const waypoints = puntos
+        .slice(1, puntos.length - 1)
+        .map(p => encodeURIComponent(p.lugar))
+        .join('|');
+
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}`;
+};
 
 export const mapDBToProcesion = (db: ProcesionDB): any => {
     return {
@@ -39,6 +66,7 @@ export const mapDBToProcesion = (db: ProcesionDB): any => {
             salida: db.hora_salida || 'Por confirmar',
             entrada: db.hora_entrada || 'Por confirmar',
         },
+        tipo_procesion: db.tipo_procesion || null,
     };
 };
 
@@ -76,14 +104,21 @@ export interface ProcesionStore {
     procesiones: ProcesionDB[];
     savedProcesionIds: Set<string>;
     savedProcesiones: ProcesionDB[];
+    cargandoTurnos: Record<string, number>;
     isLoading: boolean;
     error: string | null;
+    selectedCiudad: 'Ciudad de Guatemala' | 'Antigua Guatemala' | null;
 
     fetchProcesiones: (holidaySlug?: string) => Promise<void>;
     fetchSavedProcesiones: () => Promise<void>;
     toggleSaveProcesion: (procesionId: string) => Promise<void>;
     unsaveProcesion: (procesionId: string) => Promise<void>;
     isSaved: (procesionId: string) => boolean;
+    fetchCargandoTurnos: () => Promise<void>;
+    cargarTurno: (procesionId: string, turnoNumber: number) => Promise<void>;
+    descargarTurno: (procesionId: string) => Promise<void>;
+    getTurno: (procesionId: string) => number | undefined;
+    setSelectedCiudad: (ciudad: 'Ciudad de Guatemala' | 'Antigua Guatemala' | null) => void;
 }
 
 // ─── Store ──────────────────────────────────────────────────────────────────────
@@ -92,15 +127,21 @@ export const useProcesionStore = create<ProcesionStore>((set, get) => ({
     procesiones: [],
     savedProcesionIds: new Set(),
     savedProcesiones: [],
+    cargandoTurnos: {},
     isLoading: false,
     error: null,
+    selectedCiudad: null,
 
     fetchProcesiones: async (holidaySlug?: string) => {
         set({ isLoading: true, error: null });
         try {
+            const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+            const { selectedCiudad } = get();
+
             let query = supabase
                 .from('procesiones')
                 .select('*')
+                .gte('fecha', today)
                 .order('fecha', { ascending: true })
                 .order('hora_salida', { ascending: true });
 
@@ -115,6 +156,11 @@ export const useProcesionStore = create<ProcesionStore>((set, get) => ({
                 if (holiday) {
                     query = query.eq('holiday_id', holiday.id);
                 }
+            }
+
+            // Filter by ciudad if selected
+            if (selectedCiudad) {
+                query = query.eq('ciudad', selectedCiudad);
             }
 
             const { data, error } = await query;
@@ -257,5 +303,92 @@ export const useProcesionStore = create<ProcesionStore>((set, get) => ({
 
     isSaved: (procesionId: string) => {
         return get().savedProcesionIds.has(procesionId);
+    },
+
+    fetchCargandoTurnos: async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                set({ cargandoTurnos: {} });
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('procession_cargadores')
+                .select('procesion_id, numero_turno')
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            const turnos: Record<string, number> = {};
+            (data || []).forEach((d: any) => {
+                turnos[d.procesion_id] = d.numero_turno;
+            });
+            set({ cargandoTurnos: turnos });
+        } catch (error: any) {
+            console.error('[ProcesionStore] Error fetching cargando turnos:', error);
+        }
+    },
+
+    cargarTurno: async (procesionId: string, turnoNumber: number) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No authenticated user');
+
+            const { error } = await supabase
+                .from('procession_cargadores')
+                .upsert(
+                    { user_id: user.id, procesion_id: procesionId, numero_turno: turnoNumber },
+                    { onConflict: 'user_id,procesion_id' }
+                );
+
+            if (error) throw error;
+
+            set(state => {
+                return {
+                    cargandoTurnos: {
+                        ...state.cargandoTurnos,
+                        [procesionId]: turnoNumber,
+                    }
+                };
+            });
+        } catch (error: any) {
+            console.error('[ProcesionStore] Error saving turno:', error);
+            throw error;
+        }
+    },
+
+    descargarTurno: async (procesionId: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No authenticated user');
+
+            const { error } = await supabase
+                .from('procession_cargadores')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('procesion_id', procesionId);
+
+            if (error) throw error;
+
+            set(state => {
+                const next = { ...state.cargandoTurnos };
+                delete next[procesionId];
+                return { cargandoTurnos: next };
+            });
+        } catch (error: any) {
+            console.error('[ProcesionStore] Error removing turno:', error);
+            throw error;
+        }
+    },
+
+    getTurno: (procesionId: string) => {
+        return get().cargandoTurnos[procesionId];
+    },
+
+    setSelectedCiudad: (ciudad: 'Ciudad de Guatemala' | 'Antigua Guatemala' | null) => {
+        set({ selectedCiudad: ciudad });
+        // Re-fetch procesiones with new filter
+        get().fetchProcesiones('cuaresma-2026');
     },
 }));

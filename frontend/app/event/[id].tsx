@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Linking, Pressable } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Linking, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '../../src/services/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { useEventStore } from '../../src/store/eventStore';
+import EventForm from '../../src/components/EventForm';
 import { parseISO, isPast, isFuture, isToday, parse, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -78,6 +79,12 @@ export default function EventDetails() {
     const [paymentReceiptUrl, setPaymentReceiptUrl] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Edit modal (owner only)
+    const [showEditModal, setShowEditModal] = useState(false);
+
+    // Pencil only for public events (user_id = null) — hosted/private events are edited from myevents
+    const canEditFromDetail = !!user && !!event && !event.user_id;
 
     // Attendance modal
     const [showDateSelectionModal, setShowDateSelectionModal] = useState(false);
@@ -332,6 +339,15 @@ export default function EventDetails() {
                     >
                         <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
+
+                    {canEditFromDetail && (
+                        <TouchableOpacity
+                            style={styles.floatingEditButton}
+                            onPress={() => setShowEditModal(true)}
+                        >
+                            <Ionicons name="pencil" size={16} color="rgba(255,255,255,0.6)" />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.content}>
@@ -689,6 +705,44 @@ export default function EventDetails() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Edit Event Modal — owner only */}
+            <Modal
+                visible={showEditModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowEditModal(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: '#121212' }}>
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 20,
+                        paddingTop: Platform.OS === 'ios' ? 16 : 12,
+                        paddingBottom: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#1e293b',
+                    }}>
+                        <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Editar evento</Text>
+                        <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                            <Ionicons name="close" size={24} color="#6B7280" />
+                        </TouchableOpacity>
+                    </View>
+                    {event && (
+                        <EventForm
+                            eventId={event.id}
+                            initialData={event}
+                            isModal
+                            onSuccess={() => {
+                                setShowEditModal(false);
+                                fetchEventDetails();
+                            }}
+                            onCancel={() => setShowEditModal(false)}
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -737,6 +791,18 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    floatingEditButton: {
+        position: 'absolute',
+        top: 64,
+        right: 20,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 0.7,
     },
     content: {
         padding: 24,

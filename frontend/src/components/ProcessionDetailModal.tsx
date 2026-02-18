@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Procesion, isToday } from '../data/cuaresma-data';
+import { type ProcesionDB, isProcessionLive } from '../store/procesionStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -20,13 +21,17 @@ interface ProcessionDetailModalProps {
     procesion: Procesion | null;
     visible: boolean;
     onClose: () => void;
+    rawDb?: ProcesionDB | null;
 }
 
-export function ProcessionDetailModal({ procesion, visible, onClose }: ProcessionDetailModalProps) {
+export function ProcessionDetailModal({ procesion, visible, onClose, rawDb }: ProcessionDetailModalProps) {
     if (!procesion) return null;
 
     const isTodayProcession = isToday(procesion.fecha);
     const hasRouteImage = procesion.imagenes_recorrido.length > 0;
+    const hasRecorridoMapsUrl = !!(rawDb?.recorrido_maps_url);
+    const hasLiveTracking = !!(rawDb?.live_tracking_url) && isProcessionLive(rawDb!);
+    const hasFacebookUrl = !!(rawDb?.facebook_url);
 
     return (
         <Modal
@@ -68,6 +73,21 @@ export function ProcessionDetailModal({ procesion, visible, onClose }: Processio
                                     <Ionicons name="calendar-outline" size={14} color="#C4B5FD" />
                                     <Text style={styles.dateText}>{procesion.fecha}</Text>
                                 </View>
+                                {procesion.tipo_procesion && (
+                                    <View style={styles.tipoBadge}>
+                                        <Ionicons
+                                            name={procesion.tipo_procesion === 'Infantil' ? 'people-outline' : 'flower-outline'}
+                                            size={13}
+                                            color="#C4B5FD"
+                                        />
+                                        <Text style={styles.tipoBadgeText}>
+                                            {procesion.tipo_procesion === 'Mayor' ? 'Procesión Mayor' :
+                                                procesion.tipo_procesion === 'Penitencial' ? 'Vía Crucis Penitencial' :
+                                                    procesion.tipo_procesion === 'Infantil' ? 'Procesión Infantil' :
+                                                        procesion.tipo_procesion}
+                                        </Text>
+                                    </View>
+                                )}
                                 <View style={styles.scheduleChip}>
                                     <Ionicons name="time-outline" size={14} color="#A855F7" />
                                     <Text style={styles.scheduleChipText}>
@@ -93,6 +113,50 @@ export function ProcessionDetailModal({ procesion, visible, onClose }: Processio
                                     style={styles.mapImage}
                                     resizeMode="contain"
                                 />
+                            </View>
+                        )}
+
+                        {/* Facebook link */}
+                        {hasFacebookUrl && (
+                            <View style={styles.recorridoSection}>
+                                <TouchableOpacity
+                                    style={[styles.recorridoBtn, styles.recorridoBtnFb]}
+                                    onPress={() => Linking.openURL(rawDb!.facebook_url!)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+                                    <Text style={[styles.recorridoBtnText, styles.recorridoBtnTextFb]}>Ver en Facebook</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Recorrido: Ver en Maps (manual URL) + Seguir en vivo */}
+                        {(hasRecorridoMapsUrl || hasLiveTracking) && (
+                            <View style={styles.recorridoSection}>
+                                <View style={styles.mapHeader}>
+                                    <Ionicons name="navigate-outline" size={16} color="#A855F7" />
+                                    <Text style={styles.mapTitle}>Recorrido</Text>
+                                </View>
+                                {hasRecorridoMapsUrl && (
+                                    <TouchableOpacity
+                                        style={styles.recorridoBtn}
+                                        onPress={() => Linking.openURL(rawDb!.recorrido_maps_url!)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="map-outline" size={18} color="#C4B5FD" />
+                                        <Text style={styles.recorridoBtnText}>Ver recorrido</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {hasLiveTracking && (
+                                    <TouchableOpacity
+                                        style={[styles.recorridoBtn, styles.recorridoBtnLive]}
+                                        onPress={() => Linking.openURL(rawDb!.live_tracking_url!)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.recorridoLiveDot} />
+                                        <Text style={[styles.recorridoBtnText, styles.recorridoBtnTextLive]}>Seguir en vivo</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         )}
 
@@ -249,6 +313,22 @@ const styles = StyleSheet.create({
         color: '#C4B5FD',
         fontWeight: '600',
     },
+    tipoBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(124, 58, 237, 0.15)',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
+    },
+    tipoBadgeText: {
+        fontSize: 12,
+        color: '#C4B5FD',
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
 
     // Map section
     mapSection: {
@@ -350,5 +430,48 @@ const styles = StyleSheet.create({
         color: '#A855F7',
         fontWeight: '700',
         marginTop: 2,
+    },
+
+    // Recorrido section
+    recorridoSection: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        gap: 10,
+    },
+    recorridoBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(124, 58, 237, 0.2)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(124, 58, 237, 0.4)',
+        borderRadius: 12,
+        paddingVertical: 12,
+    },
+    recorridoBtnLive: {
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    recorridoBtnFb: {
+        backgroundColor: 'rgba(24, 119, 242, 0.15)',
+        borderColor: 'rgba(24, 119, 242, 0.4)',
+    },
+    recorridoBtnText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#C4B5FD',
+    },
+    recorridoBtnTextLive: {
+        color: '#FCA5A5',
+    },
+    recorridoBtnTextFb: {
+        color: '#7DD3FC',
+    },
+    recorridoLiveDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#EF4444',
     },
 });

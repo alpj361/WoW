@@ -10,6 +10,7 @@ export interface Procesion {
     imagenes_recorrido: { value: string }[];
     imagenes_procesion: string[];
     horarios: { salida: string; entrada: string };
+    tipo_procesion?: string;
 }
 
 export const procesionesEstaSemana: Procesion[] = [

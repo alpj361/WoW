@@ -9,6 +9,8 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  TextInput,
+  Modal,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -23,7 +25,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   groupByDate,
@@ -60,6 +62,7 @@ function mapDBtoProcesion(db: ProcesionDB): UIProcession {
       salida: db.hora_salida || 'N/A',
       entrada: db.hora_entrada || 'N/A',
     },
+    tipo_procesion: db.tipo_procesion || undefined,
     raw: db,
   };
 }
@@ -85,10 +88,12 @@ interface AnimatedProcCardProps {
   isLiked: boolean;
   isGuest: boolean;
   isTodayProcession: boolean;
-  isLive: boolean; // Added isLive prop
+  isLive: boolean;
+  isCargando: boolean;
   counter: string;
   onPress: () => void;
   onToggleLike: () => void;
+  onCargar: () => void;
 }
 
 const AnimatedProcCard = memo(({
@@ -99,9 +104,11 @@ const AnimatedProcCard = memo(({
   isGuest,
   isTodayProcession,
   isLive,
+  isCargando,
   counter,
   onPress,
   onToggleLike,
+  onCargar,
 }: AnimatedProcCardProps) => {
   const imageUri = getProcessionImage(procesion);
 
@@ -173,10 +180,21 @@ const AnimatedProcCard = memo(({
           </View>
         )}
 
-        {/* Cuaresma badge */}
-        <View style={styles.cuaresmaBadge}>
-          <Ionicons name="flower-outline" size={12} color="#E9D5FF" />
-          <Text style={styles.cuaresmaBadgeText}>Cuaresma</Text>
+        {/* Tipo procesion badge */}
+        <View style={[
+          styles.cuaresmaBadge,
+          procesion.tipo_procesion === 'Mayor' && { backgroundColor: 'rgba(168, 85, 247, 0.35)' },
+          procesion.tipo_procesion === 'Penitencial' && { backgroundColor: 'rgba(139, 92, 246, 0.3)' },
+          procesion.tipo_procesion === 'Infantil' && { backgroundColor: 'rgba(52, 211, 153, 0.3)' },
+        ]}>
+          <Ionicons
+            name={procesion.tipo_procesion === 'Infantil' ? 'people-outline' : 'flower-outline'}
+            size={12}
+            color="#E9D5FF"
+          />
+          <Text style={styles.cuaresmaBadgeText}>
+            {procesion.tipo_procesion || 'Cuaresma'}
+          </Text>
         </View>
 
         {/* Card content */}
@@ -206,15 +224,24 @@ const AnimatedProcCard = memo(({
           )}
         </View>
 
-        {/* Like overlay — logged-in only */}
+        {/* Action buttons — logged-in only */}
         {!isGuest && (
-          <TouchableOpacity
-            style={[styles.likeOverlay, isLiked && styles.likeOverlayActive]}
-            onPress={(e) => { e.stopPropagation(); onToggleLike(); }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={24} color={isLiked ? '#FFF' : '#C4B5FD'} />
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionBtn, isCargando && styles.actionBtnCargarActive]}
+              onPress={(e) => { e.stopPropagation(); onCargar(); }}
+              activeOpacity={0.7}
+            >
+              <FontAwesome5 name="people-carry" size={20} color={isCargando ? '#E9D5FF' : '#A78BFA'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, isLiked && styles.actionBtnLikeActive]}
+              onPress={(e) => { e.stopPropagation(); onToggleLike(); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={24} color={isLiked ? '#FFF' : '#C4B5FD'} />
+            </TouchableOpacity>
+          </View>
         )}
       </TouchableOpacity>
     </Animated.View>
@@ -226,15 +253,36 @@ const AnimatedProcCard = memo(({
 export function ProcessionesListView() {
   const { user } = useAuth();
   const isGuest = !user;
-  const { procesiones: procDB, savedProcesionIds, isLoading, fetchProcesiones, fetchSavedProcesiones, toggleSaveProcesion } = useProcesionStore();
+  const {
+    procesiones: procDB,
+    savedProcesionIds,
+    cargandoTurnos,
+    isLoading,
+    selectedCiudad,
+    fetchProcesiones,
+    fetchSavedProcesiones,
+    toggleSaveProcesion,
+    fetchCargandoTurnos,
+    cargarTurno,
+    descargarTurno,
+    setSelectedCiudad,
+  } = useProcesionStore();
   const [selectedProcession, setSelectedProcession] = useState<Procesion | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [cargarModalVisible, setCargarModalVisible] = useState(false);
+  const [cargarTargetId, setCargarTargetId] = useState<string | null>(null);
+  const [turnoInput, setTurnoInput] = useState('');
+  const [cargarLoading, setCargarLoading] = useState(false);
+  const [cargarError, setCargarError] = useState<string | null>(null);
 
   // Fetch data on mount
   useEffect(() => {
     fetchProcesiones('cuaresma-2026');
-    if (!isGuest) fetchSavedProcesiones();
+    if (!isGuest) {
+      fetchSavedProcesiones();
+      fetchCargandoTurnos();
+    }
   }, [isGuest]);
 
   // Map DB data to the UI interface
@@ -251,6 +299,58 @@ export function ProcessionesListView() {
     const id = processionId(p);
     toggleSaveProcesion(id).catch(err => console.error('Failed to toggle save:', err));
   }, [isGuest, toggleSaveProcesion]);
+
+  const handleCargar = useCallback((procesionId: string) => {
+    setCargarTargetId(procesionId);
+
+    // Validate if the user already has a turn saved for this procession
+    const existingTurno = cargandoTurnos[procesionId];
+    if (existingTurno) {
+      setTurnoInput(existingTurno.toString());
+    } else {
+      setTurnoInput('');
+    }
+
+    setCargarError(null);
+    setCargarModalVisible(true);
+  }, [cargandoTurnos]);
+
+  const confirmCargar = useCallback(async () => {
+    if (!cargarTargetId) return;
+    const num = parseInt(turnoInput, 10);
+    if (!turnoInput || isNaN(num) || num <= 0) {
+      setCargarError('Ingresa un número de turno válido');
+      return;
+    }
+    setCargarLoading(true);
+    setCargarError(null);
+    try {
+      await cargarTurno(cargarTargetId, num);
+      // Refresh from DB to confirm persistence
+      await fetchCargandoTurnos();
+      setCargarModalVisible(false);
+      setCargarTargetId(null);
+    } catch (err: any) {
+      setCargarError(err.message || 'Error al guardar');
+    } finally {
+      setCargarLoading(false);
+    }
+  }, [cargarTargetId, turnoInput, cargarTurno, fetchCargandoTurnos]);
+
+  const handleDescargar = useCallback(async () => {
+    if (!cargarTargetId) return;
+    setCargarLoading(true);
+    setCargarError(null);
+    try {
+      await descargarTurno(cargarTargetId);
+      setCargarModalVisible(false);
+      setCargarTargetId(null);
+    } catch (err: any) {
+      setCargarError(err.message || 'Error al desmarcar');
+    } finally {
+      setCargarLoading(false);
+    }
+  }, [cargarTargetId, descargarTurno]);
 
   const triggerHaptic = useCallback(async () => {
     if (Platform.OS === 'web') return;
@@ -339,9 +439,11 @@ export function ProcessionesListView() {
           isGuest={isGuest}
           isTodayProcession={isToday(procesion.fecha)}
           isLive={isProcessionLive(procesion.raw)}
+          isCargando={!!cargandoTurnos[id]}
           counter={`${index + 1}/${allProcesiones.length}`}
           onPress={() => setSelectedProcession(procesion)}
           onToggleLike={() => toggleLike(procesion)}
+          onCargar={() => handleCargar(id)}
         />
       );
     }
@@ -374,6 +476,40 @@ export function ProcessionesListView() {
       </Animated.View>
     );
   };
+
+  // ─── Ciudad Toggle Component ──────────────────────────────────────────────
+
+  const renderCiudadToggle = () => (
+    <View style={styles.ciudadToggleContainer}>
+      <TouchableOpacity
+        style={[styles.ciudadToggleBtn, selectedCiudad === null && styles.ciudadToggleBtnActive]}
+        onPress={() => setSelectedCiudad(null)}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.ciudadToggleText, selectedCiudad === null && styles.ciudadToggleTextActive]}>
+          Todas
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.ciudadToggleBtn, selectedCiudad === 'Ciudad de Guatemala' && styles.ciudadToggleBtnActive]}
+        onPress={() => setSelectedCiudad('Ciudad de Guatemala')}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.ciudadToggleText, selectedCiudad === 'Ciudad de Guatemala' && styles.ciudadToggleTextActive]}>
+          Ciudad
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.ciudadToggleBtn, selectedCiudad === 'Antigua Guatemala' && styles.ciudadToggleBtnActive]}
+        onPress={() => setSelectedCiudad('Antigua Guatemala')}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.ciudadToggleText, selectedCiudad === 'Antigua Guatemala' && styles.ciudadToggleTextActive]}>
+          Antigua
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   // ─── Timeline / Cronogram ──────────────────────────────────────────────────
 
@@ -473,10 +609,15 @@ export function ProcessionesListView() {
             <Ionicons name="chevron-back" size={18} color="#C4B5FD" />
             <Text style={styles.backToCardsText}>Volver a procesiones</Text>
           </TouchableOpacity>
+          {/* Ciudad toggle */}
+          {renderCiudadToggle()}
           {renderTimeline()}
         </View>
       ) : (
         <View style={styles.container}>
+          {/* Ciudad toggle */}
+          {renderCiudadToggle()}
+          
           {/* Card Stack */}
           <GestureDetector gesture={gesture}>
             <Animated.View
@@ -542,7 +683,66 @@ export function ProcessionesListView() {
         procesion={selectedProcession}
         visible={selectedProcession !== null}
         onClose={() => setSelectedProcession(null)}
+        rawDb={(selectedProcession as UIProcession | null)?.raw ?? null}
       />
+
+      {/* Cargar turno modal */}
+      <Modal
+        visible={cargarModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCargarModalVisible(false)}
+      >
+        <View style={styles.cargarOverlay}>
+          <View style={styles.cargarSheet}>
+            <View style={styles.cargarHandle} />
+            <FontAwesome5 name="people-carry" size={48} color="#A855F7" style={{ marginBottom: 16 }} />
+            <Text style={styles.cargarTitle}>¿Cuál es tu número de turno?</Text>
+            <TextInput
+              style={styles.cargarInput}
+              value={turnoInput}
+              onChangeText={t => setTurnoInput(t.replace(/[^0-9]/g, ''))}
+              placeholder="0"
+              placeholderTextColor="#4B5563"
+              keyboardType="number-pad"
+              maxLength={4}
+              autoFocus
+            />
+            {cargarError && <Text style={styles.cargarErrorText}>{cargarError}</Text>}
+            {/* Desmarcar button — only shown when user already has a turno */}
+            {cargarTargetId && !!cargandoTurnos[cargarTargetId] && (
+              <TouchableOpacity
+                style={[styles.cargarBtnDesmarcar, cargarLoading && { opacity: 0.6 }]}
+                onPress={handleDescargar}
+                disabled={cargarLoading}
+                activeOpacity={0.7}
+              >
+                <FontAwesome5 name="times-circle" size={14} color="#FCA5A5" style={{ marginRight: 6 }} />
+                <Text style={[styles.cargarBtnText, { color: '#FCA5A5' }]}>
+                  {cargarLoading ? 'Desmarcando…' : 'Desmarcar turno'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.cargarButtons}>
+              <TouchableOpacity
+                style={styles.cargarBtnCancel}
+                onPress={() => setCargarModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cargarBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cargarBtnConfirm, cargarLoading && { opacity: 0.6 }]}
+                onPress={confirmCargar}
+                disabled={cargarLoading}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.cargarBtnText}>{cargarLoading ? 'Guardando…' : 'Confirmar'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -671,11 +871,15 @@ const styles = StyleSheet.create({
     color: '#D1D5DB',
   },
 
-  // Like overlay
-  likeOverlay: {
+  // Action buttons
+  actionButtons: {
     position: 'absolute',
     bottom: 16,
     right: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -685,17 +889,95 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(196, 181, 253, 0.3)',
   },
-  likeOverlayActive: {
+  actionBtnLikeActive: {
     backgroundColor: '#7C3AED',
     borderColor: '#A855F7',
   },
-  likeLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#C4B5FD',
+  actionBtnCargarActive: {
+    backgroundColor: 'rgba(234, 179, 8, 0.25)',
+    borderColor: 'rgba(234, 179, 8, 0.5)',
   },
-  likeLabelActive: {
-    color: '#FFF',
+
+  // Cargar modal
+  cargarOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  cargarSheet: {
+    backgroundColor: '#1E1B2E',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  cargarHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#4B5563',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+
+  cargarTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#F5F3FF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  cargarInput: {
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(124, 58, 237, 0.3)',
+    borderRadius: 14,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#F5F3FF',
+    textAlign: 'center',
+    paddingVertical: 16,
+    marginBottom: 12,
+  },
+  cargarErrorText: {
+    fontSize: 13,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  cargarButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cargarBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+  },
+  cargarBtnConfirm: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+  },
+  cargarBtnDesmarcar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginBottom: 12,
+  },
+  cargarBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F5F3FF',
   },
 
   // Nav dots
@@ -995,5 +1277,38 @@ const styles = StyleSheet.create({
   timelineCardMetaText: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+
+  // Ciudad Toggle
+  ciudadToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(30, 27, 46, 0.6)',
+    borderRadius: 12,
+    padding: 4,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 4,
+  },
+  ciudadToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  ciudadToggleBtnActive: {
+    backgroundColor: '#7C3AED',
+  },
+  ciudadToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  ciudadToggleTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

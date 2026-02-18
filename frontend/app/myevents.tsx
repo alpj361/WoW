@@ -20,14 +20,15 @@ import {
   UIManager,
 } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, Feather, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import { useEventStore, HostedEventData } from '../src/store/eventStore';
+import { useEventStore, HostedEventData, Event } from '../src/store/eventStore';
+import EventForm from '../src/components/EventForm';
 import { useProcesionStore, ProcesionDB, mapDBToProcesion, isProcessionLive } from '../src/store/procesionStore';
 import { ProcessionDetailModal } from '../src/components/ProcessionDetailModal';
 import { useAuth } from '../src/context/AuthContext';
@@ -79,7 +80,11 @@ export default function MyEventsScreen() {
 
   const {
     savedProcesiones,
+    procesiones: allStoreProcesiones,
+    cargandoTurnos,
     fetchSavedProcesiones,
+    fetchProcesiones,
+    fetchCargandoTurnos,
     unsaveProcesion,
   } = useProcesionStore();
 
@@ -145,7 +150,11 @@ export default function MyEventsScreen() {
   const [procesionModal, setProcesionModal] = useState<{
     visible: boolean;
     procesion: any | null;
-  }>({ visible: false, procesion: null });
+    rawDb?: ProcesionDB | null;
+  }>({ visible: false, procesion: null, rawDb: null });
+
+  // Edit hosted event modal (private events only)
+  const [editModal, setEditModal] = useState<{ visible: boolean; event: Event | null }>({ visible: false, event: null });
 
   // -- Load Data --
   const loadData = useCallback(async () => {
@@ -155,6 +164,8 @@ export default function MyEventsScreen() {
         fetchAttendedEvents(),
         fetchHostedEvents(),
         fetchSavedProcesiones(),
+        fetchCargandoTurnos(),
+        fetchProcesiones('cuaresma-2026'),
       ]);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -163,7 +174,7 @@ export default function MyEventsScreen() {
       setRefreshing(false);
       isFirstLoad.current = false;
     }
-  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents, fetchSavedProcesiones]);
+  }, [fetchSavedEvents, fetchAttendedEvents, fetchHostedEvents, fetchSavedProcesiones, fetchCargandoTurnos, fetchProcesiones]);
 
   useFocusEffect(
     useCallback(() => {
@@ -412,7 +423,7 @@ export default function MyEventsScreen() {
 
   const handleOpenProcesion = (proc: ProcesionDB) => {
     const mapped = mapDBToProcesion(proc);
-    setProcesionModal({ visible: true, procesion: mapped });
+    setProcesionModal({ visible: true, procesion: mapped, rawDb: proc });
   };
 
 
@@ -439,9 +450,16 @@ export default function MyEventsScreen() {
           <Text style={[styles.tabText, activeTab === 'collection' && styles.activeTabText]}>
             Interesados
           </Text>
-          {(savedEvents.length + savedProcesiones.length) > 0 && (
-            <View style={styles.badge}><Text style={styles.badgeText}>{savedEvents.length + savedProcesiones.length}</Text></View>
-          )}
+          {(() => {
+            const savedProcIds = new Set(savedProcesiones.map((p: ProcesionDB) => p.id));
+            const extraCargando = allStoreProcesiones.filter(
+              (p: ProcesionDB) => cargandoTurnos[p.id] !== undefined && !savedProcIds.has(p.id)
+            ).length;
+            const total = savedEvents.length + savedProcesiones.length + extraCargando;
+            return total > 0 ? (
+              <View style={styles.badge}><Text style={styles.badgeText}>{total}</Text></View>
+            ) : null;
+          })()}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -586,6 +604,16 @@ export default function MyEventsScreen() {
             </View>
           </View>
           <TouchableOpacity
+            style={[styles.moreBtn, { opacity: 0.4, marginRight: 2 }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.selectionAsync();
+              setEditModal({ visible: true, event: event as Event });
+            }}
+          >
+            <Feather name="edit-2" size={15} color="#94A3B8" />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.moreBtn}
             onPress={(e) => { e.stopPropagation(); handleDeleteHosted(event.id); }}
           >
@@ -658,7 +686,7 @@ export default function MyEventsScreen() {
     );
   };
 
-  const renderSavedProcesionCard = (proc: ProcesionDB) => {
+  const renderSavedProcesionCard = (proc: ProcesionDB, turno?: number) => {
     const imageUri = proc.imagenes_procesion?.[0] || proc.imagenes_recorrido?.[0] || null;
     const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -669,7 +697,10 @@ export default function MyEventsScreen() {
     return (
       <TouchableOpacity
         key={`proc-${proc.id}`}
-        style={[styles.savedCard, { borderColor: '#7C3AED33', borderWidth: 1 }]}
+        style={[
+          styles.savedCard,
+          { borderColor: turno ? 'rgba(234, 179, 8, 0.4)' : '#7C3AED33', borderWidth: 1 }
+        ]}
         onPress={() => { Haptics.selectionAsync(); handleOpenProcesion(proc); }}
         onLongPress={() => handleUnsaveProcesion(proc.id)}
         delayLongPress={500}
@@ -714,12 +745,40 @@ export default function MyEventsScreen() {
         <View style={[styles.unsaveBtn, { backgroundColor: '#7C3AED20' }]}>
           <MaterialCommunityIcons name="cross-outline" size={16} color="#A78BFA" />
         </View>
+        {/* Turno badge — shown when user has registered as cargador */}
+        {!!turno && (
+          <View style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            backgroundColor: 'rgba(234, 179, 8, 0.9)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 8,
+            zIndex: 10,
+          }}>
+            <FontAwesome5 name="people-carry" size={10} color="#1a1000" />
+            <Text style={{ color: '#1a1000', fontSize: 11, fontWeight: '800' }}>
+              #{turno}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
 
   const renderCollectionTab = () => {
-    const hasProc = savedProcesiones.length > 0;
+    // Build merged list: saved procesiones + cargando processions that aren't saved
+    const savedProcIds = new Set(savedProcesiones.map(p => p.id));
+    const extraCargandoProcs = allStoreProcesiones.filter(
+      p => cargandoTurnos[p.id] !== undefined && !savedProcIds.has(p.id)
+    );
+    const allProcsToShow = [...savedProcesiones, ...extraCargandoProcs];
+
+    const hasProc = allProcsToShow.length > 0;
     const hasEvents = savedEvents.length > 0;
     const isEmpty = !hasProc && !hasEvents;
 
@@ -736,7 +795,7 @@ export default function MyEventsScreen() {
           </View>
         ) : (
           <>
-            {/* ── Saved Processions ── */}
+            {/* ── Processions (saved + cargando) ── */}
             {hasProc && (
               <View style={{ marginBottom: 20 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 }}>
@@ -745,13 +804,13 @@ export default function MyEventsScreen() {
                     Procesiones
                   </Text>
                   <View style={{ backgroundColor: '#7C3AED33', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 }}>
-                    <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: 'bold' }}>{savedProcesiones.length}</Text>
+                    <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: 'bold' }}>{allProcsToShow.length}</Text>
                   </View>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
-                  {savedProcesiones.map(proc => (
+                  {allProcsToShow.map(proc => (
                     <View key={`proc-scroll-${proc.id}`} style={{ width: (width - 48) / 2, marginHorizontal: 4 }}>
-                      {renderSavedProcesionCard(proc)}
+                      {renderSavedProcesionCard(proc, cargandoTurnos[proc.id])}
                     </View>
                   ))}
                 </ScrollView>
@@ -1142,8 +1201,48 @@ export default function MyEventsScreen() {
       <ProcessionDetailModal
         visible={procesionModal.visible}
         procesion={procesionModal.procesion}
-        onClose={() => setProcesionModal({ visible: false, procesion: null })}
+        rawDb={procesionModal.rawDb ?? null}
+        onClose={() => setProcesionModal({ visible: false, procesion: null, rawDb: null })}
       />
+
+      {/* Edit hosted event modal — private events only */}
+      <Modal
+        visible={editModal.visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditModal({ visible: false, event: null })}
+      >
+        <View style={{ flex: 1, backgroundColor: '#121212' }}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: 16,
+            paddingBottom: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: '#1e293b',
+          }}>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Editar evento</Text>
+            <TouchableOpacity onPress={() => setEditModal({ visible: false, event: null })}>
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          {editModal.event && (
+            <EventForm
+              eventId={editModal.event.id}
+              initialData={editModal.event}
+              isModal
+              onSuccess={() => {
+                setEditModal({ visible: false, event: null });
+                fetchHostedEvents();
+              }}
+              onCancel={() => setEditModal({ visible: false, event: null })}
+            />
+          )}
+        </View>
+      </Modal>
+
     </View>
   );
 }
