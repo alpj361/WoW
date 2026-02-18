@@ -2,7 +2,298 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
-## [0.0.2] - 2026-02-14
+## [0.0.30] - 2026-02-18
+
+### Fixed & Improved — Procesiones: Turno, Desmarcar y My Events
+
+#### 1. Persistencia del Número de Turno (`ProcessionesListView.tsx`)
+- **Fix de persistencia**: Después de guardar el turno con `cargarTurno()`, ahora se llama también a `fetchCargandoTurnos()` para refrescar el estado desde la base de datos y confirmar que el turno quedó guardado correctamente.
+
+#### 2. Opción de Desmarcar Turno (`procesionStore.ts` + `ProcessionesListView.tsx`)
+- **Nueva función `descargarTurno(procesionId)`** en el store: hace `DELETE` en la tabla `procession_cargadores` y limpia el estado local inmediatamente.
+- **Botón "Desmarcar turno"** (rojo) en el modal de turno: aparece solo cuando el usuario ya tiene un turno guardado para esa procesión.
+- El usuario puede desmarcar su participación en cualquier momento sin necesidad de cerrar y volver a abrir el modal.
+
+#### 3. Badge de Turno en My Events (`myevents.tsx`)
+- La pantalla **"Interesados"** ahora carga también `fetchCargandoTurnos()` y `fetchProcesiones('cuaresma-2026')` al inicializarse.
+- **Lista combinada**: Se muestran procesiones guardadas **más** procesiones donde el usuario tiene turno activo (sin duplicados). El contador de la pestaña incluye ambos tipos.
+- **Badge dorado** `#turno` con ícono `people-carry` en la esquina inferior izquierda de cada tarjeta donde el usuario es cargador.
+- Las tarjetas con turno activo muestran borde dorado `rgba(234, 179, 8, 0.4)` para distinguirlas visualmente.
+
+#### 4. Eliminación de Botones de Google Maps (`ProcessionDetailModal.tsx`)
+- **Removido completamente** el botón "Ver recorrido en Google Maps" de cada procesión.
+- La sección de recorrido ahora solo aparece cuando la procesión tiene `live_tracking_url` activo, mostrando únicamente el botón "Seguir en vivo".
+
+#### Archivos Modificados
+```
+Modified:
+- frontend/src/store/procesionStore.ts (nueva función descargarTurno)
+- frontend/src/components/ProcessionesListView.tsx (fix persistencia, botón desmarcar)
+- frontend/src/components/ProcessionDetailModal.tsx (eliminación Google Maps)
+- frontend/app/myevents.tsx (badge turno, lista combinada, fetch cargandoTurnos)
+```
+
+---
+
+## [0.0.29] - 2026-02-18
+
+### Added — Edición de Eventos
+
+**`EventForm.tsx`** — Modo edición reutilizable
+- Nueva prop `eventId`: cuando se provee, el formulario opera en `isEditMode = true`
+- Llama `updateEvent(eventId, payload)` en lugar de `createEvent`
+- En modo edición invoca `onSuccess()` sin redirigir al feed
+- Nueva prop `isModal` ajusta header/padding para presentación como sheet
+
+**`event/[id].tsx`** — Editar desde pantalla de detalle
+- Botón pencil flotante (top-right) visible solo para usuarios autenticados en eventos públicos (`user_id = null`)
+- `canEditFromDetail`: solo activo cuando el evento no tiene dueño específico
+- Modal `pageSheet` monta `EventForm` en modo edición; al guardar, recarga el evento
+
+**`myevents.tsx`** — Editar eventos del host
+- Botón pencil en cada hosted event card (junto al trash)
+- `editModal` state abre `EventForm` en modo edición como `pageSheet`
+- Refresca `fetchHostedEvents()` al guardar con éxito
+
+**`eventStore.ts`** — Nueva acción `updateEvent`
+- PATCH en Supabase filtrando por `id` AND `user_id` (solo el dueño puede editar)
+- Actualiza todos los campos del evento incluyendo `subcategory`, `tags`, `recurring_dates`, `target_audience`
+- Llama `fetchHostedEvents()` automáticamente tras el update
+
+#### Archivos Modificados
+```
+Modified:
+- frontend/app/event/[id].tsx (edit modal, floating pencil button)
+- frontend/app/myevents.tsx (edit modal en tab Anfitrión)
+- frontend/src/components/EventForm.tsx (props eventId + isModal, modo edición)
+- frontend/src/store/eventStore.ts (nueva acción updateEvent)
+```
+
+---
+
+## [0.0.28] - 2026-02-17
+
+### Fixed — Guest Login Navigation
+
+**Problema**: El botón "Guest Login" no navegaba correctamente a `/auth`, causando pérdida de estado de navegación.
+
+**Causa Raíz**: 
+- El `Tabs` navigator se desmontaba cuando el usuario navegaba a rutas de autenticación
+- Conflicto entre renderizado condicional de `Slot` vs `Tabs` en `app/_layout.tsx`
+- Al cambiar entre `Tabs` y `Slot`, el estado de navegación se perdía
+
+**Solución**:
+- **Tabs Persistente**: Mantener el `Tabs` navigator montado en todo momento
+- **Tab Bar Condicional**: Ocultar el tab bar en rutas de autenticación sin desmontar el navigator
+- Implementado `tabBar={(props) => isAuthRoute ? null : <GlassTabBar {...props} />}`
+
+#### Archivos Modificados
+
+**`app/_layout.tsx`** — Refactorización de navegación
+- Eliminado renderizado condicional de `Slot` que desmontaba `Tabs`
+- Todas las rutas (`auth`, `auth-callback`, `auth-verify`, `terminos`, `privacidad`) ahora son `Tabs.Screen`
+- Nueva prop `tabBar` condicional que retorna `null` en rutas auth en lugar de desmontar
+- Agregado logging de `segments`, `isAuthRoute`, `user` para debugging
+
+**`src/components/GlassTabBar.tsx`** — Mejora de logging
+- Cambiado `router.replace('/auth')` → `router.push('/auth')` para preservar stack
+- Logging más descriptivo: `"🔘 Guest Login button pressed - attempting push to /auth"`
+- Manejo especial para web: `window.location.href = '/auth'`
+
+**`app/auth.tsx`** — Logging de lifecycle
+- Agregado `useEffect` para logging de mount/unmount del componente
+- `console.log('✅ AuthScreen mounted')` / `console.log('👋 AuthScreen unmounted')`
+
+### Technical Details
+```typescript
+// Antes (navegación inestable)
+{isAuthRoute ? (
+  <Slot />  // Desmonta Tabs completamente
+) : (
+  <Tabs tabBar={(props) => <GlassTabBar {...props} />}>
+    {/* rutas principales */}
+  </Tabs>
+)}
+
+// Después (navegación estable)
+<Tabs tabBar={(props) => isAuthRoute ? null : <GlassTabBar {...props} />}>
+  {/* TODAS las rutas, incluyendo auth */}
+  <Tabs.Screen name="auth" options={{ href: null }} />
+  <Tabs.Screen name="auth-callback" options={{ href: null }} />
+  {/* ... rutas principales */}
+</Tabs>
+```
+
+---
+
+### Added — Procesiones de Cuaresma 2026
+
+Nueva funcionalidad para visualizar y guardar procesiones de Semana Santa, con soporte para modo de invitado (guest browsing sin login).
+
+#### Componentes Nuevos
+
+**`ProcessionesListView.tsx`** — Stack de tarjetas interactivo
+- **Navegación por gestos**: Swipe vertical con animaciones suaves (drag threshold 80px, velocity 500px/s)
+- **Stack animado**: Hasta 5 tarjetas visible simultáneamente con efecto de profundidad
+- **Indicadores visuales**:
+  - Badge "HOY" para procesiones del día actual (verde con dot pulsante)
+  - Badge "EN VIVO" durante horario de procesión (salida → entrada, maneja midnight overflow)
+  - Contador de posición (01/25) con estilo monospace
+  - Dots de navegación lateral con indicador alargado para tarjeta activa
+- **Timeline/Cronograma**: Vista alternativa con scroll vertical agrupado por fecha
+  - Header con contador total de procesiones
+  - Badges de fecha con resaltado especial para "HOY"
+  - Thumbnails con información compacta
+- **Like/Save**: Heart button para usuarios autenticados (oculto para guests)
+- **Support Web**: Mouse wheel navigation para desktop
+- **Skeleton Loader**: Loading state con spinner y mensaje
+
+**`CuaresmaBanner.tsx`** — Banner promocional
+- Gradiente purple (`#581C87` → `#6B21A8` → `#7C3AED`)
+- Icono de flor (`flower-outline`) en contenedor glassmorphic
+- Badge "HOY" dinámico si hay procesiones hoy
+- Contador: "X procesiones esta semana" / "X procesión(es) hoy · Y esta semana"
+- Patrón decorativo de cruz con opacidad baja
+
+**`ProcessionDetailModal.tsx`** — Modal de detalles
+- Imagen de procesión en hero (280px height)
+- Información completa: horarios, puntos de referencia, recorrido
+- Galería de imágenes (procesión + recorrido)
+- Botones: Guardar (heart), Cerrar
+- Diseño dark con glassmorphism
+
+**`FeedModeToggle.tsx`** — Selector de vista
+- Toggle animado entre "Eventos" y "Cuaresma"
+- Sliding indicator con spring animation
+- Iconos: `compass-outline` (Eventos), `flower-outline` (Cuaresma)
+
+#### Store y Data
+
+**`src/store/procesionStore.ts`** — Zustand store con Supabase
+```typescript
+interface ProcesionDB {
+  id: string;
+  holiday_id: string | null;
+  nombre: string;
+  fecha: string;            // ISO "2026-02-17"
+  hora_salida: string | null;
+  hora_entrada: string | null;
+  puntos_referencia: PuntoReferencia[];
+  imagenes_procesion: string[];
+  imagenes_recorrido: string[];
+  source_url: string | null;
+}
+```
+
+Funciones:
+- `fetchProcesiones(holidaySlug)` — Fetch por holiday slug (`cuaresma-2026`)
+- `fetchSavedProcesiones()` — Fetch procesiones guardadas del usuario
+- `toggleSaveProcesion(procesionId)` — Save/unsave
+- `isProcessionLive(proc)` — Detecta si está en vivo (maneja overnight)
+
+**`src/data/cuaresma-data.ts`** — Helpers y datos locales
+- `procesionesEstaSemana[]` — Array de 7 procesiones hardcoded (fallback)
+- `parseProcesionDate()` — Parse "17 de febrero 2026" → Date
+- `isToday()` — Check si fecha es hoy
+- `formatShortDate()` — Format "MAR 17 FEB"
+- `groupByDate()` — Group by fecha string
+
+#### Integración en Feed Principal
+
+**`app/index.tsx`** — Feed mode switcher
+- Nuevo estado `feedMode: 'eventos' | 'cuaresma'`
+- `FeedModeToggle` component en header
+- Renderizado condicional: `EventStack` vs `ProcessionesListView`
+- Preserva scroll position al cambiar modo
+
+#### Base de Datos — Nuevas Tablas
+
+**`procesiones`** — Tabla principal
+```sql
+CREATE TABLE procesiones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  holiday_id UUID REFERENCES holidays(id),
+  nombre TEXT NOT NULL,
+  fecha DATE NOT NULL,
+  hora_salida TIME,
+  hora_entrada TIME,
+  lugar_salida TEXT,
+  puntos_referencia JSONB,
+  imagenes_procesion TEXT[],
+  imagenes_recorrido TEXT[],
+  source_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`saved_procesiones`** — Tabla de guardados
+```sql
+CREATE TABLE saved_procesiones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  procesion_id UUID REFERENCES procesiones(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, procesion_id)
+);
+```
+
+**`holidays`** — Catálogo de temporadas
+```sql
+CREATE TABLE holidays (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,              -- "Cuaresma y Semana Santa"
+  slug TEXT UNIQUE NOT NULL,       -- "cuaresma-2026"
+  year INTEGER,
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+RLS Policies:
+- `procesiones`: Public read access
+- `saved_procesiones`: Users can only manage their own saves
+
+#### Datos Iniciales
+
+**Temporada**: Cuaresma 2026 (`slug: cuaresma-2026`)
+- 7 procesiones del 17 al 22 de febrero 2026
+- Procesiones de Guatemala, Zona 1 y Antigua Guatemala
+- Imágenes de recorrido de guatemala.com
+- Horarios completos con puntos de referencia
+
+#### Guest Experience
+
+- **Sin login**: Puede navegar todas las procesiones, ver detalles, timeline
+- **Con login**: Puede guardar procesiones favoritas (heart button)
+- No hay limitaciones de contenido para guests
+
+### Technical Details
+```
+New Files:
+- frontend/src/components/ProcessionesListView.tsx
+- frontend/src/components/CuaresmaBanner.tsx
+- frontend/src/components/ProcessionDetailModal.tsx
+- frontend/src/components/FeedModeToggle.tsx
+- frontend/src/store/procesionStore.ts
+- frontend/src/data/cuaresma-data.ts
+
+Modified:
+- frontend/app/index.tsx (feed mode toggle integration)
+
+Database Migrations:
+- create_holidays_table
+- create_procesiones_table
+- create_saved_procesiones_table
+
+Seed Data:
+- holiday: Cuaresma 2026 (slug: cuaresma-2026)
+- 7 procesiones iniciales (17-22 febrero 2026)
+```
+
+---
+
+## [0.0.27] - 2026-02-14
 
 ### Improved — UX de Feed & Modales
 

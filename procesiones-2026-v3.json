@@ -73,6 +73,23 @@
     "nota_correccion": "NUEVA ENTRADA: Primer cortejo grande de la temporada. Verificada en La Hora (15 feb 2026) y AGN."
   },
   {
+    "fecha": "2026-02-20",
+    "fecha_citation": "https://www.soy502.com/articulo/siete-procesiones-recorreran-ciudad-cuaresma-101026",
+    "tipo_procesion": "Penitencial",
+    "ubicacion": "Ciudad de Guatemala Zona 1",
+    "iglesia": "Rectoría Santa Catalina",
+    "iglesia_citation": "https://www.soy502.com/articulo/siete-procesiones-recorreran-ciudad-cuaresma-101026",
+    "nombre_imagen": "Jesús Nazareno de la Confesión",
+    "nombre_procesion": "Procesión del Primer Viernes de Cuaresma",
+    "horario_referencia": "19:00 a 22:00 horas",
+    "horario_referencia_citation": "https://www.soy502.com/articulo/siete-procesiones-recorreran-ciudad-cuaresma-101026",
+    "horarios_puntos_referencia": [],
+    "dia_liturgico": "Primer Viernes de Cuaresma",
+    "id_unico": "2026-02-20-sta-catalina-pen-1",
+    "estado_verificacion": "verificado",
+    "nota_correccion": "Agregado desde soy502.com"
+  },
+  {
     "fecha": "2026-02-22",
     "fecha_citation": "https://cucuruchoenguatemala.com/calendario-de-procesiones-2026/",
     "tipo_procesion": "Mayor",

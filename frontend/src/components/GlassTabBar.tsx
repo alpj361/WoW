@@ -78,6 +78,11 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
   const { user } = useAuth();
   const router = useRouter();
 
+  // Hide tab bar completely on web
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
   // Filter out hidden routes
   // Guest mode: only show Explorar tab
   // Authenticated: show all 5 main tabs
@@ -86,67 +91,6 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
     : ['index'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 
-  const content = (
-    <>
-      {/* Glass overlay for extra effect */}
-      <View style={styles.glassOverlay} />
-
-      {/* Top border glow */}
-      <View style={styles.topBorder} />
-
-      {/* Tab items */}
-      <View style={styles.tabsContainer}>
-        {visibleRoutes.map((route) => {
-          // Find the actual index in state.routes
-          const actualIndex = state.routes.findIndex(r => r.key === route.key);
-          return (
-            <TabItem
-              key={route.key}
-              route={route}
-              index={actualIndex}
-              state={state}
-              descriptors={descriptors}
-              navigation={navigation}
-            />
-          );
-        })}
-
-        {/* Guest mode: Login tab */}
-        {!user && (
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => {
-              console.log('🔘 Guest Login button pressed - attempting push to /auth');
-              if (Platform.OS === 'web') {
-                // On web, direct URL change bypasses Tabs navigator conflicts
-                window.location.href = '/auth';
-              } else {
-                // Use push instead of replace to ensure we add to stack and potentially trigger layout re-eval
-                router.push('/auth');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.glowContainer}>
-              <View style={[styles.glow, { backgroundColor: '#10B981' }]} />
-            </View>
-            <Ionicons name="log-in" size={24} color="#10B981" />
-            <Text style={[styles.label, { color: '#10B981' }]}>Login</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </>
-  );
-
-  // Use BlurView on native, fallback on web
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[styles.container, styles.webFallback, { paddingBottom: insets.bottom }]}>
-        {content}
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.containerWrapper, { paddingBottom: insets.bottom }]}>
       <BlurView
@@ -154,7 +98,47 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
         tint="dark"
         style={styles.blurContainer}
       >
-        {content}
+        {/* Glass overlay for extra effect */}
+        <View style={styles.glassOverlay} />
+
+        {/* Top border glow */}
+        <View style={styles.topBorder} />
+
+        {/* Tab items */}
+        <View style={styles.tabsContainer}>
+          {visibleRoutes.map((route) => {
+            // Find the actual index in state.routes
+            const actualIndex = state.routes.findIndex(r => r.key === route.key);
+            return (
+              <TabItem
+                key={route.key}
+                route={route}
+                index={actualIndex}
+                state={state}
+                descriptors={descriptors}
+                navigation={navigation}
+              />
+            );
+          })}
+
+          {/* Guest mode: Login tab */}
+          {!user && (
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => {
+                console.log('🔘 Guest Login button pressed - attempting push to /auth');
+                router.push('/auth');
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.glowContainer}>
+                <View style={[styles.glow, { backgroundColor: '#10B981' }]} />
+              </View>
+              <Ionicons name="log-in" size={24} color="#10B981" />
+              <Text style={[styles.label, { color: '#10B981' }]}>Login</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </BlurView>
     </View>
   );
