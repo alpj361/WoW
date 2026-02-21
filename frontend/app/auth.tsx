@@ -515,6 +515,7 @@ export default function AuthScreen() {
 
     // Handle Google Sign In for LOGIN (existing users only)
     const handleGoogleLogin = async () => {
+        animateButtonPress();
         setLoading(true);
         setError(null);
 
