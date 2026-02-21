@@ -1,13 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withRepeat,
-    withTiming,
-    withSequence,
-    withDelay,
-    Easing
-} from 'react-native-reanimated';
 import {
     View,
     Text,
@@ -23,17 +14,21 @@ import {
     Modal,
     Pressable,
     Linking,
+    Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEventStore } from '../store/eventStore';
 import { router } from 'expo-router';
-import { analyzeImage, analyzeExtractedImage } from '../services/api';
+import { analyzeImage, analyzeExtractedImage, uploadImageBase64, uploadImageFromUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useExtractionStore } from '../store/extractionStore';
 import { useDraftStore, DraftFormData } from '../store/draftStore';
+import { processRecurringDates } from '../utils/dateUtils';
 import AudienceSelector from './AudienceSelector';
 import SubcategorySelector from './SubcategorySelector';
 import TagSelector from './TagSelector';
@@ -84,6 +79,7 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
     // Payment & Registration fields
     const [price, setPrice] = useState('');
     const [registrationFormUrl, setRegistrationFormUrl] = useState('');
+    const [reservationContact, setReservationContact] = useState('');
     const [bankName, setBankName] = useState('');
     const [bankAccountNumber, setBankAccountNumber] = useState('');
 
@@ -118,6 +114,9 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
     const [showImageSelector, setShowImageSelector] = useState(false);
     const [extractedImages, setExtractedImages] = useState<string[]>([]);
     const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
+
+    // Zoom / fullscreen image modal
+    const [showImageZoom, setShowImageZoom] = useState(false);
 
     // Format date for display
     const formatDate = (date: Date): string => {
@@ -173,6 +172,7 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
 
             if (initialData.price) setPrice(String(initialData.price));
             if (initialData.registration_form_url) setRegistrationFormUrl(initialData.registration_form_url);
+            if (initialData.reservation_contact) setReservationContact(initialData.reservation_contact);
 
             // Handle recurring
             if (initialData.is_recurring === 'true' || initialData.is_recurring === true) {
@@ -325,7 +325,7 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
         setRecurringDates(prev => prev.filter(d => formatDateForStorage(d) !== dateStr));
     };
 
-    const pickImage = async () => {
+    const pickImage = async (autoAnalyze = false) => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para subir imágenes.');
@@ -334,18 +334,23 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 5],
-            quality: 0.7,
+            allowsEditing: false,
+            allowsMultipleSelection: false,
+            quality: 0.8,
             base64: true,
         });
 
         if (!result.canceled && result.assets[0].base64) {
-            setImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setImage(base64Image);
+            if (autoAnalyze) {
+                // Auto-analyze after picking, same as extractions flow
+                await analyzeImageFromBase64(base64Image);
+            }
         }
     };
 
-    const takePhoto = async () => {
+    const takePhoto = async (autoAnalyze = false) => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permiso requerido', 'Necesitamos acceso a tu cámara para tomar fotos.');
@@ -353,63 +358,54 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
         }
 
         const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [4, 5],
-            quality: 0.7,
+            allowsEditing: false,
+            quality: 0.8,
             base64: true,
         });
 
         if (!result.canceled && result.assets[0].base64) {
-            setImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setImage(base64Image);
+            if (autoAnalyze) {
+                await analyzeImageFromBase64(base64Image);
+            }
         }
     };
 
-    const handleAnalyzeImage = async () => {
-        if (!image) return;
+    // Helper: returns null if value is empty, "No especificado", "Gratis", or "N/A"
+    const sanitizeAiValue = (val: string | null | undefined): string | null => {
+        if (!val) return null;
+        const trimmed = val.trim();
+        const invalid = ['no especificado', 'gratis', 'n/a', 'none', 'null', ''];
+        if (invalid.includes(trimmed.toLowerCase())) return null;
+        return trimmed;
+    };
 
+    // Unified image analysis from base64 (same AI model as extractions)
+    const analyzeImageFromBase64 = async (base64Image: string) => {
         setIsAnalyzing(true);
         try {
-            const result = await analyzeImage(image, title);
-
-            if (result.success && result.analysis) {
-                const { analysis } = result;
-
-                // Auto-fill fields
-                setTitle(analysis.event_name || title);
-                setDescription(analysis.description || description);
-                setLocation(analysis.location || location);
-
-                // Parse Date
-                if (analysis.date) {
-                    let parsedDate = new Date();
-                    const dateParts = analysis.date.split(/[-/]/);
-
-                    if (dateParts.length === 3) {
-                        parsedDate = new Date(analysis.date);
-                    } else if (dateParts.length === 2) {
-                        const currentYear = new Date().getFullYear();
-                        const day = parseInt(dateParts[0]);
-                        const month = parseInt(dateParts[1]) - 1;
-                        parsedDate.setFullYear(currentYear);
-                        parsedDate.setMonth(month);
-                        parsedDate.setDate(day);
-                    }
-                    if (!isNaN(parsedDate.getTime())) {
-                        setSelectedDate(parsedDate);
-                    }
+            let result;
+            try {
+                // Upload to storage to get a URL, then use the same endpoint as extracted images
+                const uploadResult = await uploadImageBase64(base64Image);
+                if (uploadResult.success && uploadResult.publicUrl) {
+                    result = await analyzeExtractedImage(uploadResult.publicUrl, title || 'Event Flyer');
                 }
+            } catch {
+                // Storage upload failed — fall back to base64 endpoint
+            }
 
-                // Parse Time
-                if (analysis.time) {
-                    const timeParts = analysis.time.split(':');
-                    if (timeParts.length >= 2) {
-                        const parsedTime = new Date();
-                        parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
-                        setSelectedTime(parsedTime);
-                    }
-                }
+            // Fallback: direct base64 analysis
+            if (!result) {
+                result = await analyzeImage(base64Image, title);
+            }
 
+            if (result?.success && result.analysis) {
+                applyAnalysisToForm(result.analysis);
                 Alert.alert('¡Análisis Completado!', 'Hemos llenado los campos con la información detectada.');
+            } else {
+                Alert.alert('Sin resultados', 'No pudimos extraer información del flyer. Intenta llenar los datos manualmente.');
             }
         } catch (error) {
             console.error('Analysis error:', error);
@@ -417,6 +413,11 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
         } finally {
             setIsAnalyzing(false);
         }
+    };
+
+    const handleAnalyzeImage = async () => {
+        if (!image) return;
+        await analyzeImageFromBase64(image);
     };
 
     const handleAnalyzeUrl = async () => {
@@ -452,9 +453,20 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
     const analyzeAndSetImage = async (imageUrl: string) => {
         setIsAnalyzing(true);
         try {
-            setImage(imageUrl);
+            // Upload to Supabase Storage first to get a permanent URL
+            let permanentUrl = imageUrl;
+            try {
+                const uploadResult = await uploadImageFromUrl(imageUrl);
+                if (uploadResult.success && uploadResult.publicUrl) {
+                    permanentUrl = uploadResult.publicUrl;
+                }
+            } catch {
+                // Upload failed — fall back to original URL
+            }
 
-            const analysisResult = await analyzeExtractedImage(imageUrl, 'Event Flyer');
+            setImage(permanentUrl);
+
+            const analysisResult = await analyzeExtractedImage(permanentUrl, 'Event Flyer');
 
             if (analysisResult.success && analysisResult.analysis) {
                 applyAnalysisToForm(analysisResult.analysis);
@@ -473,45 +485,48 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
     const applyAnalysisToForm = (analysis: any) => {
         if (!analysis) return;
 
-        setTitle(analysis.event_name || title);
-        setDescription(analysis.description || description);
-        setLocation(analysis.location || location);
+        // Only update fields if AI returned a meaningful value
+        const cleanName = sanitizeAiValue(analysis.event_name);
+        if (cleanName) setTitle(cleanName);
 
-        if (analysis.organizer && analysis.organizer !== 'No especificado') {
-            setOrganizer(analysis.organizer);
+        const cleanDesc = sanitizeAiValue(analysis.description);
+        if (cleanDesc) setDescription(cleanDesc);
+
+        const cleanLocation = sanitizeAiValue(analysis.location);
+        if (cleanLocation) setLocation(cleanLocation);
+
+        const cleanOrganizer = sanitizeAiValue(analysis.organizer);
+        if (cleanOrganizer) setOrganizer(cleanOrganizer);
+
+        const cleanRegUrl = sanitizeAiValue(analysis.registration_url);
+        if (cleanRegUrl) setRegistrationFormUrl(cleanRegUrl);
+
+        // Price — also exclude "Gratis" and non-numeric
+        const cleanPrice = sanitizeAiValue(analysis.price);
+        if (cleanPrice) {
+            const priceMatch = cleanPrice.match(/[\d.]+/);
+            if (priceMatch) setPrice(priceMatch[0]);
         }
 
-        if (analysis.price && analysis.price !== 'No especificado' && analysis.price !== 'Gratis') {
-            const priceMatch = analysis.price.match(/[\d.]+/);
-            if (priceMatch) {
-                setPrice(priceMatch[0]);
-            }
+        // Date + recurring — handled together via shared utility to avoid UTC shift and
+        // ensure the closest future date is selected as main date for recurring events
+        const { mainDate, recurringDates: parsedRecurring, isRecurring: detectedRecurring } =
+            processRecurringDates(
+                sanitizeAiValue(analysis.date),
+                Array.isArray(analysis.recurring_dates) ? analysis.recurring_dates : [],
+                analysis.is_recurring || false
+            );
+
+        if (mainDate) setSelectedDate(mainDate);
+        setIsRecurring(detectedRecurring);
+        if (detectedRecurring && parsedRecurring.length > 0) {
+            setRecurringDates(parsedRecurring);
         }
 
-        if (analysis.registration_url && analysis.registration_url !== 'No especificado') {
-            setRegistrationFormUrl(analysis.registration_url);
-        }
-
-        if (analysis.date && analysis.date !== 'No especificado') {
-            let parsedDate = new Date();
-            const dateParts = analysis.date.split(/[-/]/);
-            if (dateParts.length === 3) {
-                parsedDate = new Date(analysis.date);
-            } else if (dateParts.length === 2) {
-                const currentYear = new Date().getFullYear();
-                const day = parseInt(dateParts[0]);
-                const month = parseInt(dateParts[1]) - 1;
-                parsedDate.setFullYear(currentYear);
-                parsedDate.setMonth(month);
-                parsedDate.setDate(day);
-            }
-            if (!isNaN(parsedDate.getTime())) {
-                setSelectedDate(parsedDate);
-            }
-        }
-
-        if (analysis.time && analysis.time !== 'No especificado') {
-            const timeParts = analysis.time.split(':');
+        // Time
+        const cleanTime = sanitizeAiValue(analysis.time);
+        if (cleanTime) {
+            const timeParts = cleanTime.split(':');
             if (timeParts.length >= 2) {
                 const parsedTime = new Date();
                 parsedTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
@@ -519,30 +534,14 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
             }
         }
 
-        if (analysis.end_time && analysis.end_time !== 'No especificado') {
-            const endTimeParts = analysis.end_time.split(':');
+        // End time
+        const cleanEndTime = sanitizeAiValue(analysis.end_time);
+        if (cleanEndTime) {
+            const endTimeParts = cleanEndTime.split(':');
             if (endTimeParts.length >= 2) {
                 const parsedEndTime = new Date();
                 parsedEndTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0, 0);
                 setSelectedEndTime(parsedEndTime);
-            }
-        }
-
-        if (analysis.is_recurring && Array.isArray(analysis.recurring_dates) && analysis.recurring_dates.length > 0) {
-            setIsRecurring(true);
-            const parsedRecurringDates: Date[] = [];
-            for (const dateStr of analysis.recurring_dates) {
-                const dateParts = dateStr.split('-').map(Number);
-                if (dateParts.length === 3) {
-                    const [year, month, day] = dateParts;
-                    const date = new Date(year, month - 1, day);
-                    if (!isNaN(date.getTime())) {
-                        parsedRecurringDates.push(date);
-                    }
-                }
-            }
-            if (parsedRecurringDates.length > 0) {
-                setRecurringDates(parsedRecurringDates.sort((a, b) => a.getTime() - b.getTime()));
             }
         }
 
@@ -551,9 +550,9 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
             setCategory(analysis.category);
         }
         // Subcategory from AI
-        if (analysis.subcategory) {
-            setSubcategory(analysis.subcategory);
-        }
+        const cleanSubcategory = sanitizeAiValue(analysis.subcategory);
+        if (cleanSubcategory) setSubcategory(cleanSubcategory);
+
         // Tags from AI
         if (Array.isArray(analysis.tags) && analysis.tags.length > 0) {
             setTags(analysis.tags);
@@ -597,6 +596,7 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
             organizer: organizer.trim() || null,
             price: price ? parseFloat(price) : null,
             registration_form_url: registrationFormUrl.trim() || null,
+            reservation_contact: reservationContact.trim() || null,
             source_image_url: sourceImageUrl || image,
             target_audience: targetAudience.length > 0 ? targetAudience : ['audiencia:general'],
             end_time: selectedEndTime ? formatTimeForStorage(selectedEndTime) : null,
@@ -665,6 +665,7 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                 image,
                 price: price && priceNum > 0 ? priceNum : null,
                 registration_form_url: registrationFormUrl.trim() ? registrationFormUrl.trim() : null,
+                reservation_contact: reservationContact.trim() || null,
                 bank_name: priceNum > 0 && bankName.trim() ? bankName.trim() : null,
                 bank_account_number: priceNum > 0 && bankAccountNumber.trim() ? bankAccountNumber.trim() : null,
                 requires_attendance_check: isHost && requiresAttendance,
@@ -744,13 +745,13 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                         <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
                             <Text style={styles.cancelButtonText}>Cancelar</Text>
                         </TouchableOpacity>
-                        <Text style={styles.modalTitle}>Crear Evento</Text>
+                        <Text style={styles.modalTitle}>{isEditMode ? 'Editar Evento' : 'Crear Evento'}</Text>
                         <View style={{ width: 60 }} />
                     </View>
                 ) : (
                     <View style={styles.header}>
-                        <Text style={styles.title}>Crear Evento</Text>
-                        <Text style={styles.subtitle}>Comparte tu evento con la comunidad</Text>
+                        <Text style={styles.title}>{isEditMode ? 'Editar Evento' : 'Crear Evento'}</Text>
+                        <Text style={styles.subtitle}>{isEditMode ? 'Actualiza los detalles de tu evento' : 'Comparte tu evento con la comunidad'}</Text>
                     </View>
                 )}
 
@@ -758,23 +759,16 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                 <View style={styles.imageSection}>
                     {isAnalyzing ? (
                         <View style={styles.loadingContainer}>
-                            <View style={styles.loadingLettersRow}>
-                                {'Analizando...'.split('').map((letter, index) => (
-                                    <Animated.Text
-                                        key={index}
-                                        style={[
-                                            styles.loadingLetter,
-                                            {
-                                                transform: [{
-                                                    translateY: Math.sin((Date.now() / 200) + index * 0.5) * 8
-                                                }]
-                                            }
-                                        ]}
-                                    >
-                                        {letter}
-                                    </Animated.Text>
-                                ))}
-                            </View>
+                    <View style={styles.loadingLettersRow}>
+                        {'Analizando...'.split('').map((letter, index) => (
+                            <Text
+                                key={index}
+                                style={styles.loadingLetter}
+                            >
+                                {letter}
+                            </Text>
+                        ))}
+                    </View>
                             <View style={styles.loadingDotsRow}>
                                 <ActivityIndicator size="large" color="#8B5CF6" />
                             </View>
@@ -784,14 +778,43 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                         </View>
                     ) : image ? (
                         <View style={styles.imagePreview}>
-                            <Image source={{ uri: image }} style={styles.previewImage} />
+                            {/* Tap image to zoom */}
+                            <TouchableOpacity
+                                activeOpacity={0.95}
+                                onPress={() => setShowImageZoom(true)}
+                            >
+                                <Image source={{ uri: image }} style={styles.previewImage} />
+                                {/* Zoom hint badge */}
+                                <View style={styles.zoomHintBadge}>
+                                    <Ionicons name="expand" size={14} color="#fff" />
+                                    <Text style={styles.zoomHintText}>Toca para ampliar</Text>
+                                </View>
+                            </TouchableOpacity>
 
+                            {/* Remove button */}
                             <TouchableOpacity
                                 style={styles.removeImageButton}
                                 onPress={() => setImage(null)}
                             >
                                 <Ionicons name="close-circle" size={28} color="#EF4444" />
                             </TouchableOpacity>
+
+                            {/* Change poster button — visible in edit mode */}
+                            {isEditMode && (
+                                <TouchableOpacity
+                                    style={styles.changePosterButton}
+                                    onPress={() =>
+                                        Alert.alert('Cambiar poster', 'Elige una opción', [
+                                            { text: 'Galería', onPress: () => pickImage(false) },
+                                            { text: 'Cámara', onPress: () => takePhoto(false) },
+                                            { text: 'Cancelar', style: 'cancel' },
+                                        ])
+                                    }
+                                >
+                                    <Ionicons name="camera" size={15} color="#fff" />
+                                    <Text style={styles.changePosterText}>Cambiar poster</Text>
+                                </TouchableOpacity>
+                            )}
 
                             <TouchableOpacity
                                 style={styles.analyzeButton}
@@ -810,11 +833,11 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                         </View>
                     ) : (
                         <View style={styles.uploadOptions}>
-                            <TouchableOpacity style={styles.uploadButton} onPress={takePhoto}>
+                            <TouchableOpacity style={styles.uploadButton} onPress={() => takePhoto(true)}>
                                 <Ionicons name="camera" size={32} color="#8B5CF6" />
                                 <Text style={styles.uploadText}>Tomar Foto</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+                            <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage(true)}>
                                 <Ionicons name="images" size={32} color="#8B5CF6" />
                                 <Text style={styles.uploadText}>Galería</Text>
                             </TouchableOpacity>
@@ -1251,6 +1274,23 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                         </Text>
                     </View>
 
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Contacto para Reservas</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="@instagram, +502 1234-5678 o correo@email.com"
+                            placeholderTextColor="#6B7280"
+                            value={reservationContact}
+                            onChangeText={setReservationContact}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            keyboardType="default"
+                        />
+                        <Text style={styles.inputHint}>
+                            Opcional: número de WhatsApp, Instagram o correo electrónico
+                        </Text>
+                    </View>
+
                     {/* Bank info */}
                     {parseFloat(price) > 0 && isHost && (
                         <>
@@ -1326,27 +1366,29 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                     )}
                 </View>
 
-                {/* Save Draft Button */}
-                <TouchableOpacity
-                    style={[
-                        styles.submitButton,
-                        { backgroundColor: '#374151', marginBottom: 12 },
-                        (!title.trim() || isSubmitting) && styles.submitButtonDisabled,
-                    ]}
-                    onPress={handleSaveDraft}
-                    disabled={!title.trim() || isSubmitting}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <>
-                            <Ionicons name="save-outline" size={24} color="#fff" />
-                            <Text style={styles.submitButtonText}>
-                                {draftId ? 'Guardar Cambios en Borrador' : 'Guardar como Borrador'}
-                            </Text>
-                        </>
-                    )}
-                </TouchableOpacity>
+                {/* Save Draft Button — only shown when creating, not editing */}
+                {!isEditMode && (
+                    <TouchableOpacity
+                        style={[
+                            styles.submitButton,
+                            { backgroundColor: '#374151', marginBottom: 12 },
+                            (!title.trim() || isSubmitting) && styles.submitButtonDisabled,
+                        ]}
+                        onPress={handleSaveDraft}
+                        disabled={!title.trim() || isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons name="save-outline" size={24} color="#fff" />
+                                <Text style={styles.submitButtonText}>
+                                    {draftId ? 'Guardar Cambios en Borrador' : 'Guardar como Borrador'}
+                                </Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                )}
 
                 {/* Submit Button */}
                 <TouchableOpacity
@@ -1361,8 +1403,10 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                         <ActivityIndicator color="#fff" />
                     ) : (
                         <>
-                            <Ionicons name="add-circle" size={24} color="#fff" />
-                            <Text style={styles.submitButtonText}>Publicar Evento</Text>
+                            <Ionicons name={isEditMode ? 'save' : 'add-circle'} size={24} color="#fff" />
+                            <Text style={styles.submitButtonText}>
+                                {isEditMode ? 'Actualizar Evento' : 'Publicar Evento'}
+                            </Text>
                         </>
                     )}
                 </TouchableOpacity>
@@ -1541,6 +1585,27 @@ export default function EventForm({ initialData, eventId, onSuccess, onCancel, i
                     minimumDate={new Date()}
                 />
             )}
+
+            {/* Fullscreen Image Zoom Modal */}
+            <Modal
+                visible={showImageZoom}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowImageZoom(false)}
+            >
+                <Pressable style={styles.imageZoomOverlay} onPress={() => setShowImageZoom(false)}>
+                    <TouchableOpacity style={styles.imageZoomClose} onPress={() => setShowImageZoom(false)}>
+                        <Ionicons name="close" size={22} color="#fff" />
+                    </TouchableOpacity>
+                    {image && (
+                        <Image
+                            source={{ uri: image }}
+                            style={styles.imageZoomFull}
+                            resizeMode="contain"
+                        />
+                    )}
+                </Pressable>
+            </Modal>
 
             {/* URL Input Modal */}
             <Modal
@@ -2037,5 +2102,60 @@ const styles = StyleSheet.create({
     cancelButtonText: {
         color: '#9CA3AF',
         fontSize: 16,
+    },
+    zoomHintBadge: {
+        position: 'absolute',
+        bottom: 56,
+        right: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+    },
+    zoomHintText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    changePosterButton: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    changePosterText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    imageZoomOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    imageZoomClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 20,
+        padding: 8,
+    },
+    imageZoomFull: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT * 0.82,
     },
 });

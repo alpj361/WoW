@@ -33,6 +33,8 @@ export interface Event {
   subcategory?: string | null;
   tags?: string[] | null;
   event_features?: { mood?: string; vibe?: string; timeOfDay?: string; socialSetting?: string } | null;
+  // Reservations
+  reservation_contact?: string | null;
 }
 
 export interface SavedEventData {
@@ -743,11 +745,14 @@ export const useEventStore = create<EventStore>((set, get) => ({
 
   createEvent: async (eventData: Partial<Event> & { user_id?: string | null }) => {
     try {
+      const isBase64 = !!eventData.image && eventData.image.startsWith('data:');
+
       const newEvent = await api.createEvent({
         title: eventData.title || '',
         description: eventData.description || undefined,
         category: eventData.category || 'general',
-        image: eventData.image,
+        // If base64, create with null — storage upload below will update it
+        image: isBase64 ? null : (eventData.image || undefined),
         date: eventData.date,
         time: eventData.time,
         end_time: eventData.end_time || undefined,
@@ -756,6 +761,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
         user_id: eventData.user_id || undefined,
         price: eventData.price || undefined,
         registration_form_url: eventData.registration_form_url || undefined,
+        reservation_contact: eventData.reservation_contact || undefined,
         bank_account_number: eventData.bank_account_number || undefined,
         bank_name: eventData.bank_name || undefined,
         requires_attendance_check: eventData.requires_attendance_check || undefined,
@@ -766,6 +772,16 @@ export const useEventStore = create<EventStore>((set, get) => ({
         tags: eventData.tags || undefined,
         event_features: eventData.event_features || undefined,
       });
+
+      // Upload base64 image to storage and auto-update event.image in DB
+      if (isBase64 && newEvent.id) {
+        try {
+          await api.uploadImageBase64(eventData.image!, newEvent.id);
+        } catch (uploadErr) {
+          console.error('Image upload failed after event creation:', uploadErr);
+          // Non-fatal — event is created, image just won't show
+        }
+      }
 
       // Refresh events list
       get().fetchEvents();
@@ -889,13 +905,22 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
+      // If image is a new base64, upload to storage first to get a permanent URL
+      let imageToSave = eventData.image ?? undefined;
+      if (imageToSave && imageToSave.startsWith('data:')) {
+        const uploadResult = await api.uploadImageBase64(imageToSave, eventId);
+        if (uploadResult.success && uploadResult.publicUrl) {
+          imageToSave = uploadResult.publicUrl;
+        }
+      }
+
       const { error } = await supabase
         .from('events')
         .update({
           title: eventData.title,
           description: eventData.description,
           category: eventData.category,
-          image: eventData.image,
+          image: imageToSave,
           date: eventData.date,
           time: eventData.time,
           end_time: eventData.end_time,
@@ -903,6 +928,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
           organizer: eventData.organizer,
           price: eventData.price,
           registration_form_url: eventData.registration_form_url,
+          reservation_contact: eventData.reservation_contact,
           bank_name: eventData.bank_name,
           bank_account_number: eventData.bank_account_number,
           requires_attendance_check: eventData.requires_attendance_check,
@@ -913,12 +939,29 @@ export const useEventStore = create<EventStore>((set, get) => ({
           tags: eventData.tags,
           event_features: eventData.event_features,
         })
-        .eq('id', eventId)
-        .eq('user_id', user.id);
+        .eq('id', eventId);
 
       if (error) throw error;
 
-      await get().fetchHostedEvents();
+      // Optimistic local update — reflect changes immediately without waiting for a full refetch
+      set(state => ({
+        hostedEvents: state.hostedEvents.map(he =>
+          he.event.id === eventId
+            ? { ...he, event: { ...he.event, ...eventData } }
+            : he
+        ),
+        events: state.events.map(e =>
+          e.id === eventId ? { ...e, ...eventData } : e
+        ),
+        savedEvents: state.savedEvents.map(se =>
+          se.event.id === eventId
+            ? { ...se, event: { ...se.event, ...eventData } }
+            : se
+        ),
+      }));
+
+      // Background refetch to ensure full consistency
+      get().fetchHostedEvents();
     } catch (error: any) {
       console.error('Error updating event:', error);
       throw error;

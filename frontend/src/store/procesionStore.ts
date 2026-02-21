@@ -12,6 +12,7 @@ export interface ProcesionDB {
     id: string;
     holiday_id: string | null;
     nombre: string;
+    iglesia: string | null;   // Nombre del templo/parroquia
     fecha: string;            // ISO date "2026-02-17"
     hora_salida: string | null;
     hora_entrada: string | null;

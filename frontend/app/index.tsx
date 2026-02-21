@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  TextInput,
   Platform,
   Modal,
   Pressable,
@@ -32,6 +33,9 @@ import { VerticalEventStack } from '../src/components/VerticalEventStack';
 import { FreshDataBanner } from '../src/components/FreshDataBanner';
 import { ProcessionesListView } from '../src/components/ProcessionesListView';
 import { FeedModeToggle, type FeedMode } from '../src/components/FeedModeToggle';
+import { EventDetailModal } from '../src/components/EventDetailModal';
+import { LinearGradient } from 'expo-linear-gradient';
+import { submitEventFlyer } from '../src/services/api';
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -58,6 +62,14 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const isFirstLoad = useRef(true);
+
+  // Submit event flyer
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
+  const [flyerImage, setFlyerImage] = useState<string | null>(null);
+  const [flyerDescription, setFlyerDescription] = useState('');
+  const [flyerSenderName, setFlyerSenderName] = useState('');
+  const [flyerSubmitting, setFlyerSubmitting] = useState(false);
+  const [flyerSuccess, setFlyerSuccess] = useState(false);
 
   // Toast state
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'like' | 'skip' | 'success' | 'error' | 'info' }>({
@@ -338,12 +350,69 @@ export default function ExploreScreen() {
     }
   };
 
+  // Guest event detail modal
+  const [guestSelectedEvent, setGuestSelectedEvent] = useState<Event | null>(null);
+  const [showGuestEventDetail, setShowGuestEventDetail] = useState(false);
+
+  const handleGuestCardPress = useCallback((event: Event) => {
+    console.log('[index] handleGuestCardPress called, event:', event?.title, 'id:', event?.id);
+    setGuestSelectedEvent(event);
+    setShowGuestEventDetail(true);
+    console.log('[index] showGuestEventDetail set to true');
+  }, []);
+
   // Feed mode toggle (Eventos | Cuaresma)
   const [feedMode, setFeedMode] = useState<FeedMode>('eventos');
   const isCuaresmaMode = feedMode === 'cuaresma';
 
   // Determine if we should show the vertical stack (gestures) or scrollable content
   const showVerticalStack = !isCuaresmaMode && isInitialized && events.length > 0 && currentIndex < events.length;
+
+  const openFlyerModal = () => {
+    setFlyerImage(null);
+    setFlyerDescription('');
+    setFlyerSenderName('');
+    setFlyerSuccess(false);
+    setShowFlyerModal(true);
+  };
+
+  const handlePickFlyerImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permisos requeridos', 'Necesitamos acceso a tu galería para seleccionar el flyer.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setFlyerImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+    }
+  };
+
+  const handleSubmitFlyer = async () => {
+    if (!flyerImage) {
+      Alert.alert('Imagen requerida', 'Por favor selecciona el flyer de tu evento.');
+      return;
+    }
+    setFlyerSubmitting(true);
+    try {
+      await submitEventFlyer(
+        flyerImage,
+        flyerSenderName.trim() || undefined,
+        flyerDescription.trim() || undefined
+      );
+      setFlyerSuccess(true);
+    } catch {
+      Alert.alert('Error', 'No pudimos enviar tu evento. Intenta de nuevo más tarde.');
+    } finally {
+      setFlyerSubmitting(false);
+    }
+  };
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -365,10 +434,20 @@ export default function ExploreScreen() {
       />
 
       <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
-        <WowLogo width={100} height={32} variant={isCuaresmaMode ? 'cuaresma' : 'default'} />
-        <Text style={[styles.tagline, isCuaresmaMode && { color: '#C4B5FD' }]}>
-          {isCuaresmaMode ? 'Cuaresma 2026' : 'Descubre y Vive Eventos'}
-        </Text>
+        <View>
+          <WowLogo width={100} height={32} variant={isCuaresmaMode ? 'cuaresma' : 'default'} />
+          <Text style={[styles.tagline, isCuaresmaMode && { color: '#C4B5FD' }]}>
+            {isCuaresmaMode ? 'Cuaresma 2026' : 'Descubre y Vive Eventos'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.flyerFab}
+          onPress={openFlyerModal}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="megaphone-outline" size={15} color="#10B981" />
+          <Text style={styles.flyerFabText}>Enviar evento</Text>
+        </TouchableOpacity>
       </View>
 
       <FeedModeToggle mode={feedMode} onModeChange={setFeedMode} />
@@ -395,6 +474,7 @@ export default function ExploreScreen() {
             onSave={handleSaveEvent}
             onSkip={handleSkipEvent}
             readOnly={isGuest}
+            onCardPress={isGuest ? handleGuestCardPress : undefined}
           />
         </View>
       ) : (
@@ -472,6 +552,13 @@ export default function ExploreScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Guest Event Detail Modal */}
+      <EventDetailModal
+        event={guestSelectedEvent}
+        visible={showGuestEventDetail}
+        onClose={() => setShowGuestEventDetail(false)}
+      />
 
       {/* Payment Modal */}
       <Modal
@@ -558,6 +645,125 @@ export default function ExploreScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Submit Event Flyer Modal */}
+      <Modal
+        visible={showFlyerModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFlyerModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#030303' }}>
+          {/* Header */}
+          <View style={flyerModalStyles.header}>
+            <TouchableOpacity
+              onPress={() => setShowFlyerModal(false)}
+              style={flyerModalStyles.closeButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={22} color="#9CA3AF" />
+            </TouchableOpacity>
+            <Text style={flyerModalStyles.title}>Enviar evento a WoW</Text>
+            <View style={{ width: 38 }} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={flyerModalStyles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {flyerSuccess ? (
+              <View style={flyerModalStyles.successContainer}>
+                <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+                <Text style={flyerModalStyles.successTitle}>¡Evento recibido!</Text>
+                <Text style={flyerModalStyles.successSubtitle}>
+                  Revisaremos tu evento y lo publicaremos en WoW si cumple con los requisitos. Puede tomar unas horas.
+                </Text>
+                <TouchableOpacity
+                  style={flyerModalStyles.doneButton}
+                  onPress={() => setShowFlyerModal(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={flyerModalStyles.doneButtonText}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={flyerModalStyles.label}>Flyer del evento *</Text>
+                <TouchableOpacity style={flyerModalStyles.imagePicker} onPress={handlePickFlyerImage} activeOpacity={0.75}>
+                  {flyerImage ? (
+                    <Image source={{ uri: flyerImage }} style={flyerModalStyles.preview} resizeMode="cover" />
+                  ) : (
+                    <View style={flyerModalStyles.imageEmpty}>
+                      <Ionicons name="image-outline" size={40} color="#4B5563" />
+                      <Text style={flyerModalStyles.imageEmptyText}>Seleccionar flyer</Text>
+                      <Text style={flyerModalStyles.imageEmptyHint}>Desde tu galería</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {flyerImage && (
+                  <TouchableOpacity style={flyerModalStyles.changeLink} onPress={handlePickFlyerImage} activeOpacity={0.7}>
+                    <Ionicons name="refresh" size={13} color="#818CF8" />
+                    <Text style={flyerModalStyles.changeLinkText}>Cambiar imagen</Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={flyerModalStyles.label}>Tu nombre o empresa</Text>
+                <View style={flyerModalStyles.inputBox}>
+                  <TextInput
+                    style={flyerModalStyles.input}
+                    placeholder="Ej: Café Tarro, DJ Marcos..."
+                    placeholderTextColor="#4B5563"
+                    value={flyerSenderName}
+                    onChangeText={setFlyerSenderName}
+                  />
+                </View>
+
+                <Text style={flyerModalStyles.label}>Detalles adicionales</Text>
+                <View style={flyerModalStyles.inputBox}>
+                  <TextInput
+                    style={[flyerModalStyles.input, flyerModalStyles.textArea]}
+                    placeholder="Info que no está en el flyer: precio, link de reservas, edad mínima..."
+                    placeholderTextColor="#4B5563"
+                    value={flyerDescription}
+                    onChangeText={setFlyerDescription}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[flyerModalStyles.submitButton, (!flyerImage || flyerSubmitting) && flyerModalStyles.submitDisabled]}
+                  onPress={handleSubmitFlyer}
+                  disabled={!flyerImage || flyerSubmitting}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#059669', '#10B981']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={flyerModalStyles.submitGradient}
+                  >
+                    {flyerSubmitting ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="send" size={17} color="#fff" />
+                        <Text style={flyerModalStyles.submitText}>Enviar a WoW</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <Text style={flyerModalStyles.disclaimer}>
+                  El equipo de WoW revisará tu evento antes de publicarlo.
+                </Text>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -571,6 +777,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   logo: {
     fontSize: 28,
@@ -855,6 +1064,172 @@ const styles = StyleSheet.create({
   },
   alertButtonSecondaryText: {
     color: '#9CA3AF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  flyerFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  flyerFabText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+});
+
+const flyerModalStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.07)',
+  },
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 48,
+    gap: 12,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 8,
+  },
+  imagePicker: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(75, 85, 99, 0.5)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    minHeight: 200,
+  },
+  imageEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 10,
+  },
+  imageEmptyText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  imageEmptyHint: {
+    color: '#4B5563',
+    fontSize: 12,
+  },
+  preview: {
+    width: '100%',
+    height: 260,
+  },
+  changeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-end',
+  },
+  changeLinkText: {
+    color: '#818CF8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  inputBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+  },
+  input: {
+    padding: 14,
+    fontSize: 15,
+    color: '#fff',
+  },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 14,
+  },
+  submitButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  submitDisabled: {
+    opacity: 0.5,
+  },
+  submitGradient: {
+    paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  submitText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  disclaimer: {
+    fontSize: 12,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  successContainer: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 16,
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  successSubtitle: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 16,
+  },
+  doneButton: {
+    marginTop: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    paddingVertical: 14,
+    paddingHorizontal: 48,
+    borderRadius: 14,
+  },
+  doneButtonText: {
+    color: '#10B981',
     fontSize: 16,
     fontWeight: '600',
   },

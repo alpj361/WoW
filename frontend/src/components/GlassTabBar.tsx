@@ -85,9 +85,9 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
 
   // Filter out hidden routes
   // Guest mode: only show Explorar tab
-  // Authenticated: show all 5 main tabs
+  // Authenticated: show 4 main tabs (places moved to dev area in profile)
   const mainRoutes = user
-    ? ['index', 'create', 'places', 'myevents', 'profile']
+    ? ['index', 'create', 'myevents', 'profile']
     : ['index'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 

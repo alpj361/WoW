@@ -17,6 +17,7 @@ export interface EventDraft {
   organizer?: string | null;
   price?: number | null;
   registration_form_url?: string | null;
+  reservation_contact?: string | null;
   bank_name?: string | null;
   bank_account_number?: string | null;
   source_image_url?: string | null;

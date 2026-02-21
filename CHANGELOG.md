@@ -2,6 +2,44 @@
 
 All notable changes to the WOW Events project will be documented in this file.
 
+## [0.0.31] - 2026-02-19
+
+### Added — EventForm: Zoom de Imagen & Cambiar Poster en Edición
+
+#### 1. Zoom / Ampliar imagen (`EventForm.tsx`)
+- **Tap para ampliar**: Al tocar la imagen del poster se abre un modal fullscreen con fondo oscuro (95% opacidad).
+- La imagen se muestra con `resizeMode="contain"` para no recortar el contenido.
+- **Cerrar**: Tap en cualquier parte del overlay o botón `×` en la esquina superior derecha.
+- **Badge de hint** "Toca para ampliar" (con ícono `expand`) visible sobre la imagen como ayuda visual.
+- Nuevo state `showImageZoom` + modal `<Modal animationType="fade">`.
+
+#### 2. Cambiar Poster en modo edición (`EventForm.tsx`)
+- Botón **"Cambiar poster"** (ícono cámara) visible solo cuando `isEditMode = true` y hay imagen cargada.
+- Aparece en la esquina superior izquierda sobre la imagen, con estilo semi-transparente.
+- Al presionarlo muestra `Alert.alert` con opciones: **Galería** (`pickImage`) o **Cámara** (`takePhoto`).
+- Reutiliza las funciones existentes de selección de imagen sin lógica adicional.
+
+#### 3. Añadir red social en procesiones — Solo alpha/admin (`ProcessionDetailModal.tsx`)
+- **Botón "Añadir red social"** al final del modal de detalle, visible únicamente para roles `alpha` y `admin`.
+- Muestra badge **"ALPHA"** dorado en el botón.
+- Si ya existe URL guardada el label cambia a **"Editar red social"**.
+- Al presionar abre un **bottom sheet** con:
+  - Campo de texto (teclado URL, autoFocus).
+  - Botones "Cancelar" y "Guardar".
+  - Spinner mientras guarda, botón deshabilitado si campo vacío.
+- Hace `UPDATE { facebook_url }` directo en la tabla `procesiones` de Supabase.
+- **Actualización optimista**: La URL se refleja inmediatamente en el modal vía `localFacebookUrl` state, sin cerrar/reabrir.
+- El botón de Facebook existente usa `localFacebookUrl` para abrir el enlace recién guardado al instante.
+
+#### Archivos Modificados
+```
+Modified:
+- frontend/src/components/EventForm.tsx (zoom modal, change poster button, new styles)
+- frontend/src/components/ProcessionDetailModal.tsx (social URL button + modal, alpha/admin gate)
+```
+
+---
+
 ## [0.0.30] - 2026-02-18
 
 ### Fixed & Improved — Procesiones: Turno, Desmarcar y My Events

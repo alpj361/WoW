@@ -34,9 +34,10 @@ interface AnimatedCardProps {
   onSave?: () => void;
   onSkip?: () => void;
   showActions: boolean;
+  onPress?: () => void;
 }
 
-const AnimatedCard = memo(({ event, diff, translateY, onSave, onSkip, showActions }: AnimatedCardProps) => {
+const AnimatedCard = memo(({ event, diff, translateY, onSave, onSkip, showActions, onPress }: AnimatedCardProps) => {
   const animatedStyle = useAnimatedStyle(() => {
     if (diff === 0) {
       // Current card - responds to drag
@@ -133,6 +134,7 @@ const AnimatedCard = memo(({ event, diff, translateY, onSave, onSkip, showAction
         onSave={onSave}
         onSkip={onSkip}
         showActions={showActions}
+        onPress={onPress}
       />
     </Animated.View>
   );
@@ -147,6 +149,7 @@ interface VerticalEventStackProps {
   onSave: (event: Event) => void;
   onSkip: (event: Event) => void;
   readOnly?: boolean;
+  onCardPress?: (event: Event) => void;
 }
 
 export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
@@ -156,6 +159,7 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
   onSave,
   onSkip,
   readOnly = false,
+  onCardPress,
 }) => {
   const translateY = useSharedValue(0);
   const lastNavTime = useRef(0);
@@ -212,8 +216,8 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
     };
   }, [navigateTo]);
 
-  const gesture = Gesture.Pan()
-    .activeOffsetY([-15, 15])
+  const panGesture = Gesture.Pan()
+    .activeOffsetY([-20, 20])
     .onUpdate((e) => {
       translateY.value = e.translationY * 0.6;
     })
@@ -231,6 +235,9 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
       }
       translateY.value = withSpring(0, { damping: 25, stiffness: 350 });
     });
+
+  // Use only pan gesture (taps are handled by EventCard's TouchableOpacity)
+  const gesture = panGesture;
 
   const getCardStyle = (index: number) => {
     const diff = index - currentIndex;
@@ -274,6 +281,7 @@ export const VerticalEventStack: React.FC<VerticalEventStackProps> = ({
           onSave={isCurrent && !readOnly ? () => onSave(event) : undefined}
           onSkip={isCurrent && !readOnly ? () => onSkip(event) : undefined}
           showActions={isCurrent && !readOnly}
+          onPress={isCurrent && onCardPress ? () => onCardPress(event) : undefined}
         />
       );
     }

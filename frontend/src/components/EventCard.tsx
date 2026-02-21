@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Platform,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -22,8 +21,6 @@ import Animated, {
   withSequence,
   withTiming,
   runOnJS,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Event } from '../store/eventStore';
@@ -33,6 +30,7 @@ interface EventCardProps {
   onSave?: () => void;
   onSkip?: () => void;
   showActions?: boolean;
+  onPress?: () => void;
 }
 
 const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
@@ -73,6 +71,7 @@ export const EventCard: React.FC<EventCardProps> = ({
   onSave,
   onSkip,
   showActions = true,
+  onPress,
 }) => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const gradient = getCategoryGradient(event.category);
@@ -93,6 +92,11 @@ export const EventCard: React.FC<EventCardProps> = ({
   const saveRotation = useSharedValue(0);
 
   const handlePress = () => {
+    console.log('[EventCard] handlePress fired — onPress defined:', !!onPress, 'isGuest:', isGuest, 'title:', event.title);
+    if (onPress) {
+      onPress();
+      return;
+    }
     // Guest mode: do nothing on tap
     if (isGuest) return;
     if (event.id) {
@@ -232,7 +236,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           activeOpacity={0.95}
           onPress={handlePress}
         >
-          {/* Background Image or Gradient */}
+          {/* Background Image or Gradient (fallback when no image) */}
           {event.image ? (
             <Image
               source={{ uri: event.image }}

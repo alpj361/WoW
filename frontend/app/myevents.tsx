@@ -58,6 +58,49 @@ const getStatusLabel = (status: string) => {
   }
 };
 
+// Small helper: shows a category-gradient fallback when the image URL is expired/broken
+const getCategoryGradient = (category?: string): readonly [string, string] => {
+  switch (category) {
+    case 'music': return ['#4C1D95', '#7C3AED'];
+    case 'volunteer': return ['#831843', '#BE185D'];
+    default: return ['#92400E', '#D97706'];
+  }
+};
+const getCategoryIcon = (category?: string): string => {
+  switch (category) {
+    case 'music': return 'musical-notes';
+    case 'volunteer': return 'heart';
+    default: return 'calendar';
+  }
+};
+
+interface EventImageProps {
+  uri: string;
+  style: any;
+  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
+  category?: string;
+}
+const EventImage: React.FC<EventImageProps> = ({ uri, style, resizeMode = 'cover', category }) => {
+  const [error, setError] = useState(false);
+  if (!uri || error) {
+    const gradient = getCategoryGradient(category);
+    const icon = getCategoryIcon(category);
+    return (
+      <LinearGradient colors={gradient} style={[style, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name={icon as any} size={32} color="rgba(255,255,255,0.3)" />
+      </LinearGradient>
+    );
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      resizeMode={resizeMode}
+      onError={() => setError(true)}
+    />
+  );
+};
+
 export default function MyEventsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -504,7 +547,7 @@ export default function MyEventsScreen() {
         delayLongPress={500}
         activeOpacity={0.9}
       >
-        <Image source={{ uri: imageUri }} style={styles.savedImage} resizeMode="cover" />
+        <EventImage uri={imageUri} style={styles.savedImage} resizeMode="cover" category={event.category} />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.85)']}
           style={styles.savedGradient}
@@ -541,7 +584,7 @@ export default function MyEventsScreen() {
         onLongPress={() => handleRemoveAttended(event.id)}
         delayLongPress={500}
       >
-        <Image source={{ uri: imageUri }} style={styles.attendedImage} />
+        <EventImage uri={imageUri} style={styles.attendedImage} resizeMode="cover" category={event.category} />
         <View style={styles.attendedInfo}>
           <Text style={styles.attendedTitle} numberOfLines={1}>{event.title}</Text>
           <View style={styles.attendedMeta}>
@@ -586,7 +629,7 @@ export default function MyEventsScreen() {
       >
         {/* Header Event Info */}
         <View style={styles.hostHeader}>
-          <Image source={{ uri: imageUri }} style={styles.hostThumb} />
+          <EventImage uri={imageUri} style={styles.hostThumb} resizeMode="cover" category={event.category} />
           <View style={styles.hostInfo}>
             <Text style={styles.hostTitle} numberOfLines={1}>{event.title}</Text>
             <View style={styles.hostMetaRow}>

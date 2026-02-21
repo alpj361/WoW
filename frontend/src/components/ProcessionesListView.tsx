@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
   runOnJS,
   interpolate,
   Extrapolation,
@@ -287,7 +289,9 @@ export function ProcessionesListView() {
 
   // Map DB data to the UI interface
   const allProcesiones = procDB.map(mapDBtoProcesion);
-  const grouped = groupByDate(allProcesiones);
+  // Only show procesiones with at least one image in the slide stack
+  const slidesProcesiones = allProcesiones.filter(p => getProcessionImage(p) !== null);
+  const grouped = groupByDate(allProcesiones); // Timeline shows ALL
   const likedIds = savedProcesionIds;
 
   const translateY = useSharedValue(0);
@@ -363,11 +367,11 @@ export function ProcessionesListView() {
     lastNavTime.current = now;
     isAnimating.current = true;
 
-    if (direction > 0 && currentIndex < allProcesiones.length - 1) {
+    if (direction > 0 && currentIndex < slidesProcesiones.length - 1) {
       triggerHaptic();
       setCurrentIndex(prev => prev + 1);
       setShowTimeline(false);
-    } else if (direction > 0 && currentIndex === allProcesiones.length - 1) {
+    } else if (direction > 0 && currentIndex === slidesProcesiones.length - 1) {
       // Past last card → show timeline
       triggerHaptic();
       setShowTimeline(true);
@@ -381,7 +385,7 @@ export function ProcessionesListView() {
     }
 
     setTimeout(() => { isAnimating.current = false; }, 300);
-  }, [currentIndex, allProcesiones.length, triggerHaptic, showTimeline]);
+  }, [currentIndex, slidesProcesiones.length, triggerHaptic, showTimeline]);
 
   // Scroll-wheel support for web desktop
   useEffect(() => {
@@ -440,7 +444,7 @@ export function ProcessionesListView() {
           isTodayProcession={isToday(procesion.fecha)}
           isLive={isProcessionLive(procesion.raw)}
           isCargando={!!cargandoTurnos[id]}
-          counter={`${index + 1}/${allProcesiones.length}`}
+          counter={`${index + 1}/${slidesProcesiones.length}`}
           onPress={() => setSelectedProcession(procesion)}
           onToggleLike={() => toggleLike(procesion)}
           onCargar={() => handleCargar(id)}
@@ -617,23 +621,46 @@ export function ProcessionesListView() {
         <View style={styles.container}>
           {/* Ciudad toggle */}
           {renderCiudadToggle()}
-          
+
+          {/* Temporada banner — visible only on first card */}
+          <Animated.View
+            style={[
+              styles.seasonBanner,
+              {
+                opacity: currentIndex === 0 ? 1 : 0,
+                transform: [{ translateY: currentIndex === 0 ? 0 : -20 }],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <LinearGradient
+              colors={['#4C1D95', '#6D28D9', '#7C3AED', '#6D28D9', '#4C1D95']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.seasonBannerGradient}
+            >
+              <Text style={styles.seasonBannerFlower}>🌸</Text>
+              <Text style={styles.seasonBannerText}>Temporada de Procesiones</Text>
+              <Text style={styles.seasonBannerFlower}>🌸</Text>
+            </LinearGradient>
+          </Animated.View>
+
           {/* Card Stack */}
           <GestureDetector gesture={gesture}>
             <Animated.View
               style={styles.stackContainer}
               {...(Platform.OS === 'web' ? { 'data-proc-stack': 'true' } as any : {})}
             >
-              {allProcesiones.map((p, i) => renderCard(p, i))}
+              {slidesProcesiones.map((p, i) => renderCard(p, i))}
             </Animated.View>
           </GestureDetector>
 
           {/* Navigation dots (right side) */}
           <View style={styles.dotsContainer}>
-            {allProcesiones.slice(0, Math.min(allProcesiones.length, 12)).map((_, index) => {
+            {slidesProcesiones.slice(0, Math.min(slidesProcesiones.length, 12)).map((_, index) => {
               const isActive = index === currentIndex;
               const isNearby = Math.abs(index - currentIndex) <= 2;
-              if (!isNearby && index !== 0 && index !== allProcesiones.length - 1) return null;
+              if (!isNearby && index !== 0 && index !== slidesProcesiones.length - 1) return null;
               return (
                 <TouchableOpacity
                   key={index}
@@ -658,11 +685,11 @@ export function ProcessionesListView() {
           <View style={styles.counterContainer}>
             <Text style={styles.counterCurrent}>{String(currentIndex + 1).padStart(2, '0')}</Text>
             <View style={styles.counterDivider} />
-            <Text style={styles.counterTotal}>{String(allProcesiones.length).padStart(2, '0')}</Text>
+            <Text style={styles.counterTotal}>{String(slidesProcesiones.length).padStart(2, '0')}</Text>
           </View>
 
           {/* Scroll hint if first card */}
-          {currentIndex === 0 && allProcesiones.length > 1 && (
+          {currentIndex === 0 && slidesProcesiones.length > 1 && (
             <View style={styles.hintContainer}>
               <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.4)" />
               <Text style={styles.hintText}>Desliza para explorar</Text>
@@ -670,7 +697,7 @@ export function ProcessionesListView() {
           )}
 
           {/* Timeline hint at last card */}
-          {currentIndex === allProcesiones.length - 1 && (
+          {currentIndex === slidesProcesiones.length - 1 && (
             <View style={styles.hintContainer}>
               <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.4)" />
               <Text style={styles.hintText}>Desliza para cronograma</Text>
@@ -1277,6 +1304,37 @@ const styles = StyleSheet.create({
   timelineCardMetaText: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+
+  // Season Banner
+  seasonBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  seasonBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+  },
+  seasonBannerFlower: {
+    fontSize: 16,
+  },
+  seasonBannerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#EDE9FE',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
 
   // Ciudad Toggle

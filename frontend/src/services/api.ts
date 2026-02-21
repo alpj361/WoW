@@ -41,6 +41,8 @@ export interface Event {
     subcategory?: string | null;
     tags?: string[] | null;
     event_features?: Record<string, string> | null;
+    // Reservations
+    reservation_contact?: string | null;
 }
 
 export interface CreateEventData {
@@ -57,6 +59,7 @@ export interface CreateEventData {
     // Nuevos campos para eventos de pago y registro
     price?: number | null;
     registration_form_url?: string | null;
+    reservation_contact?: string | null;
     bank_account_number?: string | null;
     bank_name?: string | null;
     // Attendance tracking
@@ -385,6 +388,71 @@ export async function updateAttendanceRequirement(
     return response.data;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// IMAGE STORAGE  (Supabase Storage — permanent URLs that never expire)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StorageUploadResult {
+  success: boolean;
+  publicUrl: string;
+}
+
+/**
+ * Upload an image from an external URL to Supabase Storage.
+ * If event_id is provided, the event's image field is also updated in the DB.
+ * Returns the permanent Supabase public URL.
+ */
+export async function uploadImageFromUrl(
+  url: string,
+  eventId?: string,
+  filename?: string
+): Promise<StorageUploadResult> {
+  const response = await api.post(
+    '/storage/upload-image-url',
+    { url, event_id: eventId, filename },
+    { timeout: 30000 }
+  );
+  return response.data;
+}
+
+/**
+ * Upload a base64-encoded image (data URI or raw) to Supabase Storage.
+ * If event_id is provided, the event's image field is also updated in the DB.
+ * Returns the permanent Supabase public URL.
+ */
+export async function uploadImageBase64(
+  base64: string,
+  eventId?: string,
+  filename?: string
+): Promise<StorageUploadResult> {
+  const response = await api.post(
+    '/storage/upload-image-base64',
+    { base64, event_id: eventId, filename },
+    { timeout: 30000 }
+  );
+  return response.data;
+}
+
+/**
+ * Migrate all existing events that still have external (expiring) image URLs
+ * to permanent Supabase Storage URLs.
+ * Returns a summary with migrated / failed counts.
+ */
+export async function migrateEventImages(limit = 50): Promise<{
+  success: boolean;
+  migrated: number;
+  failed: number;
+  total: number;
+  results: { id: string; title: string; status: string; publicUrl?: string; error?: string }[];
+}> {
+  const response = await api.post(
+    '/storage/migrate-event-images',
+    { limit },
+    { timeout: 120000 }
+  );
+  return response.data;
+}
+
 /**
  * Trigger extraction processing (fire-and-forget)
  * Backend will update Supabase directly
@@ -404,5 +472,29 @@ export const triggerAnalysis = (jobId: string, imageUrl: string): void => {
         console.error('[API] Failed to trigger analysis:', error.message);
     });
 };
+
+export interface FlyerSubmitResult {
+    success: boolean;
+    id?: string;
+    error?: string;
+}
+
+/**
+ * Submit an event flyer (base64 image) to the whatsapp_flyers pipeline
+ * for automated processing and potential publication in WoW.
+ * Works without authentication — handled server-side with service role.
+ */
+export async function submitEventFlyer(
+    base64: string,
+    senderName?: string,
+    description?: string
+): Promise<FlyerSubmitResult> {
+    const response = await api.post(
+        '/whatsapp/submit',
+        { base64, sender_name: senderName, event_description: description },
+        { timeout: 30000 }
+    );
+    return response.data;
+}
 
 export default api;

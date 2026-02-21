@@ -376,6 +376,13 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
             <View style={styles.settingsGroup}>
               <SettingItem
+                icon="globe"
+                title="Spots"
+                subtitle="Lugares y ubicaciones"
+                onPress={() => router.push('/places')}
+                color="#10B981"
+              />
+              <SettingItem
                 icon="move"
                 title="Test de Movimiento"
                 subtitle="Prueba el movimiento 3D del pin"

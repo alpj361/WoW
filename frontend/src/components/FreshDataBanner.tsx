@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,6 +23,7 @@ export const FreshDataBanner: React.FC<FreshDataBannerProps> = ({
   onPress,
   onDismiss,
 }) => {
+  const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-60);
   const opacity = useSharedValue(0);
 
@@ -53,7 +55,7 @@ export const FreshDataBanner: React.FC<FreshDataBannerProps> = ({
   if (!visible && opacity.value === 0) return null;
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
+    <Animated.View style={[styles.container, animatedStyle, { paddingTop: insets.top + 8 }]}>
       <TouchableOpacity
         style={styles.banner}
         onPress={handlePress}
@@ -76,6 +78,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   banner: {
     flexDirection: 'row',
