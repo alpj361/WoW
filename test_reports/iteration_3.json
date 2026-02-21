@@ -12,7 +12,7 @@
       },
       {
         "flow": "Public URL access",
-        "issue": "Public URL (https://gallery-letterboxd.preview.emergentagent.com) returns 'Web server returned an unknown error'",
+        "issue": "Public URL (https://login-experience-lab.preview.emergentagent.com) returns 'Web server returned an unknown error'",
         "affected_selectors": ["public endpoint"],
         "fix_priority": "MEDIUM"
       }
