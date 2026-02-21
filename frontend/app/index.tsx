@@ -15,8 +15,16 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +44,61 @@ import { FeedModeToggle, type FeedMode } from '../src/components/FeedModeToggle'
 import { EventDetailModal } from '../src/components/EventDetailModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { submitEventFlyer } from '../src/services/api';
+
+// ─── Neon Refresh Indicator ───────────────────────────────────────────────────
+
+const NeonRefreshIndicator: React.FC<{ visible: boolean }> = ({ visible }) => {
+  const rotation = useSharedValue(0);
+  const opacity  = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      opacity.value  = withTiming(1, { duration: 200 });
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 820, easing: Easing.linear }),
+        -1, false,
+      );
+    } else {
+      opacity.value  = withTiming(0, { duration: 150 });
+      rotation.value = 0;
+    }
+  }, [visible]);
+
+  const spinStyle = useAnimatedStyle(() => ({
+    opacity:   opacity.value,
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    // @ts-ignore – pointerEvents as prop works in RN
+    <Animated.View style={[neonIndicatorStyles.wrapper, spinStyle]} pointerEvents="none">
+      <View style={neonIndicatorStyles.arc} />
+    </Animated.View>
+  );
+};
+
+const neonIndicatorStyles = StyleSheet.create({
+  wrapper: {
+    position:  'absolute',
+    top:       96,
+    alignSelf: 'center',
+    zIndex:    200,
+  },
+  arc: {
+    width:             28,
+    height:            28,
+    borderRadius:      14,
+    borderWidth:       2.5,
+    borderTopColor:    '#A855F7',
+    borderRightColor:  '#EC4899',
+    borderBottomColor: 'transparent',
+    borderLeftColor:   'transparent',
+  },
+});
+
+// ─── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -425,6 +488,9 @@ export default function ExploreScreen() {
         onHide={() => setToast(prev => ({ ...prev, visible: false }))}
       />
 
+      {/* Neon refresh indicator overlay */}
+      <NeonRefreshIndicator visible={refreshing} />
+
       {/* New data banner */}
       <FreshDataBanner
         visible={hasNewFeedData}
@@ -433,21 +499,36 @@ export default function ExploreScreen() {
         onDismiss={clearNewDataFlags}
       />
 
-      <View style={[styles.header, { paddingTop: insets.top + 5 }]}>
-        <View>
-          <WowLogo width={100} height={32} variant={isCuaresmaMode ? 'cuaresma' : 'default'} />
-          <Text style={[styles.tagline, isCuaresmaMode && { color: '#C4B5FD' }]}>
-            {isCuaresmaMode ? 'Cuaresma 2026' : 'Descubre y Vive Eventos'}
-          </Text>
+      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
+        {/* Blur/glass layer */}
+        {Platform.OS !== 'android' ? (
+          <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.headerBlurFallback]} />
+        )}
+
+        {/* Row content */}
+        <View style={[styles.header, { paddingTop: 5, paddingLeft: 12 }]}>
+          <View>
+            <WowLogo size={44} variant={isCuaresmaMode ? 'cuaresma' : 'default'} interactive />
+          </View>
+          <TouchableOpacity
+            style={styles.flyerFab}
+            onPress={openFlyerModal}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="megaphone-outline" size={15} color="#10B981" />
+            <Text style={styles.flyerFabText}>Enviar evento</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.flyerFab}
-          onPress={openFlyerModal}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="megaphone-outline" size={15} color="#10B981" />
-          <Text style={styles.flyerFabText}>Enviar evento</Text>
-        </TouchableOpacity>
+
+        {/* Neon gradient separator */}
+        <LinearGradient
+          colors={['rgba(139,92,246,0.4)', 'rgba(236,72,153,0.2)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.headerSeparator}
+        />
       </View>
 
       <FeedModeToggle mode={feedMode} onModeChange={setFeedMode} />
@@ -772,6 +853,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+  },
+  headerWrapper: {
+    overflow: 'hidden',
+  },
+  headerBlurFallback: {
+    backgroundColor: 'rgba(12, 12, 18, 0.88)',
+  },
+  headerSeparator: {
+    height: 1,
   },
   header: {
     paddingHorizontal: 20,

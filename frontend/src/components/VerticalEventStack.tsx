@@ -135,6 +135,8 @@ const AnimatedCard = memo(({ event, diff, translateY, onSave, onSkip, showAction
         onSkip={onSkip}
         showActions={showActions}
         onPress={onPress}
+        parallaxY={diff === 0 ? translateY : undefined}
+        staggerDelay={Math.abs(diff) * 80}
       />
     </Animated.View>
   );

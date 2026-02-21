@@ -4,6 +4,7 @@ import { Tabs, Slot, useSegments, useRouter, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebViewport } from '../src/components/WebViewport';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
@@ -271,6 +272,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  useFonts({ 'PlusJakartaSans-ExtraBold': PlusJakartaSans_800ExtraBold });
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

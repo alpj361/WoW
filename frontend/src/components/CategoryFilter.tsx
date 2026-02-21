@@ -1,11 +1,14 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 interface Category {
   id: string;
@@ -15,11 +18,85 @@ interface Category {
 }
 
 const categories: Category[] = [
-  { id: 'all', label: 'Todos', icon: 'grid', color: '#6B7280' },
-  { id: 'music', label: 'Entretenimiento', icon: 'musical-notes', color: '#8B5CF6' },
-  { id: 'volunteer', label: 'Voluntariado', icon: 'heart', color: '#EC4899' },
-  { id: 'general', label: 'General', icon: 'cafe', color: '#F59E0B' },
+  { id: 'all',       label: 'Todos',           icon: 'grid',          color: '#8B5CF6' },
+  { id: 'music',     label: 'Entretenimiento', icon: 'musical-notes', color: '#A855F7' },
+  { id: 'volunteer', label: 'Voluntariado',    icon: 'heart',         color: '#EC4899' },
+  { id: 'general',   label: 'General',         icon: 'cafe',          color: '#F59E0B' },
 ];
+
+// ─── Animated item ────────────────────────────────────────────────────────────
+
+interface AnimatedItemProps {
+  category: Category;
+  isSelected: boolean;
+  onPress: (id: string) => void;
+}
+
+const AnimatedCategoryItem: React.FC<AnimatedItemProps> = ({ category, isSelected, onPress }) => {
+  const scale   = useSharedValue(isSelected ? 1 : 0.88);
+  const glow    = useSharedValue(isSelected ? 1 : 0);
+  const labelOp = useSharedValue(isSelected ? 1 : 0.55);
+
+  useEffect(() => {
+    scale.value   = withSpring(isSelected ? 1 : 0.88,  { damping: 14, stiffness: 280 });
+    glow.value    = withTiming(isSelected ? 1 : 0,     { duration: 220 });
+    labelOp.value = withTiming(isSelected ? 1 : 0.55,  { duration: 200 });
+  }, [isSelected]);
+
+  const wrapStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const circleStyle = useAnimatedStyle(() => ({
+    backgroundColor: isSelected ? category.color : '#1A1A2E',
+    borderColor:     isSelected ? category.color : '#2A2A3E',
+    shadowColor:     category.color,
+    shadowOpacity:   interpolate(glow.value, [0, 1], [0, 0.75]),
+    shadowRadius:    interpolate(glow.value, [0, 1], [0, 14]),
+    shadowOffset:    { width: 0, height: 0 },
+    elevation:       interpolate(glow.value, [0, 1], [0, 8]),
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: labelOp.value,
+  }));
+
+  const handlePress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress(category.id);
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={0.75}
+      style={styles.categoryItem}
+    >
+      <Animated.View style={wrapStyle}>
+        <Animated.View style={[styles.iconCircle, circleStyle]}>
+          <Ionicons
+            name={category.icon as any}
+            size={20}
+            color={isSelected ? '#fff' : '#6B7280'}
+          />
+        </Animated.View>
+        <Animated.Text
+          style={[
+            styles.label,
+            isSelected && { color: category.color, fontWeight: '600' },
+            labelStyle,
+          ]}
+        >
+          {category.label}
+        </Animated.Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// ─── CategoryFilter ───────────────────────────────────────────────────────────
 
 interface CategoryFilterProps {
   selectedCategory: string;
@@ -32,41 +109,14 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      {categories.map((category) => {
-        const isSelected = selectedCategory === category.id;
-        return (
-          <TouchableOpacity
-            key={category.id}
-            style={styles.categoryItem}
-            onPress={() => onSelectCategory(category.id)}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.iconCircle,
-                {
-                  backgroundColor: isSelected ? category.color : '#1E1E1E',
-                  borderColor: isSelected ? category.color : '#333',
-                },
-              ]}
-            >
-              <Ionicons
-                name={category.icon as any}
-                size={20}
-                color={isSelected ? '#fff' : '#9CA3AF'}
-              />
-            </View>
-            <Text
-              style={[
-                styles.label,
-                isSelected && { color: category.color, fontWeight: '600' },
-              ]}
-            >
-              {category.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+      {categories.map((cat) => (
+        <AnimatedCategoryItem
+          key={cat.id}
+          category={cat}
+          isSelected={selectedCategory === cat.id}
+          onPress={onSelectCategory}
+        />
+      ))}
     </View>
   );
 };
@@ -76,7 +126,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     gap: 16,
   },
   categoryItem: {
@@ -89,13 +139,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 1.5,
   },
   label: {
     color: '#6B7280',
     fontSize: 11,
     fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

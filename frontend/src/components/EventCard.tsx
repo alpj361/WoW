@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   useWindowDimensions,
   TouchableOpacity,
-  Image,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,166 +20,193 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
+  withRepeat,
+  withDelay,
   runOnJS,
+  interpolate,
+  Extrapolation,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Event } from '../store/eventStore';
 
-interface EventCardProps {
-  event: Event;
-  onSave?: () => void;
-  onSkip?: () => void;
-  showActions?: boolean;
-  onPress?: () => void;
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PARALLAX_OVERSHOOT = 28;
+
+const isEventToday = (dateStr?: string): boolean => {
+  if (!dateStr) return false;
+  try {
+    const today = new Date();
+    const d     = new Date(dateStr);
+    return (
+      d.getDate()     === today.getDate()   &&
+      d.getMonth()    === today.getMonth()  &&
+      d.getFullYear() === today.getFullYear()
+    );
+  } catch { return false; }
+};
 
 const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
-    case 'music':
-      return ['rgba(139, 92, 246, 0.8)', 'rgba(109, 40, 217, 0.9)'];
-    case 'volunteer':
-      return ['rgba(236, 72, 153, 0.8)', 'rgba(190, 24, 93, 0.9)'];
-    default:
-      return ['rgba(245, 158, 11, 0.8)', 'rgba(217, 119, 6, 0.9)'];
+    case 'music':     return ['rgba(139,92,246,0.8)', 'rgba(109,40,217,0.9)'];
+    case 'volunteer': return ['rgba(236,72,153,0.8)', 'rgba(190,24,93,0.9)'];
+    default:          return ['rgba(245,158,11,0.8)', 'rgba(217,119,6,0.9)'];
   }
 };
 
-const getCategoryIcon = (category: string): string => {
-  switch (category) {
-    case 'music':
-      return 'musical-notes';
-    case 'volunteer':
-      return 'heart';
-    default:
-      return 'fast-food';
-  }
-};
+const getCategoryIcon  = (c: string) => c === 'music' ? 'musical-notes' : c === 'volunteer' ? 'heart' : 'fast-food';
+const getCategoryLabel = (c: string) => c === 'music' ? 'Música & Cultura' : c === 'volunteer' ? 'Voluntariado' : 'General';
 
-const getCategoryLabel = (category: string): string => {
-  switch (category) {
-    case 'music':
-      return 'Música & Cultura';
-    case 'volunteer':
-      return 'Voluntariado';
-    default:
-      return 'General';
-  }
-};
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface EventCardProps {
+  event:        Event;
+  onSave?:      () => void;
+  onSkip?:      () => void;
+  showActions?: boolean;
+  onPress?:     () => void;
+  /** SharedValue from VerticalEventStack drag — drives parallax on image */
+  parallaxY?:   SharedValue<number>;
+  /** Entrance stagger delay in ms */
+  staggerDelay?: number;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const EventCard: React.FC<EventCardProps> = ({
   event,
   onSave,
   onSkip,
-  showActions = true,
+  showActions  = true,
   onPress,
+  parallaxY,
+  staggerDelay = 0,
 }) => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const gradient = getCategoryGradient(event.category);
-  const icon = getCategoryIcon(event.category);
+  const gradient      = getCategoryGradient(event.category);
+  const icon          = getCategoryIcon(event.category);
   const categoryLabel = getCategoryLabel(event.category);
+  const router        = useRouter();
+  const { user }      = useAuth();
+  const isGuest       = !user;
+  const showHoy       = isEventToday(event.date);
 
-  const cardWidth = Math.min(screenWidth * 0.88, 360);
+  const cardWidth  = Math.min(screenWidth  * 0.88, 360);
   const cardHeight = Math.min(screenHeight * 0.62, 520);
 
-  const router = useRouter();
-  const { user } = useAuth();
-  const isGuest = !user;
+  // ── Entrance animation ──────────────────────────────────────────────────────
+  const entranceScale   = useSharedValue(0.92);
+  const entranceOpacity = useSharedValue(0);
 
-  // Animation values for buttons
-  const skipScale = useSharedValue(1);
-  const saveScale = useSharedValue(1);
+  useEffect(() => {
+    entranceScale.value   = withDelay(staggerDelay, withSpring(1, { damping: 18, stiffness: 200 }));
+    entranceOpacity.value = withDelay(staggerDelay, withTiming(1, { duration: 320 }));
+  }, []);
+
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity:   entranceOpacity.value,
+    transform: [{ scale: entranceScale.value }],
+  }));
+
+  // ── HOY badge pulse ─────────────────────────────────────────────────────────
+  const hoyPulse = useSharedValue(1);
+  useEffect(() => {
+    if (!showHoy) return;
+    hoyPulse.value = withRepeat(
+      withSequence(
+        withTiming(1.18, { duration: 550 }),
+        withTiming(1,    { duration: 550 }),
+      ),
+      -1, false,
+    );
+  }, [showHoy]);
+
+  const hoyStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: hoyPulse.value }],
+    opacity:   interpolate(hoyPulse.value, [1, 1.18], [0.9, 1]),
+  }));
+
+  // ── Parallax image ──────────────────────────────────────────────────────────
+  const fallbackParallax = useSharedValue(0);
+  const activeParallax   = parallaxY ?? fallbackParallax;
+
+  const parallaxStyle = useAnimatedStyle(() => {
+    const shift = interpolate(
+      activeParallax.value,
+      [-120, 0, 120],
+      [-PARALLAX_OVERSHOOT, 0, PARALLAX_OVERSHOOT],
+      Extrapolation.CLAMP,
+    );
+    return { transform: [{ translateY: shift }] };
+  });
+
+  // ── Button animations ───────────────────────────────────────────────────────
+  const skipScale    = useSharedValue(1);
+  const saveScale    = useSharedValue(1);
   const skipRotation = useSharedValue(0);
   const saveRotation = useSharedValue(0);
-
-  const handlePress = () => {
-    console.log('[EventCard] handlePress fired — onPress defined:', !!onPress, 'isGuest:', isGuest, 'title:', event.title);
-    if (onPress) {
-      onPress();
-      return;
-    }
-    // Guest mode: do nothing on tap
-    if (isGuest) return;
-    if (event.id) {
-      router.push(`/event/${event.id}`);
-    }
-  };
 
   const triggerHaptic = async (type: 'success' | 'medium') => {
     if (Platform.OS === 'web') return;
     try {
-      if (type === 'success') {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-    } catch (e) { }
+      type === 'success'
+        ? await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        : await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
   };
 
-  // Skip button gesture
+  const handlePress = () => {
+    if (onPress) { onPress(); return; }
+    if (isGuest)  return;
+    if (event.id) router.push(`/event/${event.id}`);
+  };
+
   const skipGesture = Gesture.Tap()
     .onBegin(() => {
-      skipScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
-      skipRotation.value = withSequence(
-        withTiming(-8, { duration: 50 }),
-        withTiming(8, { duration: 50 }),
-        withTiming(0, { duration: 50 })
-      );
+      skipScale.value    = withSpring(0.85, { damping: 15, stiffness: 400 });
+      skipRotation.value = withSequence(withTiming(-8, { duration: 50 }), withTiming(8, { duration: 50 }), withTiming(0, { duration: 50 }));
     })
-    .onFinalize((_, success) => {
+    .onFinalize((_, ok) => {
       skipScale.value = withSpring(1, { damping: 10, stiffness: 300 });
-      if (success && onSkip) {
-        runOnJS(triggerHaptic)('medium');
-        runOnJS(onSkip)();
-      }
+      if (ok && onSkip) { runOnJS(triggerHaptic)('medium'); runOnJS(onSkip)(); }
     });
 
-  // Save button gesture
   const saveGesture = Gesture.Tap()
     .onBegin(() => {
-      saveScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
-      saveRotation.value = withSequence(
-        withTiming(-8, { duration: 50 }),
-        withTiming(8, { duration: 50 }),
-        withTiming(0, { duration: 50 })
-      );
+      saveScale.value    = withSpring(0.85, { damping: 15, stiffness: 400 });
+      saveRotation.value = withSequence(withTiming(-8, { duration: 50 }), withTiming(8, { duration: 50 }), withTiming(0, { duration: 50 }));
     })
-    .onFinalize((_, success) => {
+    .onFinalize((_, ok) => {
       saveScale.value = withSpring(1, { damping: 10, stiffness: 300 });
-      if (success && onSave) {
-        runOnJS(triggerHaptic)('success');
-        runOnJS(onSave)();
-      }
+      if (ok && onSave) { runOnJS(triggerHaptic)('success'); runOnJS(onSave)(); }
     });
 
-  const skipAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: skipScale.value },
-      { rotate: `${skipRotation.value}deg` },
-    ],
-  }));
+  const skipAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: skipScale.value }, { rotate: `${skipRotation.value}deg` }] }));
+  const saveAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: saveScale.value }, { rotate: `${saveRotation.value}deg` }] }));
 
-  const saveAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: saveScale.value },
-      { rotate: `${saveRotation.value}deg` },
-    ],
-  }));
-
-  // Glassmorphic info panel content
+  // ── Glass panel ─────────────────────────────────────────────────────────────
   const GlassInfoPanel = () => {
     const content = (
       <View style={styles.glassContent}>
-        <View style={styles.categoryBadge}>
-          <Ionicons name={icon as any} size={12} color="#fff" />
-          <Text style={styles.categoryText}>{categoryLabel}</Text>
+        {/* Category badge + HOY badge row */}
+        <View style={styles.badgeRow}>
+          <View style={styles.categoryBadge}>
+            <Ionicons name={icon as any} size={12} color="#fff" />
+            <Text style={styles.categoryText}>{categoryLabel}</Text>
+          </View>
+
+          {showHoy && (
+            <Animated.View style={[styles.hoyBadge, hoyStyle]}>
+              <Text style={styles.hoyText}>HOY</Text>
+            </Animated.View>
+          )}
         </View>
 
         <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
 
         {event.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {event.description}
-          </Text>
+          <Text style={styles.description} numberOfLines={2}>{event.description}</Text>
         )}
 
         <View style={styles.metaRow}>
@@ -213,13 +240,8 @@ export const EventCard: React.FC<EventCardProps> = ({
     );
 
     if (Platform.OS === 'web') {
-      return (
-        <View style={[styles.glassPanel, styles.glassPanelWeb]}>
-          {content}
-        </View>
-      );
+      return <View style={[styles.glassPanel, styles.glassPanelWeb]}>{content}</View>;
     }
-
     return (
       <BlurView intensity={40} tint="dark" style={styles.glassPanel}>
         <View style={styles.glassPanelOverlay} />
@@ -228,21 +250,22 @@ export const EventCard: React.FC<EventCardProps> = ({
     );
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.cardWrapper, { width: cardWidth, height: cardHeight }]}>
+    <Animated.View style={[styles.cardWrapper, { width: cardWidth, height: cardHeight }, entranceStyle]}>
       <View style={styles.card}>
-        <TouchableOpacity
-          style={styles.cardTouchable}
-          activeOpacity={0.95}
-          onPress={handlePress}
-        >
-          {/* Background Image or Gradient (fallback when no image) */}
+        <TouchableOpacity style={styles.cardTouchable} activeOpacity={0.95} onPress={handlePress}>
+
+          {/* Parallax image container — overflow:hidden is on styles.card */}
           {event.image ? (
-            <Image
-              source={{ uri: event.image }}
-              style={styles.eventImage}
-              resizeMode="cover"
-            />
+            <Animated.View style={[styles.parallaxContainer, parallaxStyle]}>
+              <Image
+                source={{ uri: event.image }}
+                style={styles.eventImage}
+                contentFit="cover"
+                transition={200}
+              />
+            </Animated.View>
           ) : (
             <LinearGradient
               colors={gradient}
@@ -254,37 +277,36 @@ export const EventCard: React.FC<EventCardProps> = ({
             </LinearGradient>
           )}
 
-          {/* Gradient overlay for better text readability */}
+          {/* Gradient overlay */}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)']}
             locations={[0, 0.5, 1]}
             style={styles.gradientOverlay}
           />
 
-          {/* Glassmorphic info panel */}
           <GlassInfoPanel />
         </TouchableOpacity>
 
-        {/* Action buttons */}
         {showActions && (
           <View style={styles.actionsContainer} pointerEvents="box-none">
             <GestureDetector gesture={skipGesture}>
-              <Animated.View style={[styles.actionButton, styles.skipButton, skipAnimatedStyle]}>
+              <Animated.View style={[styles.actionButton, styles.skipButton, skipAnimStyle]}>
                 <Ionicons name="close" size={28} color="#fff" />
               </Animated.View>
             </GestureDetector>
-
             <GestureDetector gesture={saveGesture}>
-              <Animated.View style={[styles.actionButton, styles.saveButton, saveAnimatedStyle]}>
+              <Animated.View style={[styles.actionButton, styles.saveButton, saveAnimStyle]}>
                 <Ionicons name="heart" size={28} color="#fff" />
               </Animated.View>
             </GestureDetector>
           </View>
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   cardWrapper: {
@@ -297,10 +319,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#1F1F1F',
-    // Glass card border
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    // Shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
@@ -310,8 +330,16 @@ const styles = StyleSheet.create({
   cardTouchable: {
     flex: 1,
   },
+  // Parallax: image container is PARALLAX_OVERSHOOT*2 px taller than card
+  parallaxContainer: {
+    position: 'absolute',
+    top:    -PARALLAX_OVERSHOOT,
+    bottom: -PARALLAX_OVERSHOOT,
+    left:   0,
+    right:  0,
+  },
   eventImage: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   placeholderGradient: {
     ...StyleSheet.absoluteFillObject,
@@ -321,7 +349,7 @@ const styles = StyleSheet.create({
   gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
-  // Glass panel styles
+  // Glass panel
   glassPanel: {
     position: 'absolute',
     bottom: 80,
@@ -332,21 +360,26 @@ const styles = StyleSheet.create({
   },
   glassPanelOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(30, 30, 40, 0.6)',
+    backgroundColor: 'rgba(30,30,40,0.6)',
   },
   glassPanelWeb: {
-    backgroundColor: 'rgba(30, 30, 40, 0.85)',
+    backgroundColor: 'rgba(30,30,40,0.85)',
     backdropFilter: 'blur(20px)',
-  },
+  } as any,
   glassContent: {
     padding: 16,
+    gap: 8,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(139, 92, 246, 0.6)',
+    backgroundColor: 'rgba(139,92,246,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -356,6 +389,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
+  },
+  // HOY badge — neon green pulse
+  hoyBadge: {
+    backgroundColor: 'rgba(16,185,129,0.85)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(52,211,153,0.6)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  hoyText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   title: {
     fontSize: 20,
@@ -407,7 +460,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  // Action buttons
   actionsContainer: {
     position: 'absolute',
     bottom: 16,
@@ -424,7 +476,6 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    // Glass effect
     borderWidth: 1.5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -433,12 +484,12 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   skipButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(239,68,68,0.85)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   saveButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(16,185,129,0.85)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
 });
 

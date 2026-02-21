@@ -595,7 +595,7 @@ export default function AuthScreen() {
                             ]}
                         >
                             <View style={styles.logoGlow}>
-                                <WowLogo width={280} height={100} />
+                                <WowLogo size={200} interactive />
                             </View>
                             <Text style={styles.tagline}>Descubre eventos increíbles</Text>
                         </Animated.View>
@@ -900,7 +900,7 @@ export default function AuthScreen() {
                     ]}
                 >
                     <View style={styles.logoGlow}>
-                        <WowLogo width={200} height={70} />
+                        <WowLogo size={160} interactive />
                     </View>
                     <Text style={styles.tagline}>Descubre eventos increíbles</Text>
                 </Animated.View>
