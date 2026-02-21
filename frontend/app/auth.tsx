@@ -16,6 +16,7 @@ import {
     Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { submitEventFlyer } from '../src/services/api';
 import Animated, {
     useSharedValue,
@@ -23,8 +24,11 @@ import Animated, {
     withTiming,
     withRepeat,
     withSequence,
+    withDelay,
+    withSpring,
     interpolate,
     Easing,
+    runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
