@@ -443,12 +443,15 @@ export default function AuthScreen() {
 
             if (data.success) {
                 setValidatedCode(invitationCode.toUpperCase());
+                triggerHaptic('success');
                 setStep(2);
             } else {
                 setError(data.error || 'Código inválido');
+                triggerHaptic('warning');
             }
         } catch (err) {
             setError('Error de conexión. Intenta de nuevo.');
+            triggerHaptic('warning');
             console.error('Validate code error:', err);
         } finally {
             setLoading(false);
@@ -457,6 +460,7 @@ export default function AuthScreen() {
 
     // Handle Google Sign In for REGISTRATION (with code)
     const handleGoogleRegister = async () => {
+        animateButtonPress();
         setLoading(true);
         setError(null);
 
