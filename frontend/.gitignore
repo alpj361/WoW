@@ -37,3 +37,11 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# EAS (Expo Application Services)
+.eas/
+eas-build-*.log
+*.ipa
+*.apk
+*.aab
+build-*.tar.gz
