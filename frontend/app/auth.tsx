@@ -258,6 +258,31 @@ export default function AuthScreen() {
     const slideAnim = useSharedValue(50);
     const formFadeAnim = useSharedValue(0);
     const formSlideAnim = useSharedValue(30);
+    const logoScale = useSharedValue(0.3);
+    const logoRotate = useSharedValue(-10);
+    const glowPulse = useSharedValue(0);
+    const buttonScale = useSharedValue(1);
+
+    // Haptic feedback helper
+    const triggerHaptic = async (type: 'light' | 'medium' | 'success' | 'warning') => {
+        if (Platform.OS === 'web') return;
+        try {
+            switch (type) {
+                case 'light':
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    break;
+                case 'medium':
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    break;
+                case 'success':
+                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    break;
+                case 'warning':
+                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    break;
+            }
+        } catch (e) { }
+    };
 
     useEffect(() => {
         console.log('✅ AuthScreen mounted');
@@ -265,23 +290,56 @@ export default function AuthScreen() {
     }, []);
 
     useEffect(() => {
-        // Entrance animations - logo first
-        fadeAnim.value = withTiming(1, { duration: 800 });
-        slideAnim.value = withTiming(0, { duration: 800 });
+        // Impactful entrance animation sequence
+        // 1. Logo scale + rotate entrance with spring
+        logoScale.value = withDelay(200, withSpring(1, { 
+            damping: 12, 
+            stiffness: 100,
+            mass: 1,
+        }));
+        logoRotate.value = withDelay(200, withSpring(0, { 
+            damping: 15, 
+            stiffness: 80 
+        }));
+        
+        // 2. Fade in
+        fadeAnim.value = withDelay(100, withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) }));
+        slideAnim.value = withDelay(100, withSpring(0, { damping: 20, stiffness: 90 }));
 
-        // Form animations after a delay
+        // 3. Glow pulse animation - continuous
+        glowPulse.value = withRepeat(
+            withSequence(
+                withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+                withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+            ),
+            -1,
+            false
+        );
+
+        // 4. Form animations after logo settles
         const timeout = setTimeout(() => {
-            formFadeAnim.value = withTiming(1, { duration: 600 });
-            formSlideAnim.value = withTiming(0, { duration: 600 });
-        }, 800);
+            formFadeAnim.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+            formSlideAnim.value = withSpring(0, { damping: 20, stiffness: 100 });
+            // Trigger haptic on form appear
+            triggerHaptic('light');
+        }, 700);
 
         return () => clearTimeout(timeout);
     }, []);
 
-    // Animated styles
+    // Enhanced animated styles
     const logoAnimatedStyle = useAnimatedStyle(() => ({
         opacity: fadeAnim.value,
-        transform: [{ translateY: slideAnim.value }],
+        transform: [
+            { translateY: slideAnim.value },
+            { scale: logoScale.value },
+            { rotate: `${logoRotate.value}deg` },
+        ],
+    }));
+
+    const glowAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(glowPulse.value, [0, 1], [0.5, 1]),
+        transform: [{ scale: interpolate(glowPulse.value, [0, 1], [0.95, 1.05]) }],
     }));
 
     const formAnimatedStyle = useAnimatedStyle(() => ({
