@@ -421,8 +421,11 @@ export default function AuthScreen() {
 
     // Validate invitation code
     const handleValidateCode = async () => {
+        animateButtonPress();
+        
         if (!invitationCode.trim()) {
             setError('Ingresa tu código de invitación');
+            triggerHaptic('warning');
             return;
         }
 
