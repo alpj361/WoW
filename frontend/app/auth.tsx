@@ -351,6 +351,19 @@ export default function AuthScreen() {
         opacity: formFadeAnim.value,
     }));
 
+    const buttonAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: buttonScale.value }],
+    }));
+
+    // Button press animation helper
+    const animateButtonPress = () => {
+        buttonScale.value = withSequence(
+            withTiming(0.95, { duration: 100 }),
+            withSpring(1, { damping: 15, stiffness: 400 })
+        );
+        triggerHaptic('medium');
+    };
+
     // Set error from URL params on mount
     useEffect(() => {
         if (params.error === 'not_registered') {
