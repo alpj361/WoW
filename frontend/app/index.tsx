@@ -44,28 +44,29 @@ import { FeedModeToggle, type FeedMode } from '../src/components/FeedModeToggle'
 import { EventDetailModal } from '../src/components/EventDetailModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { submitEventFlyer } from '../src/services/api';
+import LottieView from 'lottie-react-native';
 
 // ─── Neon Refresh Indicator ───────────────────────────────────────────────────
 
 const NeonRefreshIndicator: React.FC<{ visible: boolean }> = ({ visible }) => {
   const rotation = useSharedValue(0);
-  const opacity  = useSharedValue(0);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
-      opacity.value  = withTiming(1, { duration: 200 });
+      opacity.value = withTiming(1, { duration: 200 });
       rotation.value = withRepeat(
         withTiming(360, { duration: 820, easing: Easing.linear }),
         -1, false,
       );
     } else {
-      opacity.value  = withTiming(0, { duration: 150 });
+      opacity.value = withTiming(0, { duration: 150 });
       rotation.value = 0;
     }
   }, [visible]);
 
   const spinStyle = useAnimatedStyle(() => ({
-    opacity:   opacity.value,
+    opacity: opacity.value,
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
@@ -81,20 +82,20 @@ const NeonRefreshIndicator: React.FC<{ visible: boolean }> = ({ visible }) => {
 
 const neonIndicatorStyles = StyleSheet.create({
   wrapper: {
-    position:  'absolute',
-    top:       96,
+    position: 'absolute',
+    top: 96,
     alignSelf: 'center',
-    zIndex:    200,
+    zIndex: 200,
   },
   arc: {
-    width:             28,
-    height:            28,
-    borderRadius:      14,
-    borderWidth:       2.5,
-    borderTopColor:    '#A855F7',
-    borderRightColor:  '#EC4899',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2.5,
+    borderTopColor: '#A855F7',
+    borderRightColor: '#EC4899',
     borderBottomColor: 'transparent',
-    borderLeftColor:   'transparent',
+    borderLeftColor: 'transparent',
   },
 });
 
@@ -311,7 +312,12 @@ export default function ExploreScreen() {
     if (events.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Ionicons name="calendar-outline" size={64} color="#4B5563" />
+          <LottieView
+            source={{ uri: 'https://assets9.lottiefiles.com/packages/lf20_uqnqntsy.json' }}
+            autoPlay
+            loop
+            style={{ width: 160, height: 160 }}
+          />
           <Text style={styles.emptyTitle}>No hay eventos</Text>
           <Text style={styles.emptyText}>
             Parece que no hay eventos disponibles.
@@ -324,7 +330,12 @@ export default function ExploreScreen() {
       if (hasNewFeedData) {
         return (
           <View style={styles.emptyContainer}>
-            <Ionicons name="sparkles" size={64} color="#8B5CF6" />
+            <LottieView
+              source={{ uri: 'https://assets4.lottiefiles.com/packages/lf20_pNx6yH.json' }}
+              autoPlay
+              loop
+              style={{ width: 150, height: 150 }}
+            />
             <Text style={styles.emptyTitle}>¡Nuevos eventos!</Text>
             <Text style={styles.emptyText}>
               Hemos encontrado eventos recientes.
@@ -342,7 +353,12 @@ export default function ExploreScreen() {
 
       return (
         <View style={styles.emptyContainer}>
-          <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+          <LottieView
+            source={{ uri: 'https://assets7.lottiefiles.com/packages/lf20_touohxv0.json' }}
+            autoPlay
+            loop={false}
+            style={{ width: 150, height: 150 }}
+          />
           <Text style={styles.emptyTitle}>¡Has visto todos!</Text>
           <Text style={styles.emptyText}>
             Has revisado todos los eventos disponibles.
@@ -478,381 +494,399 @@ export default function ExploreScreen() {
   };
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      {/* Toast notification */}
-      <AnimatedToast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        duration={1500}
-        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
-      />
+    <View style={styles.webRoot}>
+      <GestureHandlerRootView style={styles.container}>
+        {/* Toast notification */}
+        <AnimatedToast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          duration={1500}
+          onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+        />
 
-      {/* Neon refresh indicator overlay */}
-      <NeonRefreshIndicator visible={refreshing} />
+        {/* Neon refresh indicator overlay */}
+        <NeonRefreshIndicator visible={refreshing} />
 
-      {/* New data banner */}
-      <FreshDataBanner
-        visible={hasNewFeedData}
-        message="Hay nuevos eventos"
-        onPress={handleRefreshFromBanner}
-        onDismiss={clearNewDataFlags}
-      />
+        {/* New data banner */}
+        <FreshDataBanner
+          visible={hasNewFeedData}
+          message="Hay nuevos eventos"
+          onPress={handleRefreshFromBanner}
+          onDismiss={clearNewDataFlags}
+        />
 
-      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        {/* Blur/glass layer */}
-        {Platform.OS !== 'android' ? (
-          <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.headerBlurFallback]} />
+        <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
+          {/* Blur/glass layer */}
+          {Platform.OS !== 'android' ? (
+            <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.headerBlurFallback]} />
+          )}
+
+          {/* Row content */}
+          <View style={[styles.header, { paddingTop: 5, paddingLeft: 12 }]}>
+            <View>
+              <WowLogo size={44} variant={isCuaresmaMode ? 'cuaresma' : 'default'} interactive />
+            </View>
+            <TouchableOpacity
+              style={styles.flyerFab}
+              onPress={openFlyerModal}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="megaphone-outline" size={15} color="#10B981" />
+              <Text style={styles.flyerFabText}>Enviar evento</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Neon gradient separator */}
+          <LinearGradient
+            colors={['rgba(139,92,246,0.4)', 'rgba(236,72,153,0.2)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.headerSeparator}
+          />
+        </View>
+
+        <FeedModeToggle mode={feedMode} onModeChange={setFeedMode} />
+
+        {/* Category filters only in Eventos mode */}
+        {!isCuaresmaMode && (
+          <CategoryFilter
+            selectedCategory={currentCategory}
+            onSelectCategory={setCategory}
+          />
         )}
 
-        {/* Row content */}
-        <View style={[styles.header, { paddingTop: 5, paddingLeft: 12 }]}>
-          <View>
-            <WowLogo size={44} variant={isCuaresmaMode ? 'cuaresma' : 'default'} interactive />
+        {/* Procesiones view */}
+        {isCuaresmaMode ? (
+          <View style={styles.stackContainer}>
+            <ProcessionesListView />
           </View>
-          <TouchableOpacity
-            style={styles.flyerFab}
-            onPress={openFlyerModal}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="megaphone-outline" size={15} color="#10B981" />
-            <Text style={styles.flyerFabText}>Enviar evento</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Neon gradient separator */}
-        <LinearGradient
-          colors={['rgba(139,92,246,0.4)', 'rgba(236,72,153,0.2)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerSeparator}
-        />
-      </View>
-
-      <FeedModeToggle mode={feedMode} onModeChange={setFeedMode} />
-
-      {/* Category filters only in Eventos mode */}
-      {!isCuaresmaMode && (
-        <CategoryFilter
-          selectedCategory={currentCategory}
-          onSelectCategory={setCategory}
-        />
-      )}
-
-      {/* Procesiones view */}
-      {isCuaresmaMode ? (
-        <View style={styles.stackContainer}>
-          <ProcessionesListView />
-        </View>
-      ) : showVerticalStack ? (
-        <View style={styles.stackContainer}>
-          <VerticalEventStack
-            events={events}
-            currentIndex={currentIndex}
-            onIndexChange={setCurrentIndex}
-            onSave={handleSaveEvent}
-            onSkip={handleSkipEvent}
-            readOnly={isGuest}
-            onCardPress={isGuest ? handleGuestCardPress : undefined}
-          />
-        </View>
-      ) : (
-        /* ScrollView only for loading/empty states with pull-to-refresh */
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#8B5CF6"
-              colors={['#8B5CF6']}
+        ) : showVerticalStack ? (
+          <View style={styles.stackContainer}>
+            <VerticalEventStack
+              events={events}
+              currentIndex={currentIndex}
+              onIndexChange={setCurrentIndex}
+              onSave={handleSaveEvent}
+              onSkip={handleSkipEvent}
+              readOnly={isGuest}
+              onCardPress={isGuest ? handleGuestCardPress : undefined}
             />
-          }
-        >
-          <View style={styles.cardsContainer}>
-            {renderCardContent()}
           </View>
-        </ScrollView>
-      )}
-
-      {/* Payment Alert Modal */}
-      <Modal
-        visible={showPaymentAlert}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPaymentAlert(false)}
-      >
-        <View style={styles.alertOverlay}>
-          <Pressable
-            style={styles.alertBackdrop}
-            onPress={() => {
-              setShowPaymentAlert(false);
-              goToNextCard();
-            }}
-          />
-          <View style={styles.alertBox}>
-            <View style={styles.alertIconContainer}>
-              <Ionicons name="cash" size={48} color="#F59E0B" />
-            </View>
-
-            <Text style={styles.alertTitle}>Este evento requiere pago</Text>
-
-            {currentEvent?.price && (
-              <Text style={styles.alertPrice}>Q{currentEvent.price.toFixed(2)}</Text>
-            )}
-
-            <Text style={styles.alertMessage}>
-              Has guardado este evento en tus favoritos. Para asistir, necesitas completar el pago.
-            </Text>
-
-            <View style={styles.alertButtons}>
-              <TouchableOpacity
-                style={styles.alertButtonPrimary}
-                onPress={() => {
-                  setShowPaymentAlert(false);
-                  setShowPaymentModal(true);
-                }}
-              >
-                <Ionicons name="card" size={20} color="#FFF" />
-                <Text style={styles.alertButtonPrimaryText}>Completar Pago</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.alertButtonSecondary}
-                onPress={() => {
-                  setShowPaymentAlert(false);
-                  goToNextCard();
-                }}
-              >
-                <Text style={styles.alertButtonSecondaryText}>Más Tarde</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Guest Event Detail Modal */}
-      <EventDetailModal
-        event={guestSelectedEvent}
-        visible={showGuestEventDetail}
-        onClose={() => setShowGuestEventDetail(false)}
-      />
-
-      {/* Payment Modal */}
-      <Modal
-        visible={showPaymentModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPaymentModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalDismiss}
-            onPress={() => setShowPaymentModal(false)}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Comprobante de Pago</Text>
-              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                <Ionicons name="close" size={28} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              {currentEvent?.price && (
-                <View style={styles.priceCard}>
-                  <Text style={styles.priceLabel}>Precio del Evento</Text>
-                  <Text style={styles.priceAmount}>Q{currentEvent.price.toFixed(2)}</Text>
-                </View>
-              )}
-
-              {currentEvent?.bank_name && currentEvent?.bank_account_number && (
-                <View style={styles.bankInfo}>
-                  <Text style={styles.bankInfoLabel}>Información de Pago</Text>
-                  <View style={styles.bankInfoRow}>
-                    <Ionicons name="business" size={16} color="#9CA3AF" />
-                    <Text style={styles.bankInfoText}>{currentEvent.bank_name}</Text>
-                  </View>
-                  <View style={styles.bankInfoRow}>
-                    <Ionicons name="card" size={16} color="#9CA3AF" />
-                    <Text style={styles.bankInfoText}>{currentEvent.bank_account_number}</Text>
-                  </View>
-                </View>
-              )}
-
-              <Text style={styles.uploadLabel}>Sube el comprobante de pago</Text>
-
-              {paymentReceiptUrl ? (
-                <View style={styles.receiptPreview}>
-                  <Image source={{ uri: paymentReceiptUrl }} style={styles.receiptImage} />
-                  <TouchableOpacity
-                    style={styles.removeReceipt}
-                    onPress={() => setPaymentReceiptUrl('')}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.uploadButton}
-                  onPress={pickReceipt}
-                >
-                  <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
-                  <Text style={styles.uploadButtonText}>Seleccionar Imagen</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.modalButton,
-                (!paymentReceiptUrl || isSubmitting) && styles.modalButtonDisabled
-              ]}
-              onPress={handleSubmitPayment}
-              disabled={!paymentReceiptUrl || isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                  <Text style={styles.modalButtonText}>Enviar Solicitud</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Submit Event Flyer Modal */}
-      <Modal
-        visible={showFlyerModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFlyerModal(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: '#030303' }}>
-          {/* Header */}
-          <View style={flyerModalStyles.header}>
-            <TouchableOpacity
-              onPress={() => setShowFlyerModal(false)}
-              style={flyerModalStyles.closeButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={22} color="#9CA3AF" />
-            </TouchableOpacity>
-            <Text style={flyerModalStyles.title}>Enviar evento a WoW</Text>
-            <View style={{ width: 38 }} />
-          </View>
-
+        ) : (
+          /* ScrollView only for loading/empty states with pull-to-refresh */
           <ScrollView
-            contentContainerStyle={flyerModalStyles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#8B5CF6"
+                colors={['#8B5CF6']}
+              />
+            }
           >
-            {flyerSuccess ? (
-              <View style={flyerModalStyles.successContainer}>
-                <Ionicons name="checkmark-circle" size={64} color="#10B981" />
-                <Text style={flyerModalStyles.successTitle}>¡Evento recibido!</Text>
-                <Text style={flyerModalStyles.successSubtitle}>
-                  Revisaremos tu evento y lo publicaremos en WoW si cumple con los requisitos. Puede tomar unas horas.
-                </Text>
+            <View style={styles.cardsContainer}>
+              {renderCardContent()}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Payment Alert Modal */}
+        <Modal
+          visible={showPaymentAlert}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPaymentAlert(false)}
+        >
+          <View style={styles.alertOverlay}>
+            <Pressable
+              style={styles.alertBackdrop}
+              onPress={() => {
+                setShowPaymentAlert(false);
+                goToNextCard();
+              }}
+            />
+            <View style={styles.alertBox}>
+              <View style={styles.alertIconContainer}>
+                <Ionicons name="cash" size={48} color="#F59E0B" />
+              </View>
+
+              <Text style={styles.alertTitle}>Este evento requiere pago</Text>
+
+              {currentEvent?.price && (
+                <Text style={styles.alertPrice}>Q{currentEvent.price.toFixed(2)}</Text>
+              )}
+
+              <Text style={styles.alertMessage}>
+                Has guardado este evento en tus favoritos. Para asistir, necesitas completar el pago.
+              </Text>
+
+              <View style={styles.alertButtons}>
                 <TouchableOpacity
-                  style={flyerModalStyles.doneButton}
-                  onPress={() => setShowFlyerModal(false)}
-                  activeOpacity={0.8}
+                  style={styles.alertButtonPrimary}
+                  onPress={() => {
+                    setShowPaymentAlert(false);
+                    setShowPaymentModal(true);
+                  }}
                 >
-                  <Text style={flyerModalStyles.doneButtonText}>Listo</Text>
+                  <Ionicons name="card" size={20} color="#FFF" />
+                  <Text style={styles.alertButtonPrimaryText}>Completar Pago</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.alertButtonSecondary}
+                  onPress={() => {
+                    setShowPaymentAlert(false);
+                    goToNextCard();
+                  }}
+                >
+                  <Text style={styles.alertButtonSecondaryText}>Más Tarde</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <>
-                <Text style={flyerModalStyles.label}>Flyer del evento *</Text>
-                <TouchableOpacity style={flyerModalStyles.imagePicker} onPress={handlePickFlyerImage} activeOpacity={0.75}>
-                  {flyerImage ? (
-                    <Image source={{ uri: flyerImage }} style={flyerModalStyles.preview} resizeMode="cover" />
-                  ) : (
-                    <View style={flyerModalStyles.imageEmpty}>
-                      <Ionicons name="image-outline" size={40} color="#4B5563" />
-                      <Text style={flyerModalStyles.imageEmptyText}>Seleccionar flyer</Text>
-                      <Text style={flyerModalStyles.imageEmptyHint}>Desde tu galería</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
-                {flyerImage && (
-                  <TouchableOpacity style={flyerModalStyles.changeLink} onPress={handlePickFlyerImage} activeOpacity={0.7}>
-                    <Ionicons name="refresh" size={13} color="#818CF8" />
-                    <Text style={flyerModalStyles.changeLinkText}>Cambiar imagen</Text>
-                  </TouchableOpacity>
+        {/* Guest Event Detail Modal */}
+        <EventDetailModal
+          event={guestSelectedEvent}
+          visible={showGuestEventDetail}
+          onClose={() => setShowGuestEventDetail(false)}
+        />
+
+        {/* Payment Modal */}
+        <Modal
+          visible={showPaymentModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowPaymentModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={styles.modalDismiss}
+              onPress={() => setShowPaymentModal(false)}
+            />
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Comprobante de Pago</Text>
+                <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                  <Ionicons name="close" size={28} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                {currentEvent?.price && (
+                  <View style={styles.priceCard}>
+                    <Text style={styles.priceLabel}>Precio del Evento</Text>
+                    <Text style={styles.priceAmount}>Q{currentEvent.price.toFixed(2)}</Text>
+                  </View>
                 )}
 
-                <Text style={flyerModalStyles.label}>Tu nombre o empresa</Text>
-                <View style={flyerModalStyles.inputBox}>
-                  <TextInput
-                    style={flyerModalStyles.input}
-                    placeholder="Ej: Café Tarro, DJ Marcos..."
-                    placeholderTextColor="#4B5563"
-                    value={flyerSenderName}
-                    onChangeText={setFlyerSenderName}
-                  />
-                </View>
+                {currentEvent?.bank_name && currentEvent?.bank_account_number && (
+                  <View style={styles.bankInfo}>
+                    <Text style={styles.bankInfoLabel}>Información de Pago</Text>
+                    <View style={styles.bankInfoRow}>
+                      <Ionicons name="business" size={16} color="#9CA3AF" />
+                      <Text style={styles.bankInfoText}>{currentEvent.bank_name}</Text>
+                    </View>
+                    <View style={styles.bankInfoRow}>
+                      <Ionicons name="card" size={16} color="#9CA3AF" />
+                      <Text style={styles.bankInfoText}>{currentEvent.bank_account_number}</Text>
+                    </View>
+                  </View>
+                )}
 
-                <Text style={flyerModalStyles.label}>Detalles adicionales</Text>
-                <View style={flyerModalStyles.inputBox}>
-                  <TextInput
-                    style={[flyerModalStyles.input, flyerModalStyles.textArea]}
-                    placeholder="Info que no está en el flyer: precio, link de reservas, edad mínima..."
-                    placeholderTextColor="#4B5563"
-                    value={flyerDescription}
-                    onChangeText={setFlyerDescription}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
+                <Text style={styles.uploadLabel}>Sube el comprobante de pago</Text>
 
-                <TouchableOpacity
-                  style={[flyerModalStyles.submitButton, (!flyerImage || flyerSubmitting) && flyerModalStyles.submitDisabled]}
-                  onPress={handleSubmitFlyer}
-                  disabled={!flyerImage || flyerSubmitting}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={['#059669', '#10B981']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={flyerModalStyles.submitGradient}
+                {paymentReceiptUrl ? (
+                  <View style={styles.receiptPreview}>
+                    <Image source={{ uri: paymentReceiptUrl }} style={styles.receiptImage} />
+                    <TouchableOpacity
+                      style={styles.removeReceipt}
+                      onPress={() => setPaymentReceiptUrl('')}
+                    >
+                      <Ionicons name="close-circle" size={24} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.uploadButton}
+                    onPress={pickReceipt}
                   >
-                    {flyerSubmitting ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="send" size={17} color="#fff" />
-                        <Text style={flyerModalStyles.submitText}>Enviar a WoW</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
+                    <Text style={styles.uploadButtonText}>Seleccionar Imagen</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-                <Text style={flyerModalStyles.disclaimer}>
-                  El equipo de WoW revisará tu evento antes de publicarlo.
-                </Text>
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-    </GestureHandlerRootView>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  (!paymentReceiptUrl || isSubmitting) && styles.modalButtonDisabled
+                ]}
+                onPress={handleSubmitPayment}
+                disabled={!paymentReceiptUrl || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                    <Text style={styles.modalButtonText}>Enviar Solicitud</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Submit Event Flyer Modal */}
+        <Modal
+          visible={showFlyerModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowFlyerModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#030303' }}>
+            {/* Header */}
+            <View style={flyerModalStyles.header}>
+              <TouchableOpacity
+                onPress={() => setShowFlyerModal(false)}
+                style={flyerModalStyles.closeButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+              <Text style={flyerModalStyles.title}>Enviar evento a WoW</Text>
+              <View style={{ width: 38 }} />
+            </View>
+
+            <ScrollView
+              contentContainerStyle={flyerModalStyles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {flyerSuccess ? (
+                <View style={flyerModalStyles.successContainer}>
+                  <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+                  <Text style={flyerModalStyles.successTitle}>¡Evento recibido!</Text>
+                  <Text style={flyerModalStyles.successSubtitle}>
+                    Revisaremos tu evento y lo publicaremos en WoW si cumple con los requisitos. Puede tomar unas horas.
+                  </Text>
+                  <TouchableOpacity
+                    style={flyerModalStyles.doneButton}
+                    onPress={() => setShowFlyerModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={flyerModalStyles.doneButtonText}>Listo</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <Text style={flyerModalStyles.label}>Flyer del evento *</Text>
+                  <TouchableOpacity style={flyerModalStyles.imagePicker} onPress={handlePickFlyerImage} activeOpacity={0.75}>
+                    {flyerImage ? (
+                      <Image source={{ uri: flyerImage }} style={flyerModalStyles.preview} resizeMode="cover" />
+                    ) : (
+                      <View style={flyerModalStyles.imageEmpty}>
+                        <Ionicons name="image-outline" size={40} color="#4B5563" />
+                        <Text style={flyerModalStyles.imageEmptyText}>Seleccionar flyer</Text>
+                        <Text style={flyerModalStyles.imageEmptyHint}>Desde tu galería</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {flyerImage && (
+                    <TouchableOpacity style={flyerModalStyles.changeLink} onPress={handlePickFlyerImage} activeOpacity={0.7}>
+                      <Ionicons name="refresh" size={13} color="#818CF8" />
+                      <Text style={flyerModalStyles.changeLinkText}>Cambiar imagen</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <Text style={flyerModalStyles.label}>Tu nombre o empresa</Text>
+                  <View style={flyerModalStyles.inputBox}>
+                    <TextInput
+                      style={flyerModalStyles.input}
+                      placeholder="Ej: Café Tarro, DJ Marcos..."
+                      placeholderTextColor="#4B5563"
+                      value={flyerSenderName}
+                      onChangeText={setFlyerSenderName}
+                    />
+                  </View>
+
+                  <Text style={flyerModalStyles.label}>Detalles adicionales</Text>
+                  <View style={flyerModalStyles.inputBox}>
+                    <TextInput
+                      style={[flyerModalStyles.input, flyerModalStyles.textArea]}
+                      placeholder="Info que no está en el flyer: precio, link de reservas, edad mínima..."
+                      placeholderTextColor="#4B5563"
+                      value={flyerDescription}
+                      onChangeText={setFlyerDescription}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[flyerModalStyles.submitButton, (!flyerImage || flyerSubmitting) && flyerModalStyles.submitDisabled]}
+                    onPress={handleSubmitFlyer}
+                    disabled={!flyerImage || flyerSubmitting}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={['#059669', '#10B981']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={flyerModalStyles.submitGradient}
+                    >
+                      {flyerSubmitting ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="send" size={17} color="#fff" />
+                          <Text style={flyerModalStyles.submitText}>Enviar a WoW</Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <Text style={flyerModalStyles.disclaimer}>
+                    El equipo de WoW revisará tu evento antes de publicarlo.
+                  </Text>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+      </GestureHandlerRootView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  webRoot: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#030303',
+    ...(Platform.OS === 'web' && {
+      width: '100%',
+      maxWidth: 480,
+      alignSelf: 'center',
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 40,
+    }),
   },
   headerWrapper: {
     overflow: 'hidden',

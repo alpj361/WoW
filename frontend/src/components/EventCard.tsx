@@ -34,14 +34,26 @@ import { Event } from '../store/eventStore';
 
 const PARALLAX_OVERSHOOT = 28;
 
-const isEventToday = (dateStr?: string): boolean => {
+const isEventToday = (dateStr?: string | null): boolean => {
   if (!dateStr) return false;
   try {
     const today = new Date();
-    const d     = new Date(dateStr);
+    // Use local time parsing to avoid UTC offset issues where tomorrow at UTC becomes today locally
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+
+    if (year && month && day) {
+      const d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+      return (
+        d.getDate() === today.getDate() &&
+        d.getMonth() === today.getMonth() &&
+        d.getFullYear() === today.getFullYear()
+      );
+    }
+
+    const d = new Date(dateStr);
     return (
-      d.getDate()     === today.getDate()   &&
-      d.getMonth()    === today.getMonth()  &&
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
       d.getFullYear() === today.getFullYear()
     );
   } catch { return false; }
@@ -49,25 +61,25 @@ const isEventToday = (dateStr?: string): boolean => {
 
 const getCategoryGradient = (category: string): readonly [string, string, ...string[]] => {
   switch (category) {
-    case 'music':     return ['rgba(139,92,246,0.8)', 'rgba(109,40,217,0.9)'];
+    case 'music': return ['rgba(139,92,246,0.8)', 'rgba(109,40,217,0.9)'];
     case 'volunteer': return ['rgba(236,72,153,0.8)', 'rgba(190,24,93,0.9)'];
-    default:          return ['rgba(245,158,11,0.8)', 'rgba(217,119,6,0.9)'];
+    default: return ['rgba(245,158,11,0.8)', 'rgba(217,119,6,0.9)'];
   }
 };
 
-const getCategoryIcon  = (c: string) => c === 'music' ? 'musical-notes' : c === 'volunteer' ? 'heart' : 'fast-food';
+const getCategoryIcon = (c: string) => c === 'music' ? 'musical-notes' : c === 'volunteer' ? 'heart' : 'fast-food';
 const getCategoryLabel = (c: string) => c === 'music' ? 'Música & Cultura' : c === 'volunteer' ? 'Voluntariado' : 'General';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface EventCardProps {
-  event:        Event;
-  onSave?:      () => void;
-  onSkip?:      () => void;
+  event: Event;
+  onSave?: () => void;
+  onSkip?: () => void;
   showActions?: boolean;
-  onPress?:     () => void;
+  onPress?: () => void;
   /** SharedValue from VerticalEventStack drag — drives parallax on image */
-  parallaxY?:   SharedValue<number>;
+  parallaxY?: SharedValue<number>;
   /** Entrance stagger delay in ms */
   staggerDelay?: number;
 }
@@ -78,34 +90,34 @@ export const EventCard: React.FC<EventCardProps> = ({
   event,
   onSave,
   onSkip,
-  showActions  = true,
+  showActions = true,
   onPress,
   parallaxY,
   staggerDelay = 0,
 }) => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const gradient      = getCategoryGradient(event.category);
-  const icon          = getCategoryIcon(event.category);
+  const gradient = getCategoryGradient(event.category);
+  const icon = getCategoryIcon(event.category);
   const categoryLabel = getCategoryLabel(event.category);
-  const router        = useRouter();
-  const { user }      = useAuth();
-  const isGuest       = !user;
-  const showHoy       = isEventToday(event.date);
+  const router = useRouter();
+  const { user } = useAuth();
+  const isGuest = !user;
+  const showHoy = isEventToday(event.date);
 
-  const cardWidth  = Math.min(screenWidth  * 0.88, 360);
+  const cardWidth = Math.min(screenWidth * 0.88, 360);
   const cardHeight = Math.min(screenHeight * 0.62, 520);
 
   // ── Entrance animation ──────────────────────────────────────────────────────
-  const entranceScale   = useSharedValue(0.92);
+  const entranceScale = useSharedValue(0.92);
   const entranceOpacity = useSharedValue(0);
 
   useEffect(() => {
-    entranceScale.value   = withDelay(staggerDelay, withSpring(1, { damping: 18, stiffness: 200 }));
+    entranceScale.value = withDelay(staggerDelay, withSpring(1, { damping: 18, stiffness: 200 }));
     entranceOpacity.value = withDelay(staggerDelay, withTiming(1, { duration: 320 }));
   }, []);
 
   const entranceStyle = useAnimatedStyle(() => ({
-    opacity:   entranceOpacity.value,
+    opacity: entranceOpacity.value,
     transform: [{ scale: entranceScale.value }],
   }));
 
@@ -116,7 +128,7 @@ export const EventCard: React.FC<EventCardProps> = ({
     hoyPulse.value = withRepeat(
       withSequence(
         withTiming(1.18, { duration: 550 }),
-        withTiming(1,    { duration: 550 }),
+        withTiming(1, { duration: 550 }),
       ),
       -1, false,
     );
@@ -124,12 +136,12 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const hoyStyle = useAnimatedStyle(() => ({
     transform: [{ scale: hoyPulse.value }],
-    opacity:   interpolate(hoyPulse.value, [1, 1.18], [0.9, 1]),
+    opacity: interpolate(hoyPulse.value, [1, 1.18], [0.9, 1]),
   }));
 
   // ── Parallax image ──────────────────────────────────────────────────────────
   const fallbackParallax = useSharedValue(0);
-  const activeParallax   = parallaxY ?? fallbackParallax;
+  const activeParallax = parallaxY ?? fallbackParallax;
 
   const parallaxStyle = useAnimatedStyle(() => {
     const shift = interpolate(
@@ -142,8 +154,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   });
 
   // ── Button animations ───────────────────────────────────────────────────────
-  const skipScale    = useSharedValue(1);
-  const saveScale    = useSharedValue(1);
+  const skipScale = useSharedValue(1);
+  const saveScale = useSharedValue(1);
   const skipRotation = useSharedValue(0);
   const saveRotation = useSharedValue(0);
 
@@ -153,18 +165,18 @@ export const EventCard: React.FC<EventCardProps> = ({
       type === 'success'
         ? await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
         : await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
+    } catch { }
   };
 
   const handlePress = () => {
     if (onPress) { onPress(); return; }
-    if (isGuest)  return;
+    if (isGuest) return;
     if (event.id) router.push(`/event/${event.id}`);
   };
 
   const skipGesture = Gesture.Tap()
     .onBegin(() => {
-      skipScale.value    = withSpring(0.85, { damping: 15, stiffness: 400 });
+      skipScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
       skipRotation.value = withSequence(withTiming(-8, { duration: 50 }), withTiming(8, { duration: 50 }), withTiming(0, { duration: 50 }));
     })
     .onFinalize((_, ok) => {
@@ -174,7 +186,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const saveGesture = Gesture.Tap()
     .onBegin(() => {
-      saveScale.value    = withSpring(0.85, { damping: 15, stiffness: 400 });
+      saveScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
       saveRotation.value = withSequence(withTiming(-8, { duration: 50 }), withTiming(8, { duration: 50 }), withTiming(0, { duration: 50 }));
     })
     .onFinalize((_, ok) => {
@@ -333,10 +345,10 @@ const styles = StyleSheet.create({
   // Parallax: image container is PARALLAX_OVERSHOOT*2 px taller than card
   parallaxContainer: {
     position: 'absolute',
-    top:    -PARALLAX_OVERSHOOT,
+    top: -PARALLAX_OVERSHOOT,
     bottom: -PARALLAX_OVERSHOOT,
-    left:   0,
-    right:  0,
+    left: 0,
+    right: 0,
   },
   eventImage: {
     flex: 1,
@@ -482,6 +494,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
   },
   skipButton: {
     backgroundColor: 'rgba(239,68,68,0.85)',

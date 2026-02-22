@@ -250,6 +250,12 @@ function RootLayoutNav() {
               href: null,
             }}
           />
+          <Tabs.Screen
+            name="procesiones-admin"
+            options={{
+              href: null,
+            }}
+          />
           {/* Legal screens */}
           <Tabs.Screen
             name="terminos"

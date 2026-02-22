@@ -376,6 +376,13 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitleMargin}>DESARROLLO</Text>
             <View style={styles.settingsGroup}>
               <SettingItem
+                icon="list"
+                title="Procesiones"
+                subtitle="Gestionar procesiones"
+                onPress={() => router.push('/procesiones-admin')}
+                color="#8B5CF6"
+              />
+              <SettingItem
                 icon="globe"
                 title="Spots"
                 subtitle="Lugares y ubicaciones"

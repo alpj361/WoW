@@ -35,7 +35,8 @@ import { useAuth } from '../src/context/AuthContext';
 import { QRScanner } from '../src/components/QRScanner';
 import { scanAttendance, getAttendanceList, AttendanceListItem } from '../src/services/api';
 
-const { width } = Dimensions.get('window');
+const { width: windowWidth } = Dimensions.get('window');
+const width = Platform.OS === 'web' ? Math.min(windowWidth, 480) : windowWidth;
 
 // -- Types --
 const getStatusColor = (status: string) => {
@@ -56,49 +57,6 @@ const getStatusLabel = (status: string) => {
     case 'completed': return 'Finalizado';
     default: return status || 'Borrador';
   }
-};
-
-// Small helper: shows a category-gradient fallback when the image URL is expired/broken
-const getCategoryGradient = (category?: string): readonly [string, string] => {
-  switch (category) {
-    case 'music': return ['#4C1D95', '#7C3AED'];
-    case 'volunteer': return ['#831843', '#BE185D'];
-    default: return ['#92400E', '#D97706'];
-  }
-};
-const getCategoryIcon = (category?: string): string => {
-  switch (category) {
-    case 'music': return 'musical-notes';
-    case 'volunteer': return 'heart';
-    default: return 'calendar';
-  }
-};
-
-interface EventImageProps {
-  uri: string;
-  style: any;
-  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
-  category?: string;
-}
-const EventImage: React.FC<EventImageProps> = ({ uri, style, resizeMode = 'cover', category }) => {
-  const [error, setError] = useState(false);
-  if (!uri || error) {
-    const gradient = getCategoryGradient(category);
-    const icon = getCategoryIcon(category);
-    return (
-      <LinearGradient colors={gradient} style={[style, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Ionicons name={icon as any} size={32} color="rgba(255,255,255,0.3)" />
-      </LinearGradient>
-    );
-  }
-  return (
-    <Image
-      source={{ uri }}
-      style={style}
-      resizeMode={resizeMode}
-      onError={() => setError(true)}
-    />
-  );
 };
 
 export default function MyEventsScreen() {
@@ -547,7 +505,7 @@ export default function MyEventsScreen() {
         delayLongPress={500}
         activeOpacity={0.9}
       >
-        <EventImage uri={imageUri} style={styles.savedImage} resizeMode="cover" category={event.category} />
+        <Image source={{ uri: imageUri }} style={styles.savedImage} resizeMode="cover" />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.85)']}
           style={styles.savedGradient}
@@ -584,7 +542,7 @@ export default function MyEventsScreen() {
         onLongPress={() => handleRemoveAttended(event.id)}
         delayLongPress={500}
       >
-        <EventImage uri={imageUri} style={styles.attendedImage} resizeMode="cover" category={event.category} />
+        <Image source={{ uri: imageUri }} style={styles.attendedImage} />
         <View style={styles.attendedInfo}>
           <Text style={styles.attendedTitle} numberOfLines={1}>{event.title}</Text>
           <View style={styles.attendedMeta}>
@@ -629,7 +587,7 @@ export default function MyEventsScreen() {
       >
         {/* Header Event Info */}
         <View style={styles.hostHeader}>
-          <EventImage uri={imageUri} style={styles.hostThumb} resizeMode="cover" category={event.category} />
+          <Image source={{ uri: imageUri }} style={styles.hostThumb} />
           <View style={styles.hostInfo}>
             <Text style={styles.hostTitle} numberOfLines={1}>{event.title}</Text>
             <View style={styles.hostMetaRow}>
@@ -828,7 +786,7 @@ export default function MyEventsScreen() {
     return (
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
       >
         {isEmpty ? (
@@ -850,7 +808,7 @@ export default function MyEventsScreen() {
                     <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: 'bold' }}>{allProcsToShow.length}</Text>
                   </View>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={Platform.OS === 'web'} contentContainerStyle={{ paddingHorizontal: 12 }}>
                   {allProcsToShow.map(proc => (
                     <View key={`proc-scroll-${proc.id}`} style={{ width: (width - 48) / 2, marginHorizontal: 4 }}>
                       {renderSavedProcesionCard(proc, cargandoTurnos[proc.id])}
@@ -894,7 +852,7 @@ export default function MyEventsScreen() {
   const renderAttendedTab = () => (
     <ScrollView
       contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={Platform.OS === 'web'}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
     >
       {attendedEvents.length === 0 ? (
@@ -932,7 +890,7 @@ export default function MyEventsScreen() {
           renderItem={renderHostedCard}
           keyExtractor={item => item.event.id}
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={Platform.OS === 'web'}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
         />
       )}
@@ -1407,7 +1365,7 @@ const styles = StyleSheet.create({
   },
   savedCard: {
     width: '100%',
-    aspectRatio: 0.75,
+    aspectRatio: 0.667,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1E293B',

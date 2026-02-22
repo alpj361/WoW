@@ -78,8 +78,8 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
   const { user } = useAuth();
   const router = useRouter();
 
-  // Hide tab bar completely on web
-  if (Platform.OS === 'web') {
+  // On web: hide tab bar for guests, show for authenticated users
+  if (Platform.OS === 'web' && !user) {
     return null;
   }
 
@@ -91,55 +91,63 @@ export const GlassTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
     : ['index'];
   const visibleRoutes = state.routes.filter(route => mainRoutes.includes(route.name));
 
+  const tabContent = (
+    <>
+      {/* Glass overlay for extra effect */}
+      <View style={styles.glassOverlay} />
+
+      {/* Top border glow */}
+      <View style={styles.topBorder} />
+
+      {/* Tab items */}
+      <View style={styles.tabsContainer}>
+        {visibleRoutes.map((route) => {
+          // Find the actual index in state.routes
+          const actualIndex = state.routes.findIndex(r => r.key === route.key);
+          return (
+            <TabItem
+              key={route.key}
+              route={route}
+              index={actualIndex}
+              state={state}
+              descriptors={descriptors}
+              navigation={navigation}
+            />
+          );
+        })}
+
+        {/* Guest mode: Login tab */}
+        {!user && (
+          <TouchableOpacity
+            style={styles.tabItem}
+            onPress={() => {
+              console.log('🔘 Guest Login button pressed - attempting push to /auth');
+              router.push('/auth');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.glowContainer}>
+              <View style={[styles.glow, { backgroundColor: '#10B981' }]} />
+            </View>
+            <Ionicons name="log-in" size={24} color="#10B981" />
+            <Text style={[styles.label, { color: '#10B981' }]}>Login</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </>
+  );
+
   return (
     <View style={[styles.containerWrapper, { paddingBottom: insets.bottom }]}>
-      <BlurView
-        intensity={50}
-        tint="dark"
-        style={styles.blurContainer}
-      >
-        {/* Glass overlay for extra effect */}
-        <View style={styles.glassOverlay} />
-
-        {/* Top border glow */}
-        <View style={styles.topBorder} />
-
-        {/* Tab items */}
-        <View style={styles.tabsContainer}>
-          {visibleRoutes.map((route) => {
-            // Find the actual index in state.routes
-            const actualIndex = state.routes.findIndex(r => r.key === route.key);
-            return (
-              <TabItem
-                key={route.key}
-                route={route}
-                index={actualIndex}
-                state={state}
-                descriptors={descriptors}
-                navigation={navigation}
-              />
-            );
-          })}
-
-          {/* Guest mode: Login tab */}
-          {!user && (
-            <TouchableOpacity
-              style={styles.tabItem}
-              onPress={() => {
-                console.log('🔘 Guest Login button pressed - attempting push to /auth');
-                router.push('/auth');
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.glowContainer}>
-                <View style={[styles.glow, { backgroundColor: '#10B981' }]} />
-              </View>
-              <Ionicons name="log-in" size={24} color="#10B981" />
-              <Text style={[styles.label, { color: '#10B981' }]}>Login</Text>
-            </TouchableOpacity>
-          )}
+      {Platform.OS === 'web' ? (
+        <View style={[styles.blurContainer, styles.webFallback]}>
+          {tabContent}
         </View>
-      </BlurView>
+      ) : (
+        <BlurView intensity={50} tint="dark" style={styles.blurContainer}>
+          {tabContent}
+        </BlurView>
+      )}
     </View>
   );
 };

@@ -18,6 +18,9 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  withDelay,
+  withSequence,
+  withRepeat,
   runOnJS,
   interpolate,
   Extrapolation,
@@ -92,7 +95,6 @@ interface AnimatedProcCardProps {
   isTodayProcession: boolean;
   isLive: boolean;
   isCargando: boolean;
-  counter: string;
   onPress: () => void;
   onToggleLike: () => void;
   onCargar: () => void;
@@ -107,12 +109,20 @@ const AnimatedProcCard = memo(({
   isTodayProcession,
   isLive,
   isCargando,
-  counter,
   onPress,
   onToggleLike,
   onCargar,
 }: AnimatedProcCardProps) => {
   const imageUri = getProcessionImage(procesion);
+  const staggerDelay = Math.abs(diff) * 80;
+
+  const entranceScale = useSharedValue(0.92);
+  const entranceOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    entranceScale.value = withDelay(staggerDelay, withSpring(1, { damping: 18, stiffness: 200 }));
+    entranceOpacity.value = withDelay(staggerDelay, withTiming(1, { duration: 320 }));
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
     if (diff === 0) {
@@ -129,8 +139,8 @@ const AnimatedProcCard = memo(({
         Extrapolation.CLAMP,
       );
       return {
-        transform: [{ translateY: dragProgress }, { scale: scaleProgress }],
-        opacity: 1,
+        transform: [{ translateY: dragProgress }, { scale: scaleProgress * entranceScale.value }],
+        opacity: entranceOpacity.value,
         zIndex: 10,
       };
     } else if (diff === -1) {
@@ -138,15 +148,15 @@ const AnimatedProcCard = memo(({
       const move = interpolate(translateY.value, [0, DRAG_THRESHOLD * 2], [0, 60], Extrapolation.CLAMP);
       const scale = interpolate(translateY.value, [0, DRAG_THRESHOLD * 2], [0.88, 0.94], Extrapolation.CLAMP);
       const opacity = interpolate(translateY.value, [0, DRAG_THRESHOLD * 2], [0.6, 0.85], Extrapolation.CLAMP);
-      return { transform: [{ translateY: baseY + move }, { scale }], opacity, zIndex: 5 };
+      return { transform: [{ translateY: baseY + move }, { scale: scale * entranceScale.value }], opacity: opacity * entranceOpacity.value, zIndex: 5 };
     } else if (diff === 1) {
       const baseY = 100;
       const move = interpolate(translateY.value, [-DRAG_THRESHOLD * 2, 0], [-60, 0], Extrapolation.CLAMP);
       const scale = interpolate(translateY.value, [-DRAG_THRESHOLD * 2, 0], [0.94, 0.88], Extrapolation.CLAMP);
       const opacity = interpolate(translateY.value, [-DRAG_THRESHOLD * 2, 0], [0.85, 0.6], Extrapolation.CLAMP);
-      return { transform: [{ translateY: baseY + move }, { scale }], opacity, zIndex: 5 };
+      return { transform: [{ translateY: baseY + move }, { scale: scale * entranceScale.value }], opacity: opacity * entranceOpacity.value, zIndex: 5 };
     }
-    return { transform: [{ translateY: 0 }, { scale: 1 }], opacity: 0, zIndex: 0 };
+    return { transform: [{ translateY: 0 }, { scale: entranceScale.value }], opacity: 0, zIndex: 0 };
   });
 
   return (
@@ -168,11 +178,6 @@ const AnimatedProcCard = memo(({
             <Text style={styles.liveText}>EN VIVO</Text>
           </View>
         )}
-
-        {/* Counter badge */}
-        <View style={styles.cardCounter}>
-          <Text style={styles.cardCounterText}>{counter}</Text>
-        </View>
 
         {/* Today badge */}
         {isTodayProcession && (
@@ -200,7 +205,11 @@ const AnimatedProcCard = memo(({
         </View>
 
         {/* Card content */}
-        <View style={styles.cardContent}>
+        <LinearGradient
+          colors={['transparent', 'rgba(15, 15, 25, 0.8)', '#0F0F1A']}
+          locations={[0, 0.3, 1]}
+          style={styles.cardContent}
+        >
           <Text style={styles.cardTitle} numberOfLines={2}>
             {procesion.nombre_procesion.toUpperCase()}
           </Text>
@@ -224,29 +233,78 @@ const AnimatedProcCard = memo(({
               </Text>
             </View>
           )}
-        </View>
 
-        {/* Action buttons — logged-in only */}
-        {!isGuest && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionBtn, isCargando && styles.actionBtnCargarActive]}
-              onPress={(e) => { e.stopPropagation(); onCargar(); }}
-              activeOpacity={0.7}
-            >
-              <FontAwesome5 name="people-carry" size={20} color={isCargando ? '#E9D5FF' : '#A78BFA'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, isLiked && styles.actionBtnLikeActive]}
-              onPress={(e) => { e.stopPropagation(); onToggleLike(); }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={24} color={isLiked ? '#FFF' : '#C4B5FD'} />
-            </TouchableOpacity>
-          </View>
-        )}
+          {/* Action buttons — logged-in only */}
+          {!isGuest && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[styles.actionBtn, isCargando && styles.actionBtnCargarActive]}
+                onPress={(e) => { e.stopPropagation(); onCargar(); }}
+                activeOpacity={0.7}
+              >
+                <FontAwesome5 name="people-carry" size={20} color={isCargando ? '#E9D5FF' : '#A78BFA'} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, isLiked && styles.actionBtnLikeActive]}
+                onPress={(e) => { e.stopPropagation(); onToggleLike(); }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={24} color={isLiked ? '#FFF' : '#C4B5FD'} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
+  );
+});
+
+// ─── Micro Animations ──────────────────────────────────────────────────────────
+
+// ─── Micro Animations ──────────────────────────────────────────────────────────
+
+const AnimatedHint = memo(({ text }: { text: string }) => {
+  const bounceY = useSharedValue(0);
+
+  useEffect(() => {
+    bounceY.value = withRepeat(
+      withSequence(
+        withTiming(-6, { duration: 500 }),
+        withTiming(0, { duration: 500 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bounceY.value }]
+  }));
+
+  return (
+    <Animated.View style={[styles.hintContainer, animatedStyle]} pointerEvents="none">
+      <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.4)" />
+      <Text style={styles.hintText}>{text}</Text>
+    </Animated.View>
+  );
+});
+
+const AnimatedDot = memo(({ isActive, onPress }: { isActive: boolean; onPress: () => void }) => {
+  const height = useSharedValue(isActive ? 24 : 6);
+
+  useEffect(() => {
+    height.value = withSpring(isActive ? 24 : 6, { damping: 15, stiffness: 300 });
+  }, [isActive]);
+
+  const style = useAnimatedStyle(() => ({
+    height: height.value,
+    backgroundColor: isActive ? '#A855F7' : 'rgba(255,255,255,0.25)',
+  }));
+
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <Animated.View style={[styles.dot, style]} />
+    </TouchableOpacity>
   );
 });
 
@@ -444,7 +502,6 @@ export function ProcessionesListView() {
           isTodayProcession={isToday(procesion.fecha)}
           isLive={isProcessionLive(procesion.raw)}
           isCargando={!!cargandoTurnos[id]}
-          counter={`${index + 1}/${slidesProcesiones.length}`}
           onPress={() => setSelectedProcession(procesion)}
           onToggleLike={() => toggleLike(procesion)}
           onCargar={() => handleCargar(id)}
@@ -471,11 +528,15 @@ export function ProcessionesListView() {
               <Ionicons name="flower" size={48} color="#7C3AED" />
             </View>
           )}
-          <View style={styles.cardContent}>
+          <LinearGradient
+            colors={['transparent', 'rgba(15, 15, 25, 0.8)', '#0F0F1A']}
+            locations={[0, 0.3, 1]}
+            style={styles.cardContent}
+          >
             <Text style={styles.cardTitle} numberOfLines={1}>
               {procesion.nombre_procesion.toUpperCase()}
             </Text>
-          </View>
+          </LinearGradient>
         </View>
       </Animated.View>
     );
@@ -484,7 +545,7 @@ export function ProcessionesListView() {
   // ─── Ciudad Toggle Component ──────────────────────────────────────────────
 
   const renderCiudadToggle = () => (
-    <View style={styles.ciudadToggleContainer}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.ciudadScroll} contentContainerStyle={styles.ciudadToggleContainer}>
       <TouchableOpacity
         style={[styles.ciudadToggleBtn, selectedCiudad === null && styles.ciudadToggleBtnActive]}
         onPress={() => setSelectedCiudad(null)}
@@ -500,7 +561,7 @@ export function ProcessionesListView() {
         activeOpacity={0.7}
       >
         <Text style={[styles.ciudadToggleText, selectedCiudad === 'Ciudad de Guatemala' && styles.ciudadToggleTextActive]}>
-          Ciudad
+          Ciudad de Guatemala
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -509,10 +570,10 @@ export function ProcessionesListView() {
         activeOpacity={0.7}
       >
         <Text style={[styles.ciudadToggleText, selectedCiudad === 'Antigua Guatemala' && styles.ciudadToggleTextActive]}>
-          Antigua
+          Antigua Guatemala
         </Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 
   // ─── Timeline / Cronogram ──────────────────────────────────────────────────
@@ -634,7 +695,7 @@ export function ProcessionesListView() {
             pointerEvents="none"
           >
             <LinearGradient
-              colors={['#4C1D95', '#6D28D9', '#7C3AED', '#6D28D9', '#4C1D95']}
+              colors={['rgba(139, 92, 246, 0.25)', 'rgba(76, 29, 149, 0.15)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.seasonBannerGradient}
@@ -662,11 +723,10 @@ export function ProcessionesListView() {
               const isNearby = Math.abs(index - currentIndex) <= 2;
               if (!isNearby && index !== 0 && index !== slidesProcesiones.length - 1) return null;
               return (
-                <TouchableOpacity
+                <AnimatedDot
                   key={index}
+                  isActive={isActive}
                   onPress={() => setCurrentIndex(index)}
-                  style={[styles.dot, isActive && styles.dotActive]}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 />
               );
             })}
@@ -690,18 +750,12 @@ export function ProcessionesListView() {
 
           {/* Scroll hint if first card */}
           {currentIndex === 0 && slidesProcesiones.length > 1 && (
-            <View style={styles.hintContainer}>
-              <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.hintText}>Desliza para explorar</Text>
-            </View>
+            <AnimatedHint text="Desliza para explorar" />
           )}
 
           {/* Timeline hint at last card */}
           {currentIndex === slidesProcesiones.length - 1 && (
-            <View style={styles.hintContainer}>
-              <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.hintText}>Desliza para cronograma</Text>
-            </View>
+            <AnimatedHint text="Desliza para cronograma" />
           )}
         </View>
       )}
@@ -798,44 +852,32 @@ const styles = StyleSheet.create({
   mainCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#1E1B2E',
-    borderRadius: 20,
+    backgroundColor: '#0F0F1A',
+    borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.3)',
-    maxHeight: '92%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    height: '92%',
   },
   mainCardToday: {
-    borderColor: 'rgba(168, 85, 247, 0.6)',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    borderColor: 'rgba(168, 85, 247, 0.5)',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
   cardImage: {
     width: '100%',
-    height: 280,
-    backgroundColor: '#2A1A3E',
+    height: '100%',
+    position: 'absolute',
   },
   cardImagePlaceholder: {
+    backgroundColor: '#1A1A2E',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardCounter: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  cardCounterText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#C4B5FD',
-  },
+
   todayCardBadge: {
     position: 'absolute',
     top: 12,
@@ -878,7 +920,11 @@ const styles = StyleSheet.create({
     color: '#E9D5FF',
   },
   cardContent: {
-    padding: 16,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    padding: 24,
+    paddingTop: 60,
   },
   cardTitle: {
     fontSize: 17,
@@ -901,8 +947,8 @@ const styles = StyleSheet.create({
   // Action buttons
   actionButtons: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: 24,
+    right: 24,
     flexDirection: 'row',
     gap: 8,
   },
@@ -1052,19 +1098,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   counterCurrent: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '200',
     color: '#fff',
     fontVariant: ['tabular-nums'],
   },
   counterDivider: {
-    width: 22,
+    width: 24,
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    marginVertical: 5,
+    marginVertical: 6,
   },
   counterTotal: {
-    fontSize: 12,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.4)',
     fontVariant: ['tabular-nums'],
   },
@@ -1309,12 +1355,14 @@ const styles = StyleSheet.create({
   // Season Banner
   seasonBanner: {
     marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 14,
+    marginBottom: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#7C3AED',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.4)',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
@@ -1322,9 +1370,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 11,
+    gap: 12,
+    paddingVertical: 12,
     paddingHorizontal: 20,
+    backgroundColor: 'rgba(15, 15, 25, 0.6)', // Glassmorphism base
   },
   seasonBannerFlower: {
     fontSize: 16,
@@ -1332,38 +1381,39 @@ const styles = StyleSheet.create({
   seasonBannerText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#EDE9FE',
-    letterSpacing: 1.2,
+    color: '#E9D5FF',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
 
   // Ciudad Toggle
-  ciudadToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(30, 27, 46, 0.6)',
-    borderRadius: 12,
-    padding: 4,
-    marginHorizontal: 16,
+  ciudadScroll: {
+    flexGrow: 0,
     marginTop: 8,
     marginBottom: 8,
-    gap: 4,
+  },
+  ciudadToggleContainer: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
   ciudadToggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(255,255,255,0.06)' : '#1A1A2E',
+    borderWidth: 1,
+    borderColor: Platform.OS === 'web' ? 'rgba(255,255,255,0.1)' : '#2A2A3E',
   },
   ciudadToggleBtnActive: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderColor: '#8B5CF6',
   },
   ciudadToggleText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#9CA3AF',
+    color: 'rgba(255,255,255,0.6)',
   },
   ciudadToggleTextActive: {
     color: '#FFFFFF',
