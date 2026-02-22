@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
@@ -101,7 +101,7 @@ const AnimatedCategoryItem: React.FC<AnimatedItemProps> = ({ category, isSelecte
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      <Animated.View style={wrapStyle}>
+      <Animated.View style={[styles.itemInner, wrapStyle]}>
         <Animated.View style={[styles.iconCircle, circleStyle]}>
           <Ionicons
             name={category.icon as any}
@@ -135,29 +135,45 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   onSelectCategory,
 }) => {
   return (
-    <View style={styles.container}>
-      {categories.map((cat) => (
-        <AnimatedCategoryItem
-          key={cat.id}
-          category={cat}
-          isSelected={selectedCategory === cat.id}
-          onPress={onSelectCategory}
-        />
-      ))}
+    <View style={styles.outerContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        bounces={true}
+      >
+        {categories.map((cat) => (
+          <AnimatedCategoryItem
+            key={cat.id}
+            category={cat}
+            isSelected={selectedCategory === cat.id}
+            onPress={onSelectCategory}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  scrollContent: {
+    flexGrow: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 16,
   },
   categoryItem: {
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  itemInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   iconCircle: {

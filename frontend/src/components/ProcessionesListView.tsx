@@ -308,6 +308,107 @@ const AnimatedDot = memo(({ isActive, onPress }: { isActive: boolean; onPress: (
   );
 });
 
+// ─── Season Banner ────────────────────────────────────────────────────────────
+
+const SeasonBanner = ({ visible }: { visible: boolean }) => {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(visible ? 1 : 0);
+  const translateY = useSharedValue(visible ? 0 : -20);
+  const maxHeight = useSharedValue(200);
+  const marginBottom = useSharedValue(12);
+  const isDismissed = useSharedValue(false);
+
+  React.useEffect(() => {
+    if (!isDismissed.value) {
+      if (visible) {
+        opacity.value = withTiming(1, { duration: 300 });
+        translateY.value = withSpring(0, { damping: 15 });
+      } else {
+        opacity.value = withTiming(0, { duration: 200 });
+        translateY.value = withTiming(-10, { duration: 200 });
+      }
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+    maxHeight: maxHeight.value,
+    marginBottom: marginBottom.value,
+    overflow: 'hidden',
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, { damping: 15 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  const handleDismiss = () => {
+    isDismissed.value = true;
+    opacity.value = withTiming(0, { duration: 250 });
+    translateY.value = withTiming(-10, { duration: 250 });
+    maxHeight.value = withTiming(0, { duration: 350 });
+    marginBottom.value = withTiming(0, { duration: 350 });
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    }
+  };
+
+  const handlePress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+    }
+  };
+
+  return (
+    <Animated.View style={[styles.newSeasonBannerWrapper, animatedStyle]} pointerEvents="box-none">
+      <TouchableOpacity
+        activeOpacity={1}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={handlePress}
+        style={styles.newSeasonBannerContainer}
+      >
+        <LinearGradient
+          colors={['rgba(26, 26, 46, 0.8)', 'rgba(15, 15, 25, 0.95)']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <View style={styles.newBannerRow}>
+          {/* Icon */}
+          <View style={styles.newBannerIconCircle}>
+            <Ionicons name="sparkles" size={16} color="#A855F7" />
+          </View>
+
+          {/* Content */}
+          <View style={styles.newBannerContent}>
+            <View style={styles.newBannerHeader}>
+              <Text style={styles.newBannerTitle}>Temporada de Procesiones</Text>
+              <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.newBannerSubtitle}>Explora los recorridos de Cuaresma</Text>
+
+            <View style={styles.newBannerActions}>
+              <TouchableOpacity onPress={handleDismiss}>
+                <Text style={styles.newBannerActionDismiss}>Ocultar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handlePress}>
+                <Text style={styles.newBannerActionPrimary}>Ver Calendario</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ProcessionesListView() {
@@ -683,28 +784,8 @@ export function ProcessionesListView() {
           {/* Ciudad toggle */}
           {renderCiudadToggle()}
 
-          {/* Temporada banner — visible only on first card */}
-          <Animated.View
-            style={[
-              styles.seasonBanner,
-              {
-                opacity: currentIndex === 0 ? 1 : 0,
-                transform: [{ translateY: currentIndex === 0 ? 0 : -20 }],
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <LinearGradient
-              colors={['rgba(139, 92, 246, 0.25)', 'rgba(76, 29, 149, 0.15)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.seasonBannerGradient}
-            >
-              <Text style={styles.seasonBannerFlower}>🌸</Text>
-              <Text style={styles.seasonBannerText}>Temporada de Procesiones</Text>
-              <Text style={styles.seasonBannerFlower}>🌸</Text>
-            </LinearGradient>
-          </Animated.View>
+          {/* Temporada Banner - Notification style */}
+          <SeasonBanner visible={currentIndex === 0} />
 
           {/* Card Stack */}
           <GestureDetector gesture={gesture}>
@@ -1352,38 +1433,73 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
-  // Season Banner
-  seasonBanner: {
+  // Season Banner (Notification Style)
+  newSeasonBannerWrapper: {
     marginHorizontal: 16,
     marginBottom: 12,
+    zIndex: 10,
+  },
+  newSeasonBannerContainer: {
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.4)',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 8,
   },
-  seasonBannerGradient: {
+  newBannerRow: {
     flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+  },
+  newBannerIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#8B5CF6',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(15, 15, 25, 0.6)', // Glassmorphism base
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
-  seasonBannerFlower: {
-    fontSize: 16,
+  newBannerContent: {
+    flex: 1,
+    gap: 4,
   },
-  seasonBannerText: {
+  newBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  newBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.2,
+  },
+  newBannerSubtitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#E9D5FF',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    color: '#9CA3AF',
+    marginBottom: 6,
+  },
+  newBannerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 16,
+    marginTop: 2,
+  },
+  newBannerActionDismiss: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  newBannerActionPrimary: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
   },
 
   // Ciudad Toggle

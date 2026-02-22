@@ -32,6 +32,10 @@ export interface Extraction {
         recurring_dates?: string[];
         confidence?: string;
         extracted_text?: string;
+        category?: string;
+        subcategory?: string | null;
+        tags?: string[];
+        event_features?: Record<string, string> | null;
     };
     error?: string;
     createdAt: number;

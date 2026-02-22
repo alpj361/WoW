@@ -5,11 +5,12 @@ import Animated, {
     interpolate,
     interpolateColor,
     Extrapolation,
+    SharedValue,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
 interface SwipeOverlayProps {
-    translateX: Animated.SharedValue<number>;
+    translateX: SharedValue<number>;
     threshold: number;
 }
 

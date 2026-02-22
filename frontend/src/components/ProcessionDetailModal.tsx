@@ -16,7 +16,7 @@ import {
     KeyboardAvoidingView,
     Pressable,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Procesion, isToday } from '../data/cuaresma-data';
 import { type ProcesionDB, isProcessionLive } from '../store/procesionStore';
@@ -24,6 +24,38 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const STREET_PATTERNS = [
+    /\bcalle\b/i,
+    /\bavenida\b/i,
+    /\bav\.\s/i,
+    /\bca\.\s/i,
+    /\bzona\s+\d/i,
+    /\bvía\b/i,
+    /\bpasaje\b/i,
+    /\bdiagonal\b/i,
+    /^\d+\s*[aAª]/,
+];
+
+function isStreetAddress(lugar: string): boolean {
+    return STREET_PATTERNS.some(p => p.test(lugar));
+}
+
+function buildPuntoMapsUrl(lugar: string, ciudad: string | null): string {
+    const isStreet = isStreetAddress(lugar);
+    const query = isStreet && ciudad
+        ? `${lugar}, ${ciudad}, Guatemala`
+        : `${lugar}, Guatemala`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function buildPuntoWazeUrl(lugar: string, ciudad: string | null): string {
+    const isStreet = isStreetAddress(lugar);
+    const query = isStreet && ciudad
+        ? `${lugar}, ${ciudad}, Guatemala`
+        : `${lugar}, Guatemala`;
+    return `https://waze.com/ul?q=${encodeURIComponent(query)}&navigate=yes`;
+}
 
 interface ProcessionDetailModalProps {
     procesion: Procesion | null;
@@ -240,6 +272,26 @@ export function ProcessionDetailModal({ procesion, visible, onClose, rawDb }: Pr
                                                 {/* Content */}
                                                 <View style={styles.timelineContent}>
                                                     <Text style={styles.timelineLugar}>{punto.lugar}</Text>
+                                                    {/* Navigation chips */}
+                                                    <View style={styles.navChipsRow}>
+                                                        <TouchableOpacity
+                                                            style={styles.navIconBtn}
+                                                            onPress={() => Linking.openURL(buildPuntoMapsUrl(punto.lugar, rawDb?.ciudad ?? null))}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <Image
+                                                                source={{ uri: 'https://www.google.com/s2/favicons?domain=maps.google.com&sz=32' }}
+                                                                style={styles.navBrandIcon}
+                                                            />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity
+                                                            style={styles.navIconBtn}
+                                                            onPress={() => Linking.openURL(buildPuntoWazeUrl(punto.lugar, rawDb?.ciudad ?? null))}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <MaterialCommunityIcons name="waze" size={16} color="#00D4A0" />
+                                                        </TouchableOpacity>
+                                                    </View>
                                                     {hasTime && (
                                                         <Text style={styles.timelineHora}>{punto.hora}</Text>
                                                     )}
@@ -718,5 +770,26 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 15,
         fontWeight: '700',
+    },
+
+    // Navigation icon buttons
+    navChipsRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginTop: 4,
+        marginBottom: 2,
+    },
+    navIconBtn: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    navBrandIcon: {
+        width: 16,
+        height: 16,
+        borderRadius: 3,
     },
 });
