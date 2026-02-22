@@ -23,6 +23,7 @@ export interface ProcesionDB {
     source_url: string | null;
     created_at: string;
     tipo_procesion: string | null;
+    maps_url: string | null;        // legacy column, kept for DB compatibility
     live_tracking_url: string | null;
     recorrido_maps_url: string | null;
     facebook_url: string | null;

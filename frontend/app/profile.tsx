@@ -383,6 +383,13 @@ export default function ProfileScreen() {
                 color="#8B5CF6"
               />
               <SettingItem
+                icon="calendar"
+                title="Eventos"
+                subtitle="Gestionar eventos"
+                onPress={() => router.push('/eventos-admin')}
+                color="#F59E0B"
+              />
+              <SettingItem
                 icon="globe"
                 title="Spots"
                 subtitle="Lugares y ubicaciones"

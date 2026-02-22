@@ -174,11 +174,13 @@ function ImageThumb({
 interface EditSheetProps {
   procesion: ProcesionDB | null;
   visible: boolean;
+  isCreating: boolean;
   onClose: () => void;
   onSaved: (updated: ProcesionDB) => void;
+  onCreated: (created: ProcesionDB) => void;
 }
 
-function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
+function EditSheet({ procesion, visible, isCreating, onClose, onSaved, onCreated }: EditSheetProps) {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
@@ -200,6 +202,7 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [uploadingType, setUploadingType] = useState<'procesion' | 'recorrido' | null>(null);
   const [sections, setSections] = useState({
     info: true,
@@ -220,25 +223,51 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
     setToastVisible(true);
   };
 
-  // Populate form when procesion changes
+  const populateForm = (p: ProcesionDB) => {
+    setNombre(p.nombre || '');
+    setIglesia(p.iglesia || '');
+    setCiudad((p.ciudad as any) || '');
+    setTipoProcesion(p.tipo_procesion || '');
+    setFecha(p.fecha || '');
+    setHoraSalida(p.hora_salida || '');
+    setHoraEntrada(p.hora_entrada || '');
+    setLugarSalida(p.lugar_salida || '');
+    setPuntosRef(p.puntos_referencia ? [...p.puntos_referencia] : []);
+    setImagenesProcession(p.imagenes_procesion ? [...p.imagenes_procesion] : []);
+    setImagenesRecorrido(p.imagenes_recorrido ? [...p.imagenes_recorrido] : []);
+    setLiveUrl(p.live_tracking_url || '');
+    setRecorridoUrl(p.recorrido_maps_url || '');
+    setFacebookUrl(p.facebook_url || '');
+  };
+
+  // On open: reset form (create mode) or fetch fresh data (edit mode)
   useEffect(() => {
-    if (procesion) {
-      setNombre(procesion.nombre || '');
-      setIglesia(procesion.iglesia || '');
-      setCiudad((procesion.ciudad as any) || '');
-      setTipoProcesion(procesion.tipo_procesion || '');
-      setFecha(procesion.fecha || '');
-      setHoraSalida(procesion.hora_salida || '');
-      setHoraEntrada(procesion.hora_entrada || '');
-      setLugarSalida(procesion.lugar_salida || '');
-      setPuntosRef(procesion.puntos_referencia ? [...procesion.puntos_referencia] : []);
-      setImagenesProcession(procesion.imagenes_procesion ? [...procesion.imagenes_procesion] : []);
-      setImagenesRecorrido(procesion.imagenes_recorrido ? [...procesion.imagenes_recorrido] : []);
-      setLiveUrl(procesion.live_tracking_url || '');
-      setRecorridoUrl(procesion.recorrido_maps_url || '');
-      setFacebookUrl(procesion.facebook_url || '');
+    if (!visible) return;
+
+    if (isCreating) {
+      // Reset all fields to blank
+      setNombre(''); setIglesia(''); setCiudad(''); setTipoProcesion('');
+      setFecha(''); setHoraSalida(''); setHoraEntrada(''); setLugarSalida('');
+      setPuntosRef([]); setImagenesProcession([]); setImagenesRecorrido([]);
+      setLiveUrl(''); setRecorridoUrl(''); setFacebookUrl('');
+      return;
     }
-  }, [procesion]);
+
+    if (!procesion?.id) return;
+
+    setIsFetching(true);
+    populateForm(procesion);
+
+    supabase
+      .from('procesiones')
+      .select('*')
+      .eq('id', procesion.id)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) populateForm(data as ProcesionDB);
+      })
+      .finally(() => setIsFetching(false));
+  }, [visible, isCreating, procesion?.id]);
 
   // Animate sheet in/out
   useEffect(() => {
@@ -287,15 +316,23 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
     setUploadingType(type);
 
     try {
-      const ext = asset.uri.split('.').pop() || 'jpg';
+      // Derive extension from mimeType or fileName — never from the URI,
+      // because on web asset.uri is a blob: URL with no file extension.
+      let ext = 'jpg';
+      if (asset.mimeType) {
+        ext = asset.mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      } else if (asset.fileName) {
+        ext = asset.fileName.split('.').pop() || 'jpg';
+      }
       const fileName = `${procesion.id}/${Date.now()}.${ext}`;
 
       const response = await fetch(asset.uri);
       const blob = await response.blob();
+      const contentType = blob.type || asset.mimeType || `image/${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from('procesiones')
-        .upload(fileName, blob, { contentType: `image/${ext}` });
+        .upload(fileName, blob, { contentType });
 
       if (uploadError) throw uploadError;
 
@@ -325,10 +362,13 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
   };
 
   const handleSave = async () => {
-    if (!procesion) return;
+    if (!isCreating && !procesion) return;
+    if (!nombre.trim()) { showToastMsg('El nombre es requerido', 'error'); return; }
+    if (!fecha.trim()) { showToastMsg('La fecha es requerida', 'error'); return; }
+
     setIsSaving(true);
     try {
-      const payload: Partial<ProcesionDB> = {
+      const payload = {
         nombre: nombre.trim(),
         iglesia: iglesia.trim() || null,
         ciudad: ciudad || null,
@@ -345,15 +385,27 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
         facebook_url: facebookUrl.trim() || null,
       };
 
-      const { error } = await supabase
-        .from('procesiones')
-        .update(payload)
-        .eq('id', procesion.id);
+      if (isCreating) {
+        const { data, error } = await supabase
+          .from('procesiones')
+          .insert(payload)
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
+        onCreated(data as ProcesionDB);
+        showToastMsg('Procesión creada');
+        onClose();
+      } else {
+        const { error } = await supabase
+          .from('procesiones')
+          .update(payload)
+          .eq('id', procesion!.id);
 
-      onSaved({ ...procesion, ...payload } as ProcesionDB);
-      showToastMsg('Guardado exitosamente');
+        if (error) throw error;
+        onSaved({ ...procesion!, ...payload } as ProcesionDB);
+        showToastMsg('Guardado exitosamente');
+      }
     } catch (err: any) {
       showToastMsg(err?.message || 'Error al guardar', 'error');
     } finally {
@@ -381,9 +433,12 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
             <Ionicons name="close" size={22} color="#9CA3AF" />
           </TouchableOpacity>
           <Text style={styles.sheetTitle} numberOfLines={1}>
-            {nombre || 'Editar Procesión'}
+            {isCreating ? 'Nueva Procesión' : (nombre || 'Editar Procesión')}
           </Text>
-          <View style={{ width: 36 }} />
+          {isFetching
+            ? <ActivityIndicator size="small" color="#8B5CF6" style={{ width: 36 }} />
+            : <View style={{ width: 36 }} />
+          }
         </View>
 
         <KeyboardAvoidingView
@@ -649,7 +704,7 @@ function EditSheet({ procesion, visible, onClose, onSaved }: EditSheetProps) {
               <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
             )}
             <Text style={styles.saveButtonText}>
-              {isSaving ? 'Guardando...' : 'Guardar cambios'}
+              {isSaving ? 'Guardando...' : isCreating ? 'Crear procesión' : 'Guardar cambios'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -681,6 +736,7 @@ export default function ProcesionesAdminScreen() {
   const [localData, setLocalData] = useState<ProcesionDB[]>([]);
   const [selectedProcesion, setSelectedProcesion] = useState<ProcesionDB | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Cargar todas las procesiones (sin filtro de ciudad ni holiday)
   useEffect(() => {
@@ -701,13 +757,26 @@ export default function ProcesionesAdminScreen() {
     setSheetVisible(true);
   };
 
+  const handleOpenCreate = () => {
+    setSelectedProcesion(null);
+    setIsCreating(true);
+    setSheetVisible(true);
+  };
+
   const handleClose = () => {
     setSheetVisible(false);
-    setTimeout(() => setSelectedProcesion(null), 350);
+    setTimeout(() => {
+      setSelectedProcesion(null);
+      setIsCreating(false);
+    }, 350);
   };
 
   const handleSaved = (updated: ProcesionDB) => {
     setLocalData(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
+  const handleCreated = (created: ProcesionDB) => {
+    setLocalData(prev => [created, ...prev]);
   };
 
   const renderItem = ({ item, index }: { item: ProcesionDB; index: number }) => (
@@ -779,12 +848,19 @@ export default function ProcesionesAdminScreen() {
         />
       )}
 
-      {/* Edit sheet */}
+      {/* FAB — Create new procesion */}
+      <TouchableOpacity style={[styles.fab, { bottom: insets.bottom + 24 }]} onPress={handleOpenCreate} activeOpacity={0.85}>
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Edit / Create sheet */}
       <EditSheet
         procesion={selectedProcesion}
         visible={sheetVisible}
+        isCreating={isCreating}
         onClose={handleClose}
         onSaved={handleSaved}
+        onCreated={handleCreated}
       />
     </View>
   );
@@ -1192,5 +1268,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
